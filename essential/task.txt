@@ -1,0 +1,40 @@
+# Task Checklist
+
+- [x] Phase 1: Database Schema & Migrations
+    - [x] Create Spatie permissions & extend users table
+    - [x] Create configuration tables (product_types, categories, sub_categories, locations, product_type_fields)
+    - [x] Create master data tables (products, product_attribute_values)
+    - [x] Create import tables (product_import_batches, product_import_logs)
+    - [x] Create session & check tables (scan_configs, check_sessions, product_checks, product_check_values)
+    - [x] Create decision & comments tables (decision_types, decisions, decision_rules, decision_histories, comments, attachments)
+- [x] Phase 2: Core Models & Spatie Permission Integration
+    - [x] Add model classes and configure relationships
+    - [x] Create RolesAndPermissionsSeeder & default Admin User
+- [x] Phase 3: Service Layer Implementation
+    - [x] Implement ValidationEngine
+    - [x] Implement ProductImportService (CSV parsing & dynamic field handling)
+    - [x] Implement DecisionWorkflowService
+- [x] Phase 4: Filament Admin Panels & Resources
+    - [x] Configure Filament Panel
+    - [x] Create UserResource (with Activate/Suspend, assign role)
+    - [x] Create ProductTypeResource & categories/subcategories resources
+    - [x] Create ScanConfigResource & LocationResource
+    - [x] Create ProductResource with dynamic import feature
+    - [x] Create DecisionRuleResource & DecisionTypeResource
+- [x] Phase 5: Custom Livewire Mobile Scanner
+    - [x] Setup routes for custom Livewire app
+    - [x] Build Session Selection / Config Selection view
+    - [x] Build Camera QR/Barcode Scanning UI using html5-qrcode
+    - [x] Build dynamic check entry form with expected vs actual comparison
+    - [x] Handle photo/file attachment uploads Polymorphically
+    - [x] Connect scanner to ValidationEngine and DecisionWorkflowService
+- [x] Phase 6: Dashboards
+    - [x] Build Checker Dashboard (Livewire)
+    - [x] Build Supervisor Dashboard (Livewire)
+    - [x] Build Admin Panel Dashboards & Custom widgets
+- [ ] Phase 7: Verification & Testing
+    - [ ] Run migrations and seed data
+    - [ ] Test CSV import and rollback functionality
+    - [ ] Test scanner workflow and decision rule trigger
+
+> Verification is still pending in this container because the local PHP build does not include the SQLite PDO driver required by the test suite.
