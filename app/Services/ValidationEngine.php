@@ -67,7 +67,7 @@ class ValidationEngine
                         $expectedNum = (float)$expectedStr;
                         $actualNum = (float)$actualStr;
                         $diff = $actualNum - $expectedNum;
-                        
+
                         if ($tolerance !== null) {
                             $toleranceVal = (float)$tolerance;
                             if (abs($diff) > $toleranceVal) {
@@ -98,7 +98,7 @@ class ValidationEngine
             }
 
             $results[] = [
-                'field_name' => $fieldName,
+                'field_name' => $fieldConfig['field_name'] ?? $fieldName,
                 'expected_value' => $expectedStr,
                 'actual_value' => $actualStr,
                 'difference_value' => $differenceValue,

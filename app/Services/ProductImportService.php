@@ -61,8 +61,8 @@ class ProductImportService
         }
 
         // Standardize header names
-        $headers = array_map(function ($h) {
-            return trim(strtolower($h));
+        $headers = array_map(function ($header) {
+            return $this->normalizeHeader((string) $header);
         }, $headers);
 
         $totalRows = 0;
@@ -248,5 +248,15 @@ class ProductImportService
                 'imported_rows' => 0,
             ]);
         });
+    }
+
+    /**
+     * Normalize CSV header names for matching.
+     */
+    private function normalizeHeader(string $header): string
+    {
+        $header = preg_replace('/^\xEF\xBB\xBF/', '', $header) ?? $header;
+
+        return trim(strtolower($header));
     }
 }

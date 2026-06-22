@@ -4,9 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ScanConfigResource\Pages;
 use App\Models\ScanConfig;
+use App\Models\ProductTypeField;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -33,8 +35,8 @@ class ScanConfigResource extends Resource
                         Forms\Components\Select::make('product_type_id')
                             ->relationship('productType', 'name')
                             ->required()
-                            ->reactive()
-                            ->afterStateUpdated(fn ($state, Set $set) => $set('config_json.fields', [])),
+                            ->live()
+                            ->afterStateUpdated(fn($state, Set $set) => $set('config_json.fields', [])),
                         Forms\Components\TextInput::make('name')
                             ->required()
                             ->maxLength(255),
@@ -54,64 +56,118 @@ class ScanConfigResource extends Resource
                         Forms\Components\Repeater::make('config_json.fields')
                             ->label('Fields Checklist')
                             ->schema([
-                                Forms\Components\Select::make('field')
-                                    ->required()
-                                    ->options(function (callable $get) {
-                                        $productTypeId = $get('../../product_type_id');
-                                        
-                                        $standardFields = [
-                                            'code' => 'Product Code (Standard)',
-                                            'barcode' => 'Barcode (Standard)',
-                                            'qr_code' => 'QR Code (Standard)',
-                                            'name' => 'Product Name (Standard)',
-                                            'location_id' => 'Location (Standard)',
-                                        ];
+                                Grid::make(1)->schema([
+                                    Forms\Components\TextInput::make('field_name')
+                                        ->label('Field Name')
+                                        ->required()
+                                        ->maxLength(255)
+                                        ->helperText('A readable label for this scan field.'),
 
-                                        if (!$productTypeId) {
-                                            return $standardFields;
-                                        }
+                                    Forms\Components\Select::make('field')
+                                        ->label('Product Field')
+                                        ->required()
+                                        ->searchable()
+                                        ->live()
+                                        ->options(function (callable $get) {
+                                            $productTypeId = self::getProductTypeIdFromState($get);
+                                            return self::getFieldOptions($productTypeId);
+                                        })
+                                        ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                            if (blank($get('field_name')) && filled($state)) {
+                                                $set('field_name', self::resolveFieldLabel((string) $state, self::getProductTypeIdFromState($get)));
+                                            }
+                                        })
+                                        ->helperText('Select the actual field key from the chosen product type.'),
 
-                                        $dynamicFields = \App\Models\ProductTypeField::where('product_type_id', $productTypeId)
-                                            ->where('is_active', true)
-                                            ->pluck('field_label', 'field_name')
-                                            ->toArray();
+                                    Forms\Components\Select::make('source')
+                                        ->required()
+                                        ->options([
+                                            'product' => 'Expected (from Product Master Data)',
+                                            'check' => 'Actual Input Only (e.g. checker notes)',
+                                        ])
+                                        ->default('product'),
 
-                                        return array_merge($standardFields, $dynamicFields);
-                                    })
-                                    ->columnSpan(2),
-                                
-                                Forms\Components\Select::make('source')
-                                    ->required()
-                                    ->options([
-                                        'product' => 'Expected (from Product Master Data)',
-                                        'check' => 'Actual Input Only (e.g. checker notes)',
-                                    ])
-                                    ->default('product')
-                                    ->columnSpan(2),
+                                    Forms\Components\Toggle::make('required')
+                                        ->label('Is Required?')
+                                        ->default(true),
 
-                                Forms\Components\Toggle::make('required')
-                                    ->label('Is Required?')
-                                    ->default(true)
-                                    ->columnSpan(1),
+                                    Forms\Components\Toggle::make('compare')
+                                        ->label('Compare Expected?')
+                                        ->default(true)
+                                        ->reactive(),
 
-                                Forms\Components\Toggle::make('compare')
-                                    ->label('Compare Expected?')
-                                    ->default(true)
-                                    ->reactive()
-                                    ->columnSpan(1),
-
-                                Forms\Components\TextInput::make('tolerance')
-                                    ->numeric()
-                                    ->label('Tolerance (if numeric)')
-                                    ->helperText('e.g. 0.02 for weight deviations')
-                                    ->visible(fn (Get $get) => $get('compare') === true)
-                                    ->columnSpan(2),
+                                    Forms\Components\TextInput::make('tolerance')
+                                        ->numeric()
+                                        ->label('Tolerance (if numeric)')
+                                        ->helperText('e.g. 0.02 for weight deviations')
+                                        ->visible(fn(Get $get) => $get('compare') === true),
+                                ]),
                             ])
-                            ->columns(8)
-                            ->itemLabel(fn (array $state): ?string => ($state['field'] ?? null) ? "Field: " . $state['field'] : 'New Field')
+                            ->itemLabel(fn(array $state): ?string => $state['field_name'] ?? $state['field'] ?? 'New Field')
                             ->default([]),
                     ])
             ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function getFieldOptions(?string $productTypeId): array
+    {
+        $standardFields = [
+            'code' => 'Product Code (Standard)',
+            'barcode' => 'Barcode (Standard)',
+            'qr_code' => 'QR Code (Standard)',
+            'name' => 'Product Name (Standard)',
+            'location_id' => 'Location (Standard)',
+        ];
+
+        if (! $productTypeId) {
+            return $standardFields;
+        }
+
+        $dynamicFields = ProductTypeField::query()
+            ->where('product_type_id', $productTypeId)
+            ->where('is_active', true)
+            ->get()
+            ->mapWithKeys(function (ProductTypeField $field): array {
+                $label = $field->field_label;
+                if ($field->field_type) {
+                    $label .= ' (' . $field->field_type . ')';
+                }
+
+                return [$field->field_name => $label];
+            })
+            ->all();
+
+        return array_merge($standardFields, $dynamicFields);
+    }
+
+    private static function resolveFieldLabel(string $fieldName, ?string $productTypeId): string
+    {
+        return self::getFieldOptions($productTypeId)[$fieldName] ?? $fieldName;
+    }
+
+    /**
+     * Try multiple relative state paths because the field sits inside nested schema containers.
+     */
+    private static function getProductTypeIdFromState(callable $get): ?string
+    {
+        foreach ([
+            'product_type_id',
+            '../product_type_id',
+            '../../product_type_id',
+            '../../../product_type_id',
+            '../../../../product_type_id',
+        ] as $path) {
+            $productTypeId = $get($path);
+
+            if (filled($productTypeId)) {
+                return (string) $productTypeId;
+            }
+        }
+
+        return null;
     }
 
     public static function table(Table $table): Table
