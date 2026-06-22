@@ -2,12 +2,28 @@
     showSelectionModal: @entangle('showSelectionModal'),
     showScannerModal: @entangle('showScannerModal'),
     showMatchedModal: @entangle('showMatchedModal'),
+    countdown: 0,
+    delaySeconds: parseInt(localStorage.getItem('scannerDelaySeconds')) || 3,
     init() {
         this.$watch('showScannerModal', value => {
             window.dispatchEvent(new CustomEvent(value ? 'mobile-scanner-start' : 'mobile-scanner-stop'));
         });
     },
-}" x-init="init()">
+    startCountdown() {
+        this.countdown = this.delaySeconds;
+        if (this.countdown <= 0) {
+            this.showScannerModal = true;
+            return;
+        }
+        let timer = setInterval(() => {
+            this.countdown--;
+            if (this.countdown <= 0) {
+                clearInterval(timer);
+                this.showScannerModal = true;
+            }
+        }, 1000);
+    }
+}" x-init="init()" @check-saved.window="startCountdown()">
     <style>
         [x-cloak] {
             display: none !important;
@@ -143,7 +159,7 @@
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Scanned
                             code</label>
-                        <input id="scan-code-main" wire:model.live.debounce.5000ms="scanCode" type="text"
+                        <input id="scan-code-main" wire:model.live.debounce.2000ms="scanCode" type="text"
                             class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                             placeholder="Scan or type a code">
                     </div>
@@ -196,7 +212,14 @@
 
         @if ($lastResult)
             <div class="rounded-3xl bg-white p-6 shadow-sm dark:bg-gray-900">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Validation result</h3>
+                <div class="flex items-center gap-3">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Validation result</h3>
+                    <template x-if="countdown > 0">
+                        <span class="rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-medium text-white animate-pulse">
+                            Scanning starts in <span x-text="countdown"></span>s...
+                        </span>
+                    </template>
+                </div>
                 <div class="mt-2 text-sm text-gray-500 dark:text-gray-400 space-y-1">
                     <p>Overall status: <span
                             class="font-medium text-gray-900 dark:text-white">{{ $lastResult['result_status'] }}</span>
@@ -233,7 +256,11 @@
                             <p class="text-sm text-gray-500 dark:text-gray-400">Actual:
                                 {{ $result['actual_value'] ?? 'N/A' }}</p>
                             <p class="text-sm text-gray-500 dark:text-gray-400">Difference:
-                                {{ $result['difference_value'] ?? 'N/A' }}</p>
+                                {{ $result['difference_value'] ?? 'N/A' }}
+                                @if (isset($result['tolerance']) && $result['tolerance'] !== null)
+                                    | Tol: ±{{ $result['tolerance'] }}
+                                @endif
+                            </p>
                         </div>
                     @endforeach
                 </div>
@@ -344,6 +371,12 @@
                             <option value="{{ $config->id }}">{{ $config->name }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Scanner restart delay (seconds)</label>
+                    <input type="number" x-model.number="delaySeconds" @change="localStorage.setItem('scannerDelaySeconds', delaySeconds)" min="0" max="60"
+                        class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                 </div>
             </div>
 
@@ -486,6 +519,15 @@
                         @endphp
 
                         <div class="mt-6 space-y-4">
+                            @if (count($uploadedAttachments) === 0)
+                                <div
+                                    class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                                    <p class="font-semibold">Attachment required for mismatch checks</p>
+                                    <p class="mt-1">Please upload at least one photo before saving this record.
+                                        Without an attachment, mismatch checks cannot be saved.</p>
+                                </div>
+                            @endif
+
                             <div class="flex flex-wrap gap-5">
                                 <input x-ref="photoInput" type="file" wire:model="attachments" multiple
                                     accept="image/*" class="hidden">
@@ -539,6 +581,41 @@
                                     Save check
                                 </button>
                             </div>
+
+                            @if ($showDuplicateWarning)
+                                <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+                                    <p class="font-semibold">Duplicate Check Detected</p>
+                                    <p class="mt-1">This product has already been checked in the current session. Are you sure you want to save it again?</p>
+                                    
+                                    @if(count($duplicateChecks) > 0)
+                                    <div class="mt-3 space-y-2">
+                                        <p class="font-medium">Previous Checks:</p>
+                                        @foreach ($duplicateChecks as $dupCheck)
+                                            <div class="rounded bg-rose-100 p-2 text-xs dark:bg-rose-900/40 text-rose-900 dark:text-rose-100">
+                                                Checked by: <span class="font-semibold">{{ data_get($dupCheck, 'checked_by.name', 'Unknown') }}</span> 
+                                                at {{ \Carbon\Carbon::parse($dupCheck['checked_at'])->format('Y-m-d H:i') }}
+                                                <br>
+                                                Result: <span class="font-semibold">{{ $dupCheck['result_status'] }}</span>
+                                                @if ($dupCheck['remark'])
+                                                    <br><span class="text-rose-700 dark:text-rose-300">Remark: {{ $dupCheck['remark'] }}</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    @endif
+
+                                    <div class="mt-4">
+                                        <button type="button" wire:click="save(true)" class="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">
+                                            Save as duplicate check entry
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                For mismatch records, add a photo first. The save action is blocked until at least one
+                                attachment is uploaded.
+                            </p>
 
                             <div class="rounded-2xl border border-dashed border-gray-200 p-4 dark:border-gray-700">
                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">Attachment preview</p>
@@ -625,6 +702,36 @@
                                 Save check
                             </button>
                         </div>
+
+                        @if ($showDuplicateWarning)
+                            <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+                                <p class="font-semibold">Duplicate Check Detected</p>
+                                <p class="mt-1">This product has already been checked in the current session. Are you sure you want to save it again?</p>
+                                
+                                @if(count($duplicateChecks) > 0)
+                                <div class="mt-3 space-y-2">
+                                    <p class="font-medium">Previous Checks:</p>
+                                    @foreach ($duplicateChecks as $dupCheck)
+                                        <div class="rounded bg-rose-100 p-2 text-xs dark:bg-rose-900/40 text-rose-900 dark:text-rose-100">
+                                            Checked by: <span class="font-semibold">{{ data_get($dupCheck, 'checked_by.name', 'Unknown') }}</span> 
+                                            at {{ \Carbon\Carbon::parse($dupCheck['checked_at'])->format('Y-m-d H:i') }}
+                                            <br>
+                                            Result: <span class="font-semibold">{{ $dupCheck['result_status'] }}</span>
+                                            @if ($dupCheck['remark'])
+                                                <br><span class="text-rose-700 dark:text-rose-300">Remark: {{ $dupCheck['remark'] }}</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                                @endif
+
+                                <div class="mt-4">
+                                    <button type="button" wire:click="save(true)" class="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">
+                                        Save as duplicate check entry
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="rounded-3xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
@@ -632,6 +739,15 @@
                         @php
                             $uploadedAttachments = array_merge($attachments ?? [], $cameraAttachments ?? []);
                         @endphp
+
+                        @if (count($uploadedAttachments) === 0)
+                            <div
+                                class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                                <p class="font-semibold">Attachment required for mismatch checks</p>
+                                <p class="mt-1">Please upload at least one photo before saving this record.
+                                    Without an attachment, mismatch checks cannot be saved.</p>
+                            </div>
+                        @endif
 
                         <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             @forelse ($uploadedAttachments as $attachment)

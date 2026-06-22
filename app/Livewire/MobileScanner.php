@@ -44,6 +44,10 @@ class MobileScanner extends Component
 
     public ?string $flashTone = null;
 
+    public bool $showDuplicateWarning = false;
+
+    public array $duplicateChecks = [];
+
     public bool $showSelectionModal = false;
 
     public bool $showScannerModal = false;
@@ -99,7 +103,7 @@ class MobileScanner extends Component
         $this->matchProductFromCode();
     }
 
-    public function save(): void
+    public function save(bool $confirmDuplicate = false): void
     {
         if (! $this->checkSessionId || ! $this->productTypeId || ! $this->scanConfigId) {
             $this->showSelectionModal = true;
@@ -122,13 +126,6 @@ class MobileScanner extends Component
             $this->matchedProductId = $product?->id;
         }
 
-        $this->refreshConfigFields();
-
-        $this->validate(array_merge([
-            'checkSessionId' => ['required', 'exists:check_sessions,id'],
-            'scanConfigId' => ['required', 'exists:scan_configs,id'],
-            'scanCode' => ['required', 'string', 'max:255'],
-        ], $this->getActualValueValidationRules()));
         // If $product wasn't resolved from code above, fall back to matchedProductId
         if (! $product) {
             $product = $this->matchedProductId
@@ -136,18 +133,45 @@ class MobileScanner extends Component
                 : null;
         }
 
+        if (!$confirmDuplicate) {
+            $duplicates = collect();
+
+            if ($product) {
+                $duplicates = ProductCheck::with('checkedBy')
+                    ->where('check_session_id', $this->checkSessionId)
+                    ->where('product_id', $product->id)
+                    ->get();
+            } else {
+                $duplicates = ProductCheck::with('checkedBy')
+                    ->where('check_session_id', $this->checkSessionId)
+                    ->whereNull('product_id')
+                    ->where('remark', 'like', "%({$this->scanCode})%")
+                    ->get();
+            }
+
+            if ($duplicates->isNotEmpty()) {
+                $this->duplicateChecks = $duplicates->toArray();
+                $this->showDuplicateWarning = true;
+                return;
+            }
+        }
+
+        $this->refreshConfigFields();
+
+        $validationRules = [
+            'checkSessionId' => ['required', 'exists:check_sessions,id'],
+            'scanConfigId' => ['required', 'exists:scan_configs,id'],
+            'scanCode' => ['required', 'string', 'max:255'],
+        ];
+
+        if ($product) {
+            $validationRules = array_merge($validationRules, $this->getActualValueValidationRules());
+        }
+
+        $this->validate($validationRules);
+
         $scanConfig = ScanConfig::findOrFail($this->scanConfigId);
         $uploadedAttachments = array_merge($this->attachments, $this->cameraAttachments);
-
-        if (! $product && count($uploadedAttachments) === 0) {
-            Notification::make()
-                ->title('Attachment required')
-                ->body('Please upload at least one photo before saving a mismatch check.')
-                ->warning()
-                ->send();
-
-            return;
-        }
 
         if ($product) {
             $validation = app(ValidationEngine::class)->validate($scanConfig, $product, $this->actualValues);
@@ -156,9 +180,25 @@ class MobileScanner extends Component
                 'result_status' => 'WARNING',
                 'values' => $this->buildMismatchValues(),
                 'errors' => [
-                    'No matching product was found for the scanned code. Saved as a manual mismatch review.',
+                    "No matching product was found for the scanned code ({$this->scanCode}). Saved as a manual mismatch review.",
                 ],
             ];
+        }
+
+        if (!$product && count($uploadedAttachments) === 0) {
+            $this->showDuplicateWarning = false;
+            $this->flashMessage = 'Attachment required: please upload at least one photo before saving an unmatched mismatch check.';
+            $this->flashTone = 'warning';
+            $this->showMatchedModal = true;
+            $this->showScannerModal = false;
+
+            Notification::make()
+                ->title('Attachment required')
+                ->body('Please upload at least one photo before saving an unmatched mismatch check.')
+                ->warning()
+                ->send();
+
+            return;
         }
 
         // Add metadata so the view can show who checked, which code and when
@@ -169,6 +209,7 @@ class MobileScanner extends Component
 
         $check = ProductCheck::create([
             'check_session_id' => $this->checkSessionId,
+            'scan_config_id' => $this->scanConfigId,
             'product_id' => $product?->id,
             'checked_by' => auth()->id(),
             'checked_at' => now(),
@@ -208,8 +249,10 @@ class MobileScanner extends Component
         $this->matchedProductId = null;
         $this->actualValues = [];
         $this->showMatchedModal = false;
-        $this->showScannerModal = true;
-        // $this->dispatch('mobile-scanner-restart');
+        $this->showScannerModal = false;
+        $this->showDuplicateWarning = false;
+        $this->duplicateChecks = [];
+        $this->dispatch('check-saved');
 
         $savedNotification = Notification::make()
             ->title($product ? 'Check saved successfully' : 'Mismatch saved with caution')
@@ -253,6 +296,9 @@ class MobileScanner extends Component
 
     public function matchProductFromCode(): void
     {
+        $this->showDuplicateWarning = false;
+        $this->duplicateChecks = [];
+
         if (! $this->checkSessionId || ! $this->productTypeId || ! $this->scanConfigId) {
             $this->showSelectionModal = true;
             $this->showMatchedModal = false;

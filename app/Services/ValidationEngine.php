@@ -103,6 +103,7 @@ class ValidationEngine
                 'actual_value' => $actualStr,
                 'difference_value' => $differenceValue,
                 'status' => $fieldStatus,
+                'tolerance' => $tolerance,
             ];
         }
 
