@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DecisionResource\Pages;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\DecisionResource\RelationManagers\AttachmentsRelationManager;
 use App\Filament\Resources\DecisionResource\RelationManagers\CommentsRelationManager;
 use App\Filament\Resources\DecisionResource\RelationManagers\HistoriesRelationManager;
@@ -19,6 +20,8 @@ use UnitEnum;
 
 class DecisionResource extends Resource
 {
+    use HasPermissionGates;
+
     protected static ?string $model = Decision::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-flag';

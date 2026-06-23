@@ -8,6 +8,7 @@ use App\Models\User;
 use BackedEnum;
 use Filament\Actions;
 use Filament\Forms;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
@@ -22,6 +23,8 @@ use UnitEnum;
 
 class UserResource extends Resource
 {
+    use HasPermissionGates;
+
     protected static ?string $model = User::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-users';

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SessionResource\Pages;
 use App\Models\CheckSession;
 use BackedEnum;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Resource;
@@ -16,6 +17,8 @@ use UnitEnum;
 
 class SessionResource extends Resource
 {
+    use HasPermissionGates;
+
     protected static ?string $model = CheckSession::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-clipboard-document-list';
@@ -23,6 +26,26 @@ class SessionResource extends Resource
     protected static UnitEnum|string|null $navigationGroup = 'Inspection';
 
     protected static ?string $navigationLabel = 'Sessions';
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->can('sessions.view') ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->can('sessions.create') ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->can('sessions.update') ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->can('sessions.delete') ?? false;
+    }
 
     public static function form(Schema $schema): Schema
     {

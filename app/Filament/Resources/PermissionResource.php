@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PermissionResource\Pages;
 use BackedEnum;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Resource;
@@ -12,10 +13,13 @@ use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use UnitEnum;
 
 class PermissionResource extends Resource
 {
+    use HasPermissionGates;
+
     protected static ?string $model = Permission::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-key';
@@ -57,7 +61,14 @@ class PermissionResource extends Resource
                     ->default('web')
                     ->required()
                     ->maxLength(255),
-            ])->columns(2),
+                Forms\Components\Select::make('roles')
+                    ->label('Roles')
+                    ->multiple()
+                    ->searchable()
+                    ->preload()
+                    ->options(fn (): array => self::availableRoleOptions())
+                    ->helperText('Assign this permission to one or more roles.'),
+            ])->columns(1)->columnSpan('full'),
         ]);
     }
 
@@ -85,5 +96,13 @@ class PermissionResource extends Resource
             'create' => Pages\CreatePermission::route('/create'),
             'edit' => Pages\EditPermission::route('/{record}/edit'),
         ];
+    }
+
+    public static function availableRoleOptions(): array
+    {
+        return Role::query()
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
     }
 }

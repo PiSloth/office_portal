@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\ProductCheckResource\Pages;
 use App\Filament\Resources\ProductCheckResource\RelationManagers\AttachmentsRelationManager;
 use App\Filament\Resources\ProductCheckResource\RelationManagers\CommentsRelationManager;
@@ -25,6 +26,10 @@ use UnitEnum;
 
 class ProductCheckResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'product-checks';
+
     protected static ?string $model = ProductCheck::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-clipboard-document-check';

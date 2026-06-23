@@ -19,7 +19,9 @@ class EditUser extends EditRecord
 
     protected function afterSave(): void
     {
-        $this->record->syncRoles($this->data['roles'] ?? []);
+        $roles = Role::findMany($this->data['roles'] ?? []);
+
+        $this->record->syncRoles($roles);
         $this->record->syncPermissions($this->data['permissions'] ?? []);
     }
 

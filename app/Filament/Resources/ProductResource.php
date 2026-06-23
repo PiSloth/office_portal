@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
 use App\Models\ProductType;
@@ -20,6 +21,8 @@ use UnitEnum;
 
 class ProductResource extends Resource
 {
+    use HasPermissionGates;
+
     protected static ?string $model = Product::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-archive-box';

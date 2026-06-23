@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\LocationResource\Pages;
 use App\Models\Location;
 use Filament\Actions;
@@ -16,6 +17,10 @@ use UnitEnum;
 
 class LocationResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'config';
+
     protected static ?string $model = Location::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-map-pin';

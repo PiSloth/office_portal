@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\ProductTypeResource\Pages;
 use App\Filament\Resources\ProductTypeResource\RelationManagers\ProductTypeFieldsRelationManager;
 use App\Models\ProductType;
@@ -17,6 +18,10 @@ use UnitEnum;
 
 class ProductTypeResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'config';
+
     protected static ?string $model = ProductType::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-cog-6-tooth';

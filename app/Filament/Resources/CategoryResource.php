@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource\RelationManagers\SubCategoriesRelationManager;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Models\Category;
 use Filament\Actions;
 use Filament\Forms;
@@ -17,6 +18,10 @@ use UnitEnum;
 
 class CategoryResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'config';
+
     protected static ?string $model = Category::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-folder';

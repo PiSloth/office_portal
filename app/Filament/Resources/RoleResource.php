@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\RoleResource\Pages;
 use BackedEnum;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Resource;
@@ -17,6 +18,8 @@ use UnitEnum;
 
 class RoleResource extends Resource
 {
+    use HasPermissionGates;
+
     protected static ?string $model = Role::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-shield-check';
@@ -101,7 +104,7 @@ class RoleResource extends Resource
         ];
     }
 
-    protected static function permittedPermissionOptions(): array
+    public static function permittedPermissionOptions(): array
     {
         $user = auth()->user();
         $own = $user?->getAllPermissions()->pluck('name')->all() ?? [];

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\SubCategoryResource\Pages;
 use App\Models\SubCategory;
 use Filament\Actions;
@@ -16,6 +17,10 @@ use UnitEnum;
 
 class SubCategoryResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'config';
+
     protected static ?string $model = SubCategory::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-folder-minus';

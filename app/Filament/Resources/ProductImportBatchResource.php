@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\ProductImportBatchResource\Pages;
 use App\Models\ProductImportBatch;
 use App\Models\ProductImportLog;
@@ -19,6 +20,10 @@ use UnitEnum;
 
 class ProductImportBatchResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'product-import-batches';
+
     protected static ?string $model = ProductImportBatch::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-document-duplicate';

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\ScanConfigResource\Pages;
 use App\Models\ScanConfig;
 use App\Models\ProductTypeField;
@@ -20,6 +21,10 @@ use UnitEnum;
 
 class ScanConfigResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'scan-configs';
+
     protected static ?string $model = ScanConfig::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-adjustments-horizontal';

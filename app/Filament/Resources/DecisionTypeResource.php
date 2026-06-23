@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Resources\DecisionTypeResource\Pages;
 use App\Models\DecisionType;
 use Filament\Actions;
@@ -16,6 +17,10 @@ use UnitEnum;
 
 class DecisionTypeResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'decisions';
+
     protected static ?string $model = DecisionType::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-scale';
