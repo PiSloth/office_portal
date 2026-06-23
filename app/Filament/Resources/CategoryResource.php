@@ -20,7 +20,7 @@ class CategoryResource extends Resource
 {
     use HasPermissionGates;
 
-    protected static string $permissionPrefix = 'config';
+    protected static string $permissionPrefix = 'categories';
 
     protected static ?string $model = Category::class;
 

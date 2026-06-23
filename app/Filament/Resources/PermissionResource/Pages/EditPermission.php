@@ -30,7 +30,7 @@ class EditPermission extends EditRecord
     {
         $data = parent::mutateFormDataBeforeFill($data);
 
-        $data['roles'] = $this->record->roles()->pluck('roles.id')->all();
+        $data['roles'] = $this->record->roles()->pluck('id')->all();
 
         return $data;
     }

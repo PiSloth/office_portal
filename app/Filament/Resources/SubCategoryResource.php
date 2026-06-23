@@ -19,7 +19,7 @@ class SubCategoryResource extends Resource
 {
     use HasPermissionGates;
 
-    protected static string $permissionPrefix = 'config';
+    protected static string $permissionPrefix = 'sub-categories';
 
     protected static ?string $model = SubCategory::class;
 

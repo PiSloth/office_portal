@@ -25,15 +25,15 @@ class EditRole extends EditRecord
                         ->label('Permissions')
                         ->multiple()
                         ->searchable()
-                        ->options(fn (): array => RoleResource::permittedPermissionOptions())
-                        ->default(fn (): array => $this->record->permissions()->pluck('name')->all()),
+                        ->options(fn(): array => RoleResource::permittedPermissionOptions())
+                        ->default(fn(): array => $this->record->permissions()->pluck('name')->all()),
                 ])
                 ->action(function (Role $record, array $data): void {
                     $record->syncPermissions($data['permissions'] ?? []);
                 })
-                ->visible(fn (): bool => auth()->user()?->can('roles.update') ?? false),
+                ->visible(fn(): bool => (auth()->user()?->can('roles.update') ?? false) || (auth()->user()?->can('roles.assign') ?? false)),
             Actions\DeleteAction::make()
-                ->visible(fn (): bool => auth()->user()?->can('roles.delete') ?? false),
+                ->visible(fn(): bool => auth()->user()?->can('roles.delete') ?? false),
         ];
     }
 }

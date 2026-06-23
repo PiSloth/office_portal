@@ -67,6 +67,7 @@ class PermissionResource extends Resource
                     ->searchable()
                     ->preload()
                     ->options(fn (): array => self::availableRoleOptions())
+                    ->dehydrated(false)
                     ->helperText('Assign this permission to one or more roles.'),
             ])->columns(1)->columnSpan('full'),
         ]);

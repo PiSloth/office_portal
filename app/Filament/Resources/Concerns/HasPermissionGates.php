@@ -26,6 +26,11 @@ trait HasPermissionGates
         return auth()->user()?->can(static::permissionName('delete')) ?? false;
     }
 
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->can(static::permissionName('delete')) ?? false;
+    }
+
     protected static function permissionName(string $action): string
     {
         return sprintf('%s.%s', static::permissionPrefix(), $action);

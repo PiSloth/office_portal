@@ -6,6 +6,7 @@ use Filament\Actions;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class AttachmentsRelationManager extends RelationManager
 {
@@ -17,6 +18,13 @@ class AttachmentsRelationManager extends RelationManager
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('file_path')
+                    ->label('Preview')
+                    ->disk('public')
+                    ->visibility('public')
+                    ->checkFileExistence(false)
+                    ->imageHeight(60)
+                    ->imageWidth(80),
                 Tables\Columns\TextColumn::make('file_name')->searchable(),
                 Tables\Columns\TextColumn::make('file_type'),
                 Tables\Columns\TextColumn::make('uploadedBy.name')->label('Uploaded By'),

@@ -529,12 +529,9 @@
                             @endif
 
                             <div class="flex flex-wrap gap-5">
-                                <input x-ref="photoInput" type="file" wire:model="attachments" multiple
-                                    accept="image/*" class="hidden">
-                                <input x-ref="cameraInput" type="file" wire:model="cameraAttachments" multiple
-                                    accept="image/*" capture="environment" class="hidden">
-
-                                <button type="button" @click="$refs.photoInput.click()" {{-- class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800" --}}>
+                                <label class="inline-flex cursor-pointer rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                                    <input x-ref="photoInput" type="file" wire:model="attachments" multiple
+                                        accept="image/*" class="sr-only">
                                     <svg class="w-8 h-8" viewBox="0 0 48 48" version="1"
                                         xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 48 48">
                                         <path fill="#E65100"
@@ -545,8 +542,10 @@
                                         <polygon fill="#942A09" points="17,17.9 8,31 26,31" />
                                         <polygon fill="#BF360C" points="28,23.5 22,31 34,31" />
                                     </svg>
-                                </button>
-                                <button type="button" @click="$refs.cameraInput.click()">
+                                </label>
+                                <label class="inline-flex cursor-pointer rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                                    <input x-ref="cameraInput" type="file" wire:model="cameraAttachments" multiple
+                                        accept="image/*" capture="environment" class="sr-only">
                                     <svg class="w-8 h-8" viewBox="0 0 1024 1024" class="icon" version="1.1"
                                         xmlns="http://www.w3.org/2000/svg">
                                         <path
@@ -571,7 +570,7 @@
                                             d="M568.1 635.9c-28.9 0-55.7-15.6-70-41.4a79.69 79.69 0 0 1 7.6-88.8c20.4-25.4 53.8-36 85-26.8 42 12.3 66.5 56.6 54.6 98.7-8.9 31.4-35.5 54-67.9 57.8-3.1 0.3-6.2 0.5-9.3 0.5z m0-136c-16.7 0-32.7 7.5-43.5 21a55.6 55.6 0 0 0-5.3 61.9c11 19.9 32.7 31.1 55.3 28.5a55.45 55.45 0 0 0 47.3-40.3c8.3-29.4-8.8-60.2-38-68.8-5.2-1.6-10.5-2.3-15.8-2.3zM441.2 310.6L391 296.5c-6.9-1.9-11-9.1-9-16.1 1.9-6.9 9.1-11 16.1-9l50.2 14.1c6.9 1.9 11 9.1 9 16.1-1.9 6.9-9.1 10.9-16.1 9z m0 0M413.5 409.8l-50.2-14.1c-6.9-1.9-11-9.1-9-16.1 1.9-6.9 9.1-11 16.1-9.1l50.2 14.1c6.9 1.9 11 9.1 9 16.1-2 7-9.2 11.1-16.1 9.1z m0 0"
                                             fill="" />
                                     </svg>
-                                </button>
+                                </label>
                                 {{-- <button type="button" 
                                     class="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400">
                                     Upload camera photo
@@ -621,9 +620,12 @@
                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">Attachment preview</p>
                                 <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                     @forelse ($uploadedAttachments as $attachment)
+                                        @php
+                                            $showImagePreview = method_exists($attachment, 'temporaryUrl');
+                                        @endphp
                                         <div
                                             class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
-                                            @if (str_starts_with((string) ($attachment->getMimeType() ?? ''), 'image/'))
+                                            @if ($showImagePreview)
                                                 <img src="{{ $attachment->temporaryUrl() }}" alt="Preview"
                                                     class="h-40 w-full object-cover">
                                             @else
@@ -651,9 +653,9 @@
                         </p>
                         <div class="mt-6 flex flex-wrap gap-5">
                             <input x-ref="unmatchedPhotoInput" type="file" wire:model="attachments" multiple
-                                accept="image/*" class="hidden">
+                                accept="image/*" class="sr-only">
                             <input x-ref="unmatchedCameraInput" type="file" wire:model="cameraAttachments"
-                                multiple accept="image/*" capture="environment" class="hidden">
+                                multiple accept="image/*" capture="environment" class="sr-only">
                             <button type="button" @click="$refs.unmatchedPhotoInput.click()">
                                 <div>
                                     <svg class="w-6 h-6" viewBox="0 0 48 48" version="1"
@@ -751,8 +753,21 @@
 
                         <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             @forelse ($uploadedAttachments as $attachment)
+                                @php
+                                    $mime = null;
+                                    try {
+                                        $mime = $attachment->getMimeType();
+                                    } catch (\Throwable $e) {
+                                        $mime = null;
+                                    }
+                                    $extension = strtolower(pathinfo($attachment->getClientOriginalName() ?? '', PATHINFO_EXTENSION));
+                                    $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tiff'];
+                                    $showImagePreview = method_exists($attachment, 'temporaryUrl') && (
+                                        ($mime && str_starts_with($mime, 'image/')) || in_array($extension, $imageExtensions, true)
+                                    );
+                                @endphp
                                 <div class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
-                                    @if (str_starts_with((string) ($attachment->getMimeType() ?? ''), 'image/'))
+                                    @if ($showImagePreview)
                                         <img src="{{ $attachment->temporaryUrl() }}" alt="Preview"
                                             class="h-40 w-full object-cover">
                                     @else

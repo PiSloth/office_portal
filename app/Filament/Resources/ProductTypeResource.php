@@ -20,7 +20,7 @@ class ProductTypeResource extends Resource
 {
     use HasPermissionGates;
 
-    protected static string $permissionPrefix = 'config';
+    protected static string $permissionPrefix = 'product-types';
 
     protected static ?string $model = ProductType::class;
 
@@ -40,7 +40,7 @@ class ProductTypeResource extends Resource
                         Forms\Components\TextInput::make('code')
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->dehydrateStateUsing(fn ($state) => strtoupper($state))
+                            ->dehydrateStateUsing(fn($state) => strtoupper($state))
                             ->maxLength(255),
                         Forms\Components\Toggle::make('is_active')
                             ->default(true)

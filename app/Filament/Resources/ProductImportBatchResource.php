@@ -41,7 +41,7 @@ class ProductImportBatchResource extends Resource
                 Tables\Columns\TextColumn::make('file_name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'PENDING' => 'warning',
                         'SUCCESS' => 'success',
                         'FAILED' => 'danger',
@@ -74,7 +74,7 @@ class ProductImportBatchResource extends Resource
                         foreach ($logs as $log) {
                             $statusColor = $log->status === 'SUCCESS' ? 'text-green-600' : 'text-red-600 font-semibold';
                             $errors = $log->errors_json ? implode(', ', array_values($log->errors_json)) : 'None';
-                            
+
                             $html .= "<div class='border-b pb-2 dark:border-gray-700'>";
                             $html .= "<strong>Row #{$log->row_number}</strong> - <span class='{$statusColor}'>" . strtoupper($log->status) . "</span><br>";
                             if ($log->status === 'FAILED') {
@@ -98,7 +98,7 @@ class ProductImportBatchResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Rollback Uploaded Products')
                     ->modalDescription('Are you sure you want to rollback this import? This will delete all products imported in this batch.')
-                    ->visible(fn (ProductImportBatch $record) => in_array($record->status, ['SUCCESS', 'FAILED']) && $record->imported_rows > 0)
+                    ->visible(fn(ProductImportBatch $record) => in_array($record->status, ['SUCCESS', 'FAILED']) && $record->imported_rows > 0)
                     ->action(function (ProductImportBatch $record) {
                         $service = app(ProductImportService::class);
                         $service->rollback($record);

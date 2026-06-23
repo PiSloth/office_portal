@@ -19,7 +19,7 @@ class LocationResource extends Resource
 {
     use HasPermissionGates;
 
-    protected static string $permissionPrefix = 'config';
+    protected static string $permissionPrefix = 'locations';
 
     protected static ?string $model = Location::class;
 
@@ -36,7 +36,7 @@ class LocationResource extends Resource
                         Forms\Components\TextInput::make('code')
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->dehydrateStateUsing(fn ($state) => strtoupper($state))
+                            ->dehydrateStateUsing(fn($state) => strtoupper($state))
                             ->maxLength(255),
                         Forms\Components\TextInput::make('name')
                             ->required()

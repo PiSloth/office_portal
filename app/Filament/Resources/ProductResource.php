@@ -23,6 +23,8 @@ class ProductResource extends Resource
 {
     use HasPermissionGates;
 
+    protected static string $permissionPrefix = 'products';
+
     protected static ?string $model = Product::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-archive-box';
@@ -39,7 +41,7 @@ class ProductResource extends Resource
                             ->relationship('productType', 'name')
                             ->required()
                             ->reactive()
-                            ->afterStateUpdated(fn ($state, Set $set) => [
+                            ->afterStateUpdated(fn($state, Set $set) => [
                                 $set('category_id', null),
                                 $set('sub_category_id', null),
                             ]),
@@ -57,8 +59,8 @@ class ProductResource extends Resource
                             })
                             ->required()
                             ->reactive()
-                            ->afterStateUpdated(fn ($state, Set $set) => $set('sub_category_id', null)),
-                        
+                            ->afterStateUpdated(fn($state, Set $set) => $set('sub_category_id', null)),
+
                         Forms\Components\Select::make('sub_category_id')
                             ->label('Sub-Category')
                             ->options(function (callable $get) {
@@ -69,7 +71,7 @@ class ProductResource extends Resource
                                 return SubCategory::where('category_id', $categoryId)->pluck('name', 'id');
                             })
                             ->nullable(),
-                        
+
                         Forms\Components\TextInput::make('name')
                             ->required()
                             ->maxLength(255),
@@ -151,7 +153,7 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('location.code')->label('Location')->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'ACTIVE' => 'success',
                         'SUSPENDED' => 'danger',
                         default => 'gray',

@@ -19,11 +19,13 @@ class SessionResource extends Resource
 {
     use HasPermissionGates;
 
+    protected static string $permissionPrefix = 'sessions';
+
     protected static ?string $model = CheckSession::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static UnitEnum|string|null $navigationGroup = 'Inspection';
+    protected static UnitEnum|string|null $navigationGroup = 'Configuration';
 
     protected static ?string $navigationLabel = 'Sessions';
 
@@ -70,7 +72,7 @@ class SessionResource extends Resource
                     ->required(),
                 Forms\Components\DateTimePicker::make('completed_at'),
                 Forms\Components\Hidden::make('started_by')
-                    ->default(fn () => auth()->id()),
+                    ->default(fn() => auth()->id()),
             ])->columns(2),
         ]);
     }
@@ -83,7 +85,7 @@ class SessionResource extends Resource
                 Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'DRAFT' => 'gray',
                         'OPEN' => 'success',
                         'COMPLETED' => 'info',

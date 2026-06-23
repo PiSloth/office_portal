@@ -22,6 +22,8 @@ class DecisionResource extends Resource
 {
     use HasPermissionGates;
 
+    protected static string $permissionPrefix = 'decisions';
+
     protected static ?string $model = Decision::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-flag';
@@ -57,7 +59,7 @@ class DecisionResource extends Resource
                 Forms\Components\Textarea::make('remark')
                     ->columnSpanFull(),
                 Forms\Components\Hidden::make('decision_by')
-                    ->default(fn () => auth()->id()),
+                    ->default(fn() => auth()->id()),
             ])->columns(2),
         ]);
     }
@@ -79,7 +81,7 @@ class DecisionResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('action_status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'OPEN' => 'warning',
                         'IN_PROGRESS' => 'info',
                         'DONE' => 'success',
@@ -115,7 +117,7 @@ class DecisionResource extends Resource
                 Actions\Action::make('open_check')
                     ->label('View Check')
                     ->icon('heroicon-o-clipboard-document-check')
-                    ->url(fn (Decision $record) => ProductCheckResource::getUrl('view', ['record' => $record->product_check_id])),
+                    ->url(fn(Decision $record) => ProductCheckResource::getUrl('view', ['record' => $record->product_check_id])),
             ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
