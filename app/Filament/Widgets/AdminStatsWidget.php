@@ -6,21 +6,28 @@ use App\Models\CheckSession;
 use App\Models\Decision;
 use App\Models\Product;
 use App\Models\ScanConfig;
-use Filament\Widgets\Widget;
+use Filament\Widgets\StatsOverviewWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
 
-class AdminStatsWidget extends Widget
+class AdminStatsWidget extends StatsOverviewWidget
 {
-    protected string $view = 'dashboard-admin-stats';
-
     protected int | string | array $columnSpan = 'full';
 
-    public function getViewData(): array
+    protected function getStats(): array
     {
         return [
-            'productCount' => Product::count(),
-            'scanConfigCount' => ScanConfig::where('is_active', true)->count(),
-            'openDecisionCount' => Decision::where('action_status', 'OPEN')->count(),
-            'activeSessionCount' => CheckSession::whereIn('status', ['DRAFT', 'OPEN'])->count(),
+            Stat::make('Total Products', Product::count())
+                ->icon('heroicon-o-cube')
+                ->color('primary'),
+            Stat::make('Scan Configs', ScanConfig::where('is_active', true)->count())
+                ->icon('heroicon-o-qr-code')
+                ->color('info'),
+            Stat::make('Open Decisions', Decision::where('action_status', 'OPEN')->count())
+                ->icon('heroicon-o-flag')
+                ->color('warning'),
+            Stat::make('Active Sessions', CheckSession::whereIn('status', ['DRAFT', 'OPEN'])->count())
+                ->icon('heroicon-o-bolt')
+                ->color('success'),
         ];
     }
 }

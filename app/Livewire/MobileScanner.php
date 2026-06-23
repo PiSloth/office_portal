@@ -44,6 +44,8 @@ class MobileScanner extends Component
 
     public ?string $flashTone = null;
 
+    public ?string $comment = null;
+
     public bool $showDuplicateWarning = false;
 
     public array $duplicateChecks = [];
@@ -56,7 +58,8 @@ class MobileScanner extends Component
 
     public function mount(): void
     {
-        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['Super Admin', 'Admin', 'Supervisor', 'Checker']), 403);
+        // dd(auth()->user()->hasAnyRole(['Super Admin', 'Admin', 'Supervisor', 'Checker']));
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['super-admin', 'admin', 'manager', 'checker', 'Super Admin', 'Admin', 'Supervisor', 'Checker']), 403);
 
         $this->checkSessionId = CheckSession::whereIn('status', ['DRAFT', 'OPEN'])->value('id');
     }
@@ -214,7 +217,7 @@ class MobileScanner extends Component
             'checked_by' => auth()->id(),
             'checked_at' => now(),
             'result_status' => $validation['result_status'],
-            'remark' => $validation['errors'] ? implode(' | ', $validation['errors']) : null,
+            'remark' => $validation['errors'] ? implode(' | ', $validation['errors']) . ($this->comment ? ' | Comment: ' . $this->comment : '') : $this->comment,
         ]);
 
         foreach ($validation['values'] as $value) {
@@ -252,6 +255,9 @@ class MobileScanner extends Component
         $this->showScannerModal = false;
         $this->showDuplicateWarning = false;
         $this->duplicateChecks = [];
+        $this->comment = null;
+        $this->attachments = [];
+        $this->cameraAttachments = [];
         $this->dispatch('check-saved');
 
         $savedNotification = Notification::make()
@@ -415,11 +421,10 @@ class MobileScanner extends Component
         return collect($this->scanConfigFields)
             ->map(function (array $fieldConfig) {
                 $fieldName = $fieldConfig['field'] ?? null;
-                $label = $fieldConfig['field_name'] ?? $fieldName;
                 $actualValue = $fieldName ? ($this->actualValues[$fieldName] ?? null) : null;
 
                 return [
-                    'field_name' => $label ?? 'Field',
+                    'field_name' => $fieldName ?? 'Field',
                     'expected_value' => null,
                     'actual_value' => $actualValue,
                     'difference_value' => null,

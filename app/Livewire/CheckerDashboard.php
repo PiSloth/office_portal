@@ -12,7 +12,7 @@ class CheckerDashboard extends Component
 {
     public function mount(): void
     {
-        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['Super Admin', 'Admin', 'Supervisor', 'Checker']), 403);
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['super-admin', 'admin', 'manager', 'checker', 'Super Admin', 'Admin', 'Supervisor', 'Checker']), 403);
     }
 
     public function render()

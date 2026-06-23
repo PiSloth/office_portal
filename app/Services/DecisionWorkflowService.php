@@ -76,6 +76,17 @@ class DecisionWorkflowService
                         'comment_type' => 'LOG',
                         'comment' => $remark,
                     ]);
+
+                    // Copy attachments from product check to decision
+                    foreach ($productCheck->attachments as $attachment) {
+                        $decision->attachments()->create([
+                            'file_path' => $attachment->file_path,
+                            'file_name' => $attachment->file_name,
+                            'file_type' => $attachment->file_type,
+                            'file_size' => $attachment->file_size,
+                            'uploaded_by' => $attachment->uploaded_by,
+                        ]);
+                    }
                 }
             }
         }
