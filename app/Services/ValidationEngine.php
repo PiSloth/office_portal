@@ -98,7 +98,7 @@ class ValidationEngine
             }
 
             $results[] = [
-                'field_name' => $fieldConfig['field_name'] ?? $fieldName,
+                'field_name' => $fieldName,
                 'expected_value' => $expectedStr,
                 'actual_value' => $actualStr,
                 'difference_value' => $differenceValue,

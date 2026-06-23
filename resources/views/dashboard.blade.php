@@ -1,16 +1,20 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <div>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <h2 class="text-lg font-semibold leading-tight text-gray-800 sm:text-xl dark:text-gray-200">
                     {{ __('Operations Dashboard') }}
                 </h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
                     Jump straight into inventory review, mobile scanning, or decision triage.
                 </p>
             </div>
-            <a href="{{ url('/admin') }}" class="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400">
-                Open Admin Panel
+            <a href="{{ url('/admin') }}" class="inline-flex items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 sm:px-5">
+                <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10 17l5-5-5-5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span class="hidden sm:inline">Open Admin Panel</span>
+                <span class="sm:hidden">Admin</span>
             </a>
         </div>
     </x-slot>

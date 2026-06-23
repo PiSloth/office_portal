@@ -10,7 +10,7 @@ class SupervisorDashboard extends Component
 {
     public function mount(): void
     {
-        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['Super Admin', 'Admin', 'Supervisor']), 403);
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['super-admin', 'admin', 'manager', 'Super Admin', 'Admin', 'Supervisor']), 403);
     }
 
     public function render()

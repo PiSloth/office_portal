@@ -69,10 +69,9 @@
 
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+            <!-- <div>
                 <h2 class="text-2xl font-semibold leading-tight text-gray-900 dark:text-white">Mobile Scanner</h2>
-
-            </div>
+            </div> -->
 
             <div class="flex flex-wrap gap-2">
                 <button type="button" @click="showSelectionModal = true"
@@ -514,6 +513,11 @@
                             @endforelse
                         </div>
 
+                        <div class="mt-4">
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Comment / Remark (Optional)</label>
+                            <textarea wire:model="comment" rows="2" class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white" placeholder="Add any observation..."></textarea>
+                        </div>
+
                         @php
                             $uploadedAttachments = array_merge($attachments ?? [], $cameraAttachments ?? []);
                         @endphp
@@ -651,6 +655,10 @@
                         <p class="mt-2 text-lg font-semibold">Upload a photo for manual review, then save it as a
                             caution item.
                         </p>
+                        <div class="mt-4">
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Comment / Remark (Optional)</label>
+                            <textarea wire:model="comment" rows="2" class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white" placeholder="Add any observation..."></textarea>
+                        </div>
                         <div class="mt-6 flex flex-wrap gap-5">
                             <input x-ref="unmatchedPhotoInput" type="file" wire:model="attachments" multiple
                                 accept="image/*" class="sr-only">
