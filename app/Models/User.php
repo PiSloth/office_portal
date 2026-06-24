@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'status', 'last_login_at'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, HasRoles;
@@ -50,5 +52,38 @@ class User extends Authenticatable
     public function decisionsCreated()
     {
         return $this->hasMany(Decision::class, 'decision_by');
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return $this->hasAnyRole($this->adminAccessRoles());
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function adminAccessRoles(): array
+    {
+        return [
+            'super-admin',
+            'Super Admin',
+            'admin',
+            'Admin',
+            'manager',
+            'Manager',
+            'supervisor',
+            'Supervisor',
+            'checker',
+            'Checker',
+        ];
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasAnyRole(['super-admin', 'Super Admin']);
     }
 }
