@@ -4,6 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SessionResource\Pages;
 use App\Models\CheckSession;
+use App\Models\ProductType;
+use App\Models\ScanConfig;
+use App\Models\User;
 use BackedEnum;
 use App\Filament\Resources\Concerns\HasPermissionGates;
 use Filament\Actions;
@@ -58,6 +61,22 @@ class SessionResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Textarea::make('description')
                     ->columnSpanFull(),
+                Forms\Components\Select::make('product_type_id')
+                    ->label('Product Type')
+                    ->options(ProductType::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                    ->searchable()
+                    ->reactive(),
+                Forms\Components\Select::make('scan_config_id')
+                    ->label('Scan Config')
+                    ->options(fn(callable $get) => ScanConfig::where('product_type_id', $get('product_type_id'))->where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                    ->searchable()
+                    ->disabled(fn(callable $get) => ! $get('product_type_id'))
+                    ->required(),
+                Forms\Components\Select::make('assigned_user_id')
+                    ->label('Assigned User')
+                    ->relationship('assignedUser', 'name')
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('status')
                     ->options([
                         'DRAFT' => 'Draft',
@@ -92,6 +111,15 @@ class SessionResource extends Resource
                         'CANCELLED' => 'danger',
                         default => 'gray',
                     })
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('productType.name')
+                    ->label('Product Type')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('scanConfig.name')
+                    ->label('Scan Config')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('assignedUser.name')
+                    ->label('Assigned User')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('startedBy.name')
                     ->label('Started By')

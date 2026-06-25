@@ -1,12 +1,37 @@
-<div class="min-h-screen bg-slate-50 py-4 sm:py-8" x-data="{
-    showSelectionModal: @entangle('showSelectionModal'),
+<div class="min-h-screen overflow-x-hidden bg-slate-50 py-3 sm:py-8" x-data="{
     showScannerModal: @entangle('showScannerModal'),
     showMatchedModal: @entangle('showMatchedModal'),
+    showCreateLocationModal: @entangle('showCreateLocationModal'),
+    showCreateProductModal: @entangle('showCreateProductModal'),
+    showRemarkModal: @entangle('showRemarkModal'),
+    showRowActionsModal: false,
+    activeRowCheck: { id: null, barcode: '', status: '' },
+    visibleColumns: {
+        barcode: true,
+        product_name: true,
+        pickup_qty: true,
+        record_qty: true,
+        closing_stock: true,
+        actions: true
+    },
     countdown: 0,
     delaySeconds: parseInt(localStorage.getItem('scannerDelaySeconds')) || 3,
     init() {
         this.$watch('showScannerModal', value => {
             window.dispatchEvent(new CustomEvent(value ? 'mobile-scanner-start' : 'mobile-scanner-stop'));
+        });
+
+        // hydrate visible columns from localStorage
+        try {
+            const stored = localStorage.getItem('scannerVisibleColumns');
+            if (stored) this.visibleColumns = JSON.parse(stored);
+        } catch (e) {
+            // ignore
+        }
+
+        // persist visibleColumns when they change
+        this.$watch(() => JSON.stringify(this.visibleColumns), (val) => {
+            try { localStorage.setItem('scannerVisibleColumns', val); } catch (e) {}
         });
     },
     startCountdown() {
@@ -23,781 +48,547 @@
             }
         }, 1000);
     }
-}" x-init="init()" @check-saved.window="startCountdown()">
+}" x-init="init()" x-effect="document.body.style.overflow = (showMatchedModal || showScannerModal || showCreateLocationModal || showCreateProductModal || showRemarkModal) ? 'hidden' : ''" @check-saved.window="startCountdown()">
     <style>
-        [x-cloak] {
-            display: none !important;
-        }
-
-        @keyframes scan-line {
-            0% {
-                top: 0%;
-            }
-
-            50% {
-                top: 100%;
-            }
-
-            100% {
-                top: 0%;
-            }
-        }
-
-        .animate-scan {
-            animation: scan-line 3s linear infinite;
-        }
-
-        #qr-reader {
-            border: none !important;
-        }
-
-        #qr-reader__scan_region {
-            height: 100% !important;
-        }
-
-        #qr-reader video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover !important;
-        }
-
-        #qr-reader__dashboard,
-        #qr-reader__status_span {
-            display: none !important;
-        }
+        [x-cloak] { display: none !important; }
+        @keyframes scan-line { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+        .animate-scan { animation: scan-line 3s linear infinite; }
+        #qr-reader { border: none !important; }
+        #qr-reader__scan_region { height: 100% !important; }
+        #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+        #qr-reader__dashboard, #qr-reader__status_span { display: none !important; }
     </style>
-
-    <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <!-- <div>
-                <h2 class="text-2xl font-semibold leading-tight text-gray-900 dark:text-white">Mobile Scanner</h2>
-            </div> -->
-
-            <div class="flex flex-wrap gap-2">
-                <button type="button" @click="showSelectionModal = true"
-                    class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 dark:bg-gray-900 dark:text-white dark:ring-gray-700">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 6h16M4 12h10M4 18h16" stroke-linecap="round" />
-                    </svg>
-                    Filters
+    <div>
+        <div class="grid gap-2 sm:flex sm:items-center sm:gap-3">
+                <select wire:model.live="selectedLocationId" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white sm:w-auto">
+                    @foreach($locations as $loc)
+                        <option value="{{ $loc->id }}">{{ $loc->name }}</option>
+                    @endforeach
+                </select>
+                <button type="button" @click="showCreateLocationModal = true" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-50 px-3 text-sm font-semibold text-amber-700 hover:bg-amber-100 sm:bg-transparent sm:px-0 sm:text-amber-600 sm:hover:bg-transparent sm:hover:text-amber-500">
+                    + New Location
                 </button>
-
-                <button type="button" @click="showScannerModal = true"
-                    class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path
-                            d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    Start scanning
-                </button>
-            </div>
+                <div class="relative w-full sm:w-auto" x-data="{ openCols: false }" @click.outside="openCols = false">
+                    <button type="button" @click="openCols = !openCols" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 dark:bg-gray-900 dark:text-white dark:ring-gray-700 sm:w-auto">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Columns
+                    </button>
+                    <!-- Columns Dropdown Menu -->
+                    <div x-cloak x-show="openCols" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95" class="absolute left-0 sm:left-auto sm:right-0 z-50 mt-2 w-56 origin-top-right rounded-2xl bg-white p-3 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-gray-800 dark:ring-gray-700">
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-2">Show/Hide Columns</p>
+                        <div class="space-y-1">
+                            <label class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <input type="checkbox" x-model="visibleColumns.barcode" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                <span>Barcode</span>
+                            </label>
+                            <label class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <input type="checkbox" x-model="visibleColumns.product_name" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                <span>Product Name</span>
+                            </label>
+                            <label class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <input type="checkbox" x-model="visibleColumns.pickup_qty" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                <span>Pickup Qty</span>
+                            </label>
+                            <label class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <input type="checkbox" x-model="visibleColumns.record_qty" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                <span>Record Qty</span>
+                            </label>
+                            <label class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <input type="checkbox" x-model="visibleColumns.closing_stock" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                <span>Closing Stock</span>
+                            </label>
+                            <label class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <input type="checkbox" x-model="visibleColumns.actions" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                <span>Actions</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
         </div>
+    </div>
+
+
+    <div class="mx-auto w-full max-w-7xl space-y-4 overflow-x-hidden px-3 sm:space-y-6 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <!-- <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"> 
+        </div> -->
 
         @if ($flashMessage)
-            <div x-data="{ open: true }" x-init="setTimeout(() => open = false, 2800)" x-show="open" x-transition
-                class="fixed left-1/2 top-6 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
-                <div
-                    class="flex items-start gap-3 rounded-2xl border border-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-200 bg-white px-4 py-3 shadow-2xl dark:border-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-900/40 dark:bg-gray-900">
-                    <div
-                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-100 text-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-600 dark:bg-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-950/60 dark:text-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-300">
+            <div x-data="{ open: true }" x-init="setTimeout(() => open = false, 2800)" x-show="open" x-transition class="fixed left-1/2 top-6 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
+                <div class="flex items-start gap-3 rounded-2xl border border-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-200 bg-white px-4 py-3 shadow-2xl dark:border-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-900/40 dark:bg-gray-900">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-100 text-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-600 dark:bg-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-950/60 dark:text-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-300">
                         @if ($flashTone === 'success')
-                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5">
-                                <path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
+                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round" /></svg>
                         @else
-                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5">
-                                <path
-                                    d="M12 9v4m0 4h.01M10.3 3.7l-8.6 15A2 2 0 0 0 3.4 22h17.2a2 2 0 0 0 1.7-3.3l-8.6-15a2 2 0 0 0-3.4 0Z"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
+                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4m0 4h.01M10.3 3.7l-8.6 15A2 2 0 0 0 3.4 22h17.2a2 2 0 0 0 1.7-3.3l-8.6-15a2 2 0 0 0-3.4 0Z" stroke-linecap="round" stroke-linejoin="round" /></svg>
                         @endif
                     </div>
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-gray-900 dark:text-white">
-                            {{ $flashTone === 'success' ? 'Success' : 'Warning' }}
-                        </p>
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ $flashTone === 'success' ? 'Success' : 'Warning' }}</p>
                         <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{{ $flashMessage }}</p>
                     </div>
-                    <button type="button" @click="open = false"
-                        class="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200">
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M6 18 18 6M6 6l12 12" stroke-linecap="round" />
-                        </svg>
+                    <button type="button" @click="open = false" class="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18 18 6M6 6l12 12" stroke-linecap="round" /></svg>
                     </button>
                 </div>
             </div>
         @endif
 
-        <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-            <div class="space-y-6 rounded-3xl bg-white p-6 shadow-sm dark:bg-gray-900">
-                {{-- <div
-                    class="rounded-3xl border border-dashed border-amber-300 bg-amber-50/60 p-6 dark:border-amber-900/60 dark:bg-amber-950/30">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h4 class="font-semibold text-gray-900 dark:text-white">Camera Scanner</h4>
-                            <p class="text-sm text-gray-600 dark:text-gray-300">Click the button to scan barcodes or QR
-                                codes with your device camera.</p>
-                        </div>
-                        <button type="button" @click="showScannerModal = true"
-                            class="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-gray-200">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path
-                                    d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                            Start Scanner
-                        </button>
-                    </div>
-                </div> --}}
-
-                <div class="grid gap-4 md:grid-cols-[1fr_auto]">
-                    <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Scanned
-                            code</label>
-                        <input id="scan-code-main" wire:model.live.debounce.2000ms="scanCode" type="text"
-                            class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                            placeholder="Scan or type a code">
-                    </div>
-                    <div class="flex items-end">
-                        <button type="button" wire:click="matchProductFromCode"
-                            class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                            Match now
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {{-- <div class="rounded-3xl bg-slate-950 p-6 text-white shadow-sm">
-                <h3 class="text-lg font-semibold">Matched product</h3>
-
-                @if ($selectedProduct)
-                    <div class="mt-4 space-y-3">
-                        <div class="rounded-2xl bg-white/10 p-4">
-                            <p class="text-sm text-slate-300">Code</p>
-                            <p class="text-xl font-semibold">{{ $selectedProduct->code }}</p>
-                        </div>
-                        <div class="rounded-2xl bg-white/10 p-4">
-                            <p class="text-sm text-slate-300">Name</p>
-                            <p class="text-lg font-semibold">{{ $selectedProduct->name }}</p>
-                            <p class="mt-1 text-sm text-slate-300">{{ $selectedProduct->category?->name }} /
-                                {{ $selectedProduct->subCategory?->name }}</p>
-                        </div>
-                        <div class="grid gap-3 md:grid-cols-2">
-                            <div class="rounded-2xl bg-white/10 p-4">
-                                <p class="text-sm text-slate-300">Location</p>
-                                <p class="font-semibold">{{ $selectedProduct->location?->name ?? 'Unassigned' }}</p>
-                            </div>
-                            <div class="rounded-2xl bg-white/10 p-4">
-                                <p class="text-sm text-slate-300">Type</p>
-                                <p class="font-semibold">{{ $selectedProduct->productType?->name }}</p>
-                            </div>
-                        </div>
-                        <button type="button" @click="showMatchedModal = true"
-                            class="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-200">
-                            Open comparison
-                        </button>
-                    </div>
-                @else
-                    <div class="mt-4 rounded-2xl border border-dashed border-white/20 p-6 text-sm text-slate-300">
-                        Scan a barcode or QR code to load the product details here.
-                    </div>
-                @endif
-            </div> --}}
-        </div>
-
-        @if ($lastResult)
-            <div class="rounded-3xl bg-white p-6 shadow-sm dark:bg-gray-900">
-                <div class="flex items-center gap-3">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Validation result</h3>
-                    <template x-if="countdown > 0">
-                        <span class="rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-medium text-white animate-pulse">
-                            Scanning starts in <span x-text="countdown"></span>s...
-                        </span>
-                    </template>
-                </div>
-                <div class="mt-2 text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                    <p>Overall status: <span
-                            class="font-medium text-gray-900 dark:text-white">{{ $lastResult['result_status'] }}</span>
-                    </p>
-                    @if (!empty($lastResult['checked_by_name']))
-                        <p>Checked by: <span
-                                class="font-medium text-gray-900 dark:text-white">{{ $lastResult['checked_by_name'] }}</span>
-                        </p>
-                    @elseif(!empty($lastResult['checked_by_id']))
-                        <p>Checked by: <span class="font-medium text-gray-900 dark:text-white">User
-                                #{{ $lastResult['checked_by_id'] }}</span></p>
-                    @endif
-                    @if (!empty($lastResult['scanned_code']))
-                        <p>Scanned code: <span
-                                class="font-medium text-gray-900 dark:text-white">{{ $lastResult['scanned_code'] }}</span>
-                        </p>
-                    @endif
-                    @if (!empty($lastResult['checked_at']))
-                        <p>Checked at: <span
-                                class="font-medium text-gray-900 dark:text-white">{{ $lastResult['checked_at'] }}</span>
-                        </p>
-                    @endif
-                </div>
-                <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    @foreach ($lastResult['values'] as $result)
-                        <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
-                            <div class="flex items-center justify-between">
-                                <p class="font-semibold text-gray-900 dark:text-white">{{ $result['field_name'] }}</p>
-                                <span
-                                    class="text-xs font-semibold uppercase tracking-[0.25em] {{ $result['status'] === 'PASS' ? 'text-emerald-600' : 'text-rose-600' }}">{{ $result['status'] }}</span>
-                            </div>
-                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Expected:
-                                {{ $result['expected_value'] ?? 'N/A' }}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Actual:
-                                {{ $result['actual_value'] ?? 'N/A' }}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Difference:
-                                {{ $result['difference_value'] ?? 'N/A' }}
-                                @if (isset($result['tolerance']) && $result['tolerance'] !== null)
-                                    | Tol: ±{{ $result['tolerance'] }}
-                                @endif
-                            </p>
-                        </div>
-                    @endforeach
+        @if ($deletedCheckIdToRestore)
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-900/30 dark:bg-amber-950/10 dark:text-amber-200">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="leading-6">Check deleted. Restore it if this was a mistake.</p>
+                    <button type="button" wire:click="restoreCheck({{ $deletedCheckIdToRestore }})" class="inline-flex items-center justify-center rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400">
+                        Restore
+                    </button>
                 </div>
             </div>
         @endif
-    </div>
 
-    <!-- Scanner Modal Overlay -->
-    <div x-cloak x-show="showScannerModal" x-transition.opacity
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-md">
-        <div class="relative w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900"
-            @click.outside="showScannerModal = false">
-            <div class="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Camera Scanner</h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Position the QR or Barcode inside the box</p>
-                </div>
-                <button type="button" @click="showScannerModal = false"
-                    class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
+        <div class="grid min-w-0 gap-6">
+            <div class="space-y-6 rounded-2xl bg-white p-4 shadow-sm dark:bg-gray-900 sm:rounded-3xl sm:p-6">
+                <div class="grid gap-4 md:grid-cols-[1fr_auto]">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Scanned code</label>
+                        <div class="relative">
+                            <!-- Scanner Button on Left -->
+                            <button type="button" @click="showScannerModal = true" class="absolute left-1 top-1 bottom-1 px-3 flex items-center justify-center rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition shadow-sm" title="Open Camera Scanner">
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
 
-            <!-- Scanner Frame -->
-            <div class="mt-4 relative overflow-hidden rounded-2xl bg-black aspect-square">
-                <!-- HTML5 QR Reader element -->
-                <div wire:ignore id="qr-reader" class="w-full h-full"></div>
+                            <!-- Barcode Input field -->
+                            <input wire:model.defer="scanCode" wire:keydown.enter="processScannedCode" type="text"
+                                class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white pl-14 pr-14 py-3 text-base"
+                                placeholder="Scan or type a code, then press enter">
 
-                <!-- Guided Scan Overlay (Square Finder Box) -->
-                <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div
-                        class="w-2/3 h-2/3 border-2 border-dashed border-amber-500 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                        <!-- Corner guides -->
-                        <div
-                            class="absolute -top-1.5 -left-1.5 w-6 h-6 border-t-4 border-l-4 border-amber-500 rounded-tl-md">
-                        </div>
-                        <div
-                            class="absolute -top-1.5 -right-1.5 w-6 h-6 border-t-4 border-r-4 border-amber-500 rounded-tr-md">
-                        </div>
-                        <div
-                            class="absolute -bottom-1.5 -left-1.5 w-6 h-6 border-b-4 border-l-4 border-amber-500 rounded-bl-md">
-                        </div>
-                        <div
-                            class="absolute -bottom-1.5 -right-1.5 w-6 h-6 border-b-4 border-r-4 border-amber-500 rounded-br-md">
-                        </div>
-
-                        <!-- Scanning line animation -->
-                        <div class="absolute left-0 right-0 h-0.5 bg-amber-500 shadow-[0_0_10px_#f59e0b] animate-scan">
+                            <!-- Rocket Button on Right -->
+                            <button type="button" wire:click="processScannedCode" class="absolute right-1 top-1 bottom-1 px-3.5 flex items-center justify-center rounded-xl bg-slate-950 text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 transition shadow-sm" title="Launch scan/submit">
+                                <span class="text-base leading-none">🚀</span>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-4 text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Scan will start automatically once camera access is
-                    granted.</p>
-            </div>
-        </div>
-    </div>
-
-    <div x-cloak x-show="showSelectionModal" x-transition.opacity
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-md">
-        <div class="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900"
-            @click.outside="showSelectionModal = false">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Selection filters</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Pick the session, product type, and scan
-                        configuration here.</p>
-                </div>
-                <button type="button" @click="showSelectionModal = false"
-                    class="text-gray-400 transition hover:text-gray-700 dark:hover:text-gray-200">×</button>
-            </div>
-
-            <div class="mt-6 grid gap-4">
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Check
-                        session</label>
-                    <select wire:model.live="checkSessionId"
-                        class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                        <option value="">Choose session</option>
-                        @foreach ($sessions as $session)
-                            <option value="{{ $session->id }}">{{ $session->name }} ({{ $session->status }})
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Product type</label>
-                    <select wire:model.live="productTypeId"
-                        class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                        <option value="">Choose type</option>
-                        @foreach ($productTypes as $productType)
-                            <option value="{{ $productType->id }}">{{ $productType->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div wire:key="scan-config-select-{{ $productTypeId ?? 'none' }}">
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Scan config</label>
-                    <select wire:model.live="scanConfigId"
-                        class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                        <option value="">Choose config</option>
-                        @foreach ($scanConfigs as $config)
-                            <option value="{{ $config->id }}">{{ $config->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Scanner restart delay (seconds)</label>
-                    <input type="number" x-model.number="delaySeconds" @change="localStorage.setItem('scannerDelaySeconds', delaySeconds)" min="0" max="60"
-                        class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                </div>
-            </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-                <button type="button" @click="showSelectionModal = false"
-                    class="rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700">
-                    Done
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div x-cloak x-show="showMatchedModal" x-transition.opacity
-        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 backdrop-blur-md">
-        <div class="w-full max-w-5xl max-h-[calc(100vh-4rem)] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900"
-            @click.outside="showMatchedModal = false">
-            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Matched product</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        {{ $selectedProduct ? 'Review values, attach evidence, and save the check.' : 'တူညီသော ပစ္စည်းမရှိပါ၊ Code ပြန်လည် စစ်ဆေးပါ (သို့) ပုံနှင့်တကွ သိမ်းဆည်းပါ' }}
-                    </p>
-                    @if ($selectedScanConfig)
-                        <div
-                            class="mt-3 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/40 dark:text-amber-300">
-                            Scan config: {{ $selectedScanConfig->name }}
+            <!-- Checks Table Grouped by Location -->
+            <div class="min-w-0 space-y-8">
+                @forelse($recentChecksGrouped as $locationName => $checks)
+                    <div class="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-gray-900 sm:rounded-3xl">
+                        <div class="bg-slate-100 dark:bg-slate-800 px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                            <h3 class="font-semibold text-gray-900 dark:text-white">{{ $locationName }}</h3>
                         </div>
-                    @endif
-                </div>
-                <button type="button" @click="showMatchedModal = false"
-                    class="text-gray-400 transition hover:text-gray-700 dark:hover:text-gray-200">×</button>
-            </div>
-
-            @if ($selectedProduct)
-                <div class="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-                    <div class="space-y-4 rounded-3xl bg-slate-950 p-5 text-white">
-                        <div class="rounded-2xl bg-white/10 p-4">
-                            <p class="text-sm text-slate-300">Code</p>
-                            <p class="text-xl font-semibold">{{ $selectedProduct->code }}</p>
-                        </div>
-                        <div class="rounded-2xl bg-white/10 p-4">
-                            <p class="text-sm text-slate-300">Name</p>
-                            <p class="text-lg font-semibold">{{ $selectedProduct->name }}</p>
-                            <p class="mt-1 text-sm text-slate-300">{{ $selectedProduct->category?->name }} /
-                                {{ $selectedProduct->subCategory?->name }}</p>
-                        </div>
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <div class="rounded-2xl bg-white/10 p-4">
-                                <p class="text-sm text-slate-300">Location</p>
-                                <p class="font-semibold">{{ $selectedProduct->location?->name ?? 'Unassigned' }}</p>
-                            </div>
-                            <div class="rounded-2xl bg-white/10 p-4">
-                                <p class="text-sm text-slate-300">Type</p>
-                                <p class="font-semibold">{{ $selectedProduct->productType?->name }}</p>
-                            </div>
-                        </div>
-                        <div class="rounded-2xl bg-white/10 p-4">
-                            <p class="text-sm text-slate-300">Dynamic values</p>
-                            <div class="mt-3 space-y-2 text-sm">
-                                @forelse ($selectedProduct->attributeValues as $attributeValue)
-                                    <div class="flex items-center justify-between gap-3">
-                                        <span class="text-slate-300">{{ $attributeValue->field_name }}</span>
-                                        <span class="font-medium">{{ $attributeValue->value }}</span>
-                                    </div>
-                                @empty
-                                    <p class="text-slate-300">No dynamic values stored.</p>
-                                @endforelse
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="rounded-3xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Comparison form</h4>
-                        <div class="mt-4 grid gap-4 md:grid-cols-2">
-                            @forelse ($scanConfigFields as $fieldConfig)
-                                @php
-                                    $fieldName = $fieldConfig['field'] ?? '';
-                                    $fieldSource = $fieldConfig['source'] ?? 'product';
-                                    $fieldLabel = $fieldConfig['field_name'] ?? ($fieldConfig['field'] ?? 'Field');
-                                    $expectedValue = $selectedProduct
-                                        ? match ($fieldName) {
-                                            'location_id',
-                                            'category_id',
-                                            'sub_category_id'
-                                                => $selectedProduct->{$fieldName},
-                                            'code',
-                                            'barcode',
-                                            'qr_code',
-                                            'name',
-                                            'description',
-                                            'status'
-                                                => $selectedProduct->{$fieldName},
-                                            default => $selectedProduct->attributeValues->firstWhere(
-                                                'field_name',
-                                                $fieldName,
-                                            )?->value,
-                                        }
-                                        : null;
-                                @endphp
-                                <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
-                                    <div class="flex items-center justify-between gap-3">
-                                        <div>
-                                            <p class="font-semibold text-gray-900 dark:text-white">{{ $fieldLabel }}
-                                            </p>
-                                            <p class="text-xs uppercase tracking-[0.25em] text-gray-400">
-                                                {{ $fieldSource }}</p>
-                                        </div>
-                                        <span
-                                            class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300">
-                                            {{ data_get($fieldConfig, 'compare', false) ? 'Compare' : 'Note' }}
-                                        </span>
-                                    </div>
-                                    <div class="mt-4 grid gap-3">
-                                        <div
-                                            class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                            <span
-                                                class="block text-xs uppercase tracking-[0.25em] text-gray-400">Expected</span>
-                                            <span class="mt-1 block break-words">{{ $expectedValue ?? 'N/A' }}</span>
-                                        </div>
-                                        <div>
-                                            <label
-                                                class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Actual</label>
-                                            <input wire:model.live="actualValues.{{ $fieldName }}" type="text"
-                                                class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                                            @error("actualValues.{$fieldName}")
-                                                <p class="mt-2 text-xs text-rose-600 dark:text-rose-400">
-                                                    {{ $message }}</p>
-                                            @enderror
-                                        </div>
-                                    </div>
-                                </div>
-                            @empty
-                                <p class="text-sm text-gray-500 dark:text-gray-400">Pick a scan config to generate the
-                                    comparison form.</p>
-                            @endforelse
-                        </div>
-
-                        <div class="mt-4">
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Comment / Remark (Optional)</label>
-                            <textarea wire:model="comment" rows="2" class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white" placeholder="Add any observation..."></textarea>
-                        </div>
-
-                        @php
-                            $uploadedAttachments = array_merge($attachments ?? [], $cameraAttachments ?? []);
-                        @endphp
-
-                        <div class="mt-6 space-y-4">
-                            @if (count($uploadedAttachments) === 0)
-                                <div
-                                    class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-                                    <p class="font-semibold">Attachment required for mismatch checks</p>
-                                    <p class="mt-1">Please upload at least one photo before saving this record.
-                                        Without an attachment, mismatch checks cannot be saved.</p>
-                                </div>
-                            @endif
-
-                            <div class="flex flex-wrap gap-5">
-                                <label class="inline-flex cursor-pointer rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                                    <input x-ref="photoInput" type="file" wire:model="attachments" multiple
-                                        accept="image/*" class="sr-only">
-                                    <svg class="w-8 h-8" viewBox="0 0 48 48" version="1"
-                                        xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 48 48">
-                                        <path fill="#E65100"
-                                            d="M41,42H13c-2.2,0-4-1.8-4-4V18c0-2.2,1.8-4,4-4h28c2.2,0,4,1.8,4,4v20C45,40.2,43.2,42,41,42z" />
-                                        <path fill="#F57C00"
-                                            d="M35,36H7c-2.2,0-4-1.8-4-4V12c0-2.2,1.8-4,4-4h28c2.2,0,4,1.8,4,4v20C39,34.2,37.2,36,35,36z" />
-                                        <circle fill="#FFF9C4" cx="30" cy="16" r="3" />
-                                        <polygon fill="#942A09" points="17,17.9 8,31 26,31" />
-                                        <polygon fill="#BF360C" points="28,23.5 22,31 34,31" />
-                                    </svg>
-                                </label>
-                                <label class="inline-flex cursor-pointer rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                                    <input x-ref="cameraInput" type="file" wire:model="cameraAttachments" multiple
-                                        accept="image/*" capture="environment" class="sr-only">
-                                    <svg class="w-8 h-8" viewBox="0 0 1024 1024" class="icon" version="1.1"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path
-                                            d="M732.1 399.3C534.6 356 696.5 82.1 425.9 104.8s-527.2 645.8-46.8 791.7 728-415 353-497.2z"
-                                            fill="#464BD8" />
-                                        <path
-                                            d="M695.5 779.5c-5.7 0-11.3-0.8-16.9-2.3l-402-112.4c-16.1-4.5-29.4-15-37.6-29.5a62 62 0 0 1-5.7-47.5l65-232.6a62.64 62.64 0 0 1 60.1-45.4c5.7 0 11.3 0.8 16.9 2.3L508 349.2c0.3 0.1 0.6 0.1 1 0.1 1.2 0 2.3-0.6 2.9-1.6l21.3-31.5c7.5-11.1 20-17.7 33.4-17.7 3.7 0 7.4 0.5 11 1.5L695 332.9a40.03 40.03 0 0 1 29.5 36.8l1.9 37.6c0.1 1.6 1.1 2.9 2.6 3.3l48.2 13.5c16.1 4.5 29.4 15 37.6 29.5a62 62 0 0 1 5.7 47.5l-65 232.6c-7.4 27-32.1 45.8-60 45.8z"
-                                            fill="#FFFFFF" />
-                                        <path
-                                            d="M566.5 306c3 0 6 0.4 9 1.3L693 340.1a32.87 32.87 0 0 1 24.1 30l1.9 37.7a11 11 0 0 0 8 10.1l48.2 13.5a55.03 55.03 0 0 1 38.2 67.8l-65.1 232.6a55.06 55.06 0 0 1-53 40.2c-4.9 0-9.9-0.7-14.9-2l-402-112.4a55.03 55.03 0 0 1-38.2-67.8l65.1-232.6c6.9-24.2 28.9-40 52.9-40 4.9 0 9.9 0.7 14.9 2l132.7 37.1c1 0.3 2 0.4 3 0.4 3.6 0 7.1-1.8 9.1-4.9l21.3-31.4c6.3-9.2 16.5-14.4 27.3-14.4m0-14.9c-15.9 0-30.6 7.8-39.5 21l-19.7 29.2L377.4 305c-6.2-1.7-12.5-2.6-18.9-2.6a70.4 70.4 0 0 0-41.8 13.9c-12.4 9.2-21.2 22-25.5 36.9v0.1l-65.1 232.6c-10.4 37.1 11.4 75.8 48.5 86.2l402 112.4c6.2 1.7 12.5 2.6 18.9 2.6 31.2 0 58.9-21 67.3-51.1l65-232.6c5-18 2.8-36.9-6.4-53.1-9.2-16.3-24.1-28-42.1-33l-45.5-12.7-1.8-34.9a47.6 47.6 0 0 0-35-43.6l-117.5-32.9a39.3 39.3 0 0 0-13-2.1z"
-                                            fill="#151B28" />
-                                        <path
-                                            d="M686 365.2c2.9 0.8 4.9 3.3 5 6.3l1.9 37.6c0.4 16.2 11.3 30.2 26.9 34.6l48.2 13.5a28.98 28.98 0 0 1 20.1 35.7l-65 232.6c-4.6 15-20.4 23.6-35.5 19.3l-402-112.4a28.98 28.98 0 0 1-20.1-35.7l65.1-232.6a28.87 28.87 0 0 1 35.6-19.8l132.7 37.1c15.6 4.3 32.2-2 40.9-15.6l21-30.7c1.6-2.5 4.7-3.6 7.5-2.8L686 365.2"
-                                            fill="#2AEFC8" />
-                                        <path
-                                            d="M597.6 454.5c56.2 15.7 89 74 73.3 130.2-15.7 56.2-74 89-130.2 73.3-56.2-15.7-89-74-73.3-130.2 15.9-56.1 74-88.8 130.2-73.3m7-25.1c-70.1-19.6-142.8 21.3-162.3 91.4-19.6 70.1 21.3 142.8 91.4 162.3 70.1 19.6 142.8-21.3 162.3-91.4 19.5-70-21.4-142.6-91.4-162.3z m0 0"
-                                            fill="" />
-                                        <path
-                                            d="M580.1 513.2a50.39 50.39 0 0 1-27 97.1 50.44 50.44 0 0 1-35.2-61.9 50.5 50.5 0 0 1 62.2-35.2"
-                                            fill="#514DDF" />
-                                        <path
-                                            d="M568.1 635.9c-28.9 0-55.7-15.6-70-41.4a79.69 79.69 0 0 1 7.6-88.8c20.4-25.4 53.8-36 85-26.8 42 12.3 66.5 56.6 54.6 98.7-8.9 31.4-35.5 54-67.9 57.8-3.1 0.3-6.2 0.5-9.3 0.5z m0-136c-16.7 0-32.7 7.5-43.5 21a55.6 55.6 0 0 0-5.3 61.9c11 19.9 32.7 31.1 55.3 28.5a55.45 55.45 0 0 0 47.3-40.3c8.3-29.4-8.8-60.2-38-68.8-5.2-1.6-10.5-2.3-15.8-2.3zM441.2 310.6L391 296.5c-6.9-1.9-11-9.1-9-16.1 1.9-6.9 9.1-11 16.1-9l50.2 14.1c6.9 1.9 11 9.1 9 16.1-1.9 6.9-9.1 10.9-16.1 9z m0 0M413.5 409.8l-50.2-14.1c-6.9-1.9-11-9.1-9-16.1 1.9-6.9 9.1-11 16.1-9.1l50.2 14.1c6.9 1.9 11 9.1 9 16.1-2 7-9.2 11.1-16.1 9.1z m0 0"
-                                            fill="" />
-                                    </svg>
-                                </label>
-                                {{-- <button type="button" 
-                                    class="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400">
-                                    Upload camera photo
-                                </button> --}}
-                                <button type="button" wire:click="save"
-                                    class="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400">
-                                    Save check
-                                </button>
-                            </div>
-
-                            @if ($showDuplicateWarning)
-                                <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
-                                    <p class="font-semibold">Duplicate Check Detected</p>
-                                    <p class="mt-1">This product has already been checked in the current session. Are you sure you want to save it again?</p>
-                                    
-                                    @if(count($duplicateChecks) > 0)
-                                    <div class="mt-3 space-y-2">
-                                        <p class="font-medium">Previous Checks:</p>
-                                        @foreach ($duplicateChecks as $dupCheck)
-                                            <div class="rounded bg-rose-100 p-2 text-xs dark:bg-rose-900/40 text-rose-900 dark:text-rose-100">
-                                                Checked by: <span class="font-semibold">{{ data_get($dupCheck, 'checked_by.name', 'Unknown') }}</span> 
-                                                at {{ \Carbon\Carbon::parse($dupCheck['checked_at'])->format('Y-m-d H:i') }}
-                                                <br>
-                                                Result: <span class="font-semibold">{{ $dupCheck['result_status'] }}</span>
-                                                @if ($dupCheck['remark'])
-                                                    <br><span class="text-rose-700 dark:text-rose-300">Remark: {{ $dupCheck['remark'] }}</span>
-                                                @endif
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                    @endif
-
-                                    <div class="mt-4">
-                                        <button type="button" wire:click="save(true)" class="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">
-                                            Save as duplicate check entry
-                                        </button>
-                                    </div>
-                                </div>
-                            @endif
-
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                For mismatch records, add a photo first. The save action is blocked until at least one
-                                attachment is uploaded.
-                            </p>
-
-                            <div class="rounded-2xl border border-dashed border-gray-200 p-4 dark:border-gray-700">
-                                <p class="text-sm font-semibold text-gray-900 dark:text-white">Attachment preview</p>
-                                <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                    @forelse ($uploadedAttachments as $attachment)
+                        <div class="w-full max-w-full overflow-x-auto overscroll-x-contain">
+                            <table class="w-full text-left text-sm text-gray-600 dark:text-gray-300 min-w-[600px]">
+                                <thead>
+                                    <tr class="border-b border-gray-200 dark:border-gray-700 uppercase tracking-wider text-xs whitespace-nowrap">
+                                        <th x-show="visibleColumns.barcode" class="px-4 sm:px-6 py-4 font-semibold whitespace-nowrap">Barcode</th>
+                                        <th x-show="visibleColumns.product_name" class="px-4 sm:px-6 py-4 font-semibold whitespace-nowrap min-w-[150px]">Product Name</th>
+                                        <th x-show="visibleColumns.pickup_qty" class="px-4 sm:px-6 py-4 font-semibold whitespace-nowrap">Pickup Qty</th>
+                                        <th x-show="visibleColumns.record_qty" class="px-4 sm:px-6 py-4 font-semibold whitespace-nowrap">Record Qty</th>
+                                        <th x-show="visibleColumns.closing_stock" class="px-4 sm:px-6 py-4 font-semibold whitespace-nowrap">Closing Stock</th>
+                                        <th x-show="visibleColumns.actions" class="px-4 sm:px-6 py-4 font-semibold whitespace-nowrap">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($checks as $check)
                                         @php
-                                            $showImagePreview = method_exists($attachment, 'temporaryUrl');
+                                            $status = strtoupper($check->result_status ?? '');
+                                            $rowBgClass = match ($status) {
+                                                'PENDING' => 'bg-amber-100',
+                                                'PASS' => 'bg-green-200',
+                                                'FAIL' => 'bg-green-50',
+                                                'UNMATCHED' => 'bg-rose-50 dark:bg-rose-950/20',
+                                                default => '',
+                                            };
+                                            $barCodeTextClass = match ($status) {
+                                                'PASS' => 'text-white',
+                                                'PENDING' => 'text-amber-900',
+                                                'UNMATCHED' => 'text-rose-600 dark:text-rose-400',
+                                                default => 'text-gray-900 dark:text-white',
+                                            };
                                         @endphp
-                                        <div
-                                            class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
-                                            @if ($showImagePreview)
-                                                <img src="{{ $attachment->temporaryUrl() }}" alt="Preview"
-                                                    class="h-40 w-full object-cover">
-                                            @else
-                                                <div
-                                                    class="flex h-40 items-center justify-center bg-gray-50 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-300">
-                                                    {{ $attachment->getClientOriginalName() }}
+                                        <tr class="border-b border-gray-100 dark:border-gray-800 last:border-0 {{ $rowBgClass }}">
+                                            <td x-show="visibleColumns.barcode" class="px-4 sm:px-6 py-4 font-medium whitespace-nowrap {{ $barCodeTextClass }}">
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <span class="font-semibold">{{ $check->barcode }}</span>
+                                                    <div class="flex items-center gap-1.5">
+                                                        @if($status === 'UNMATCHED')
+                                                            <span class="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">Unmatched</span>
+                                                        @endif
+                                                        <button type="button" @click="activeRowCheck = { id: {{ $check->id }}, barcode: '{{ $check->barcode }}', status: '{{ $status }}' }; showRowActionsModal = true" class="p-1 rounded-lg text-slate-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition" title="Quick Actions">
+                                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            @endif
+                                            </td>
+                                            
+                                            <!-- Editable Product Name -->
+                                            <td x-show="visibleColumns.product_name" class="px-4 sm:px-6 py-4 whitespace-nowrap" 
+                                                x-data="{ editing: false, name: '{{ addslashes($check->product?->name ?? 'N/A') }}' }">
+                                                @if($check->product)
+                                                    <div x-show="!editing" @click="editing = true" class="cursor-pointer border-b border-dashed border-gray-400 hover:text-amber-600 transition">
+                                                        <span x-text="name"></span>
+                                                    </div>
+                                                    <input x-cloak x-show="editing" x-model="name" type="text"
+                                                        @click.outside="editing = false; $wire.updateProductName({{ $check->product_id }}, name)"
+                                                        @keydown.enter="editing = false; $wire.updateProductName({{ $check->product_id }}, name)"
+                                                        class="w-full rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
+                                                @else
+                                                    <span class="text-gray-400 italic">No product linked</span>
+                                                @endif
+                                            </td>
+
+                                            <!-- Editable Pickup Qty -->
+                                            <td x-show="visibleColumns.pickup_qty" class="px-4 sm:px-6 py-4 whitespace-nowrap" 
+                                                x-data="{ editing: false, qty: {{ (int) $check->quantity }} }">
+                                                <div x-show="!editing" @click="editing = true" class="cursor-pointer border-b border-dashed border-gray-400 font-semibold hover:text-amber-600 transition">
+                                                    <span x-text="qty"></span>
+                                                </div>
+                                                <input x-cloak x-show="editing" x-model.number="qty" type="number" min="1"
+                                                    @click.outside="editing = false; $wire.updateCheckQuantity({{ $check->id }}, qty)"
+                                                    @keydown.enter="editing = false; $wire.updateCheckQuantity({{ $check->id }}, qty)"
+                                                    class="w-20 rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
+                                            </td>
+
+                                            <td x-show="visibleColumns.record_qty" class="px-4 sm:px-6 py-4 whitespace-nowrap">{{ $check->record_qty }}</td>
+                                            <td x-show="visibleColumns.closing_stock" class="px-4 sm:px-6 py-4 whitespace-nowrap">{{ $check->closing_stock }}</td>
+                                            
+                                            <td x-show="visibleColumns.actions" class="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                                <div class="flex items-center gap-2">
+                                                    <!-- Finding / Validation button -->
+                                                    <button type="button" wire:click="openComparison({{ $check->id }})" title="Put actual facts" class="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white transition">
+                                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                    </button>
+                                                    
+                                                    <!-- Remark / Decision button -->
+                                                    <button type="button" wire:click="openRemarkModal({{ $check->id }})" title="Add Remark" class="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white transition">
+                                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                                    </button>
+
+                                                    <!-- Delete check button -->
+                                                    <button type="button" wire:click="deleteCheck({{ $check->id }})" onclick="if (!confirm('Delete this scanned check? It can be restored if clicked by mistake.')) { event.stopImmediatePropagation(); event.preventDefault(); }" title="Delete Check" class="rounded p-1.5 text-rose-500 hover:bg-rose-100 hover:text-rose-900 dark:hover:bg-rose-900/30 dark:hover:text-white transition">
+                                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+
+                                                    <!-- Create Product (If Unmatched) -->
+                                                    @if($check->result_status === 'UNMATCHED')
+                                                        <button type="button" wire:click="openCreateProduct({{ $check->id }})" title="Create Product" class="rounded p-1.5 text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 transition">
+                                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @empty
+                    <div class="rounded-2xl border border-dashed border-gray-300 p-8 text-center dark:border-gray-700 sm:rounded-3xl sm:p-12">
+                        <p class="text-gray-500 dark:text-gray-400">No scanned items yet.</p>
+                    </div>
+                @endforelse
+            </div>
+        </div>
+
+        <!-- Scanner Modal -->
+        <div x-cloak x-show="showScannerModal" x-transition.opacity
+            class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/80 p-0 backdrop-blur-md sm:items-center sm:px-4 sm:py-6">
+            <div class="relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-md sm:rounded-3xl sm:p-6" @click.outside="showScannerModal = false">
+                <div class="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Camera Scanner</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Position the QR or Barcode inside the box</p>
+                    </div>
+                    <button type="button" @click="showScannerModal = false" class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div class="relative mt-4 aspect-[3/4] max-h-[72dvh] overflow-hidden rounded-2xl bg-black sm:aspect-square sm:max-h-none">
+                    <div wire:ignore id="qr-reader" class="w-full h-full"></div>
+                    <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div class="w-2/3 h-2/3 border-2 border-dashed border-amber-500 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                            <div class="absolute -top-1.5 -left-1.5 w-6 h-6 border-t-4 border-l-4 border-amber-500 rounded-tl-md"></div>
+                            <div class="absolute -top-1.5 -right-1.5 w-6 h-6 border-t-4 border-r-4 border-amber-500 rounded-tr-md"></div>
+                            <div class="absolute -bottom-1.5 -left-1.5 w-6 h-6 border-b-4 border-l-4 border-amber-500 rounded-bl-md"></div>
+                            <div class="absolute -bottom-1.5 -right-1.5 w-6 h-6 border-b-4 border-r-4 border-amber-500 rounded-br-md"></div>
+                            <div class="absolute left-0 right-0 h-0.5 bg-amber-500 shadow-[0_0_10px_#f59e0b] animate-scan"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Create Location Modal -->
+        <div x-cloak x-show="showCreateLocationModal" x-transition.opacity class="fixed inset-0 z-[150] flex items-end justify-center bg-slate-950/80 p-0 backdrop-blur-md sm:items-center sm:px-4 sm:py-6">
+            <div class="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-md sm:rounded-3xl sm:p-6" @click.outside="showCreateLocationModal = false">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Create New Location</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company / Location Name</label>
+                        <input wire:model="newLocationName" type="text" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                        <textarea wire:model="newLocationDescription" rows="3" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:justify-end">
+                    <button type="button" @click="showCreateLocationModal = false" class="min-h-11 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-white">Cancel</button>
+                    <button type="button" wire:click="createLocation" class="min-h-11 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Product Modal -->
+        <div x-cloak x-show="showCreateProductModal" x-transition.opacity class="fixed inset-0 z-[150] flex items-end justify-center bg-slate-950/80 p-0 backdrop-blur-md sm:items-center sm:px-4 sm:py-6">
+            <div class="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-md sm:rounded-3xl sm:p-6" @click.outside="showCreateProductModal = false">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Create Unmatched Product</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Code / Barcode</label>
+                        <input wire:model="createProductCode" type="text" class="w-full rounded-xl border-amber-300 bg-amber-50 text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white font-semibold">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name</label>
+                        <input wire:model="createProductName" type="text" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Type</label>
+                        <select wire:model.live="createProductTypeId" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="">Select type</option>
+                            @foreach ($productTypes as $productType)
+                                <option value="{{ $productType->id }}">{{ $productType->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('createProductTypeId') <span class="text-xs text-rose-500">{{ $message }}</span> @enderror
+                    </div>
+
+                    @foreach($createProductDynamicFields as $field)
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $field['field_label'] }} <span class="text-rose-500">*</span></label>
+                            @if($field['field_type'] === 'textarea')
+                                <textarea wire:model="createProductDynamicValues.{{ $field['field_name'] }}" rows="2" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"></textarea>
+                            @else
+                                <input wire:model="createProductDynamicValues.{{ $field['field_name'] }}" type="text" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            @endif
+                            @error('createProductDynamicValues.' . $field['field_name'])
+                                <span class="text-xs text-rose-500">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    @endforeach
+                </div>
+                <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:justify-end">
+                    <button type="button" @click="showCreateProductModal = false" class="min-h-11 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-white">Cancel</button>
+                    <button type="button" wire:click="saveCreatedProduct" class="min-h-11 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400">Save Product</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Remark / Decision Modal -->
+        <div x-cloak x-show="showRemarkModal" x-transition.opacity class="fixed inset-0 z-[150] flex items-end justify-center bg-slate-950/80 p-0 backdrop-blur-md sm:items-center sm:px-4 sm:py-6">
+            <div class="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-md sm:rounded-3xl sm:p-6" @click.outside="showRemarkModal = false">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Add Remark & Decision</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Remark / Comment</label>
+                        <textarea wire:model="remarkText" rows="3" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white" placeholder="Enter remark..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Decision Type (Optional)</label>
+                        <select wire:model="decisionTypeId" class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="">None</option>
+                            @foreach ($decisionTypes as $dt)
+                                <option value="{{ $dt->id }}">{{ $dt->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:justify-end">
+                    <button type="button" @click="showRemarkModal = false" class="min-h-11 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-white">Cancel</button>
+                    <button type="button" wire:click="saveRemark" class="min-h-11 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Matched/Validation Modal (Finding) -->
+        <div x-cloak x-show="showMatchedModal" x-transition.opacity class="fixed inset-0 z-[120] flex items-end justify-center overflow-hidden bg-slate-950/80 p-0 backdrop-blur-md sm:items-start sm:px-4 sm:py-6" @touchmove.prevent>
+            <div class="flex h-[94vh] w-full max-w-[100vw] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[calc(100vh-4rem)] sm:max-w-5xl sm:rounded-3xl" @click.outside="showMatchedModal = false">
+                <div class="shrink-0 flex items-start justify-between border-b border-gray-100 p-4 dark:border-gray-800 sm:p-6">
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Validation (Finding)</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Put actual facts to validate this product check.</p>
+                    </div>
+                    <button type="button" @click="showMatchedModal = false" class="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200" aria-label="Close validation"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18 18 6M6 6l12 12" stroke-linecap="round" /></svg></button>
+                </div>
+                <div class="min-h-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain p-4 [-webkit-overflow-scrolling:touch] sm:p-6" @touchmove.stop @wheel.stop>
+                @if ($selectedProduct)
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        <div class="space-y-4 rounded-2xl bg-slate-950 p-4 text-white sm:rounded-3xl sm:p-5">
+                            <div class="rounded-2xl bg-white/10 p-4">
+                                <p class="text-sm text-slate-300">Code</p>
+                                <p class="break-words text-xl font-semibold">{{ $selectedProduct->code }}</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/10 p-4">
+                                <p class="text-sm text-slate-300">Name</p>
+                                <p class="break-words text-lg font-semibold">{{ $selectedProduct->name }}</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/10 p-4">
+                                <p class="text-sm text-slate-300">Dynamic values</p>
+                                <div class="mt-3 space-y-2 text-sm">
+                                    @forelse ($selectedProduct->attributeValues as $attributeValue)
+                                        <div class="grid gap-1 sm:flex sm:items-center sm:justify-between sm:gap-3">
+                                            <span class="text-slate-300">{{ $attributeValue->field_name }}</span>
+                                            <span class="break-words font-medium">{{ $attributeValue->value }}</span>
                                         </div>
                                     @empty
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">Uploaded files will appear
-                                            here.</p>
+                                        <p class="text-slate-300">No dynamic values stored.</p>
                                     @endforelse
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            @else
-                <div class="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-                    <div class="rounded-3xl bg-slate-950 p-6 text-white">
-                        <p class="text-sm text-slate-300">No product matched yet.</p>
-                        <p class="mt-2 text-lg font-semibold">Upload a photo for manual review, then save it as a
-                            caution item.
-                        </p>
-                        <div class="mt-4">
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Comment / Remark (Optional)</label>
-                            <textarea wire:model="comment" rows="2" class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white" placeholder="Add any observation..."></textarea>
-                        </div>
-                        <div class="mt-6 flex flex-wrap gap-5">
-                            <input x-ref="unmatchedPhotoInput" type="file" wire:model="attachments" multiple
-                                accept="image/*" class="sr-only">
-                            <input x-ref="unmatchedCameraInput" type="file" wire:model="cameraAttachments"
-                                multiple accept="image/*" capture="environment" class="sr-only">
-                            <button type="button" @click="$refs.unmatchedPhotoInput.click()">
-                                <div>
-                                    <svg class="w-6 h-6" viewBox="0 0 48 48" version="1"
-                                        xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 48 48">
-                                        <path fill="#e0e0e0"
-                                            d="M41,42H13c-2.2,0-4-1.8-4-4V18c0-2.2,1.8-4,4-4h28c2.2,0,4,1.8,4,4v20C45,40.2,43.2,42,41,42z" />
-                                        <path fill="#c7c7c7"
-                                            d="M35,36H7c-2.2,0-4-1.8-4-4V12c0-2.2,1.8-4,4-4h28c2.2,0,4,1.8,4,4v20C39,34.2,37.2,36,35,36z" />
-                                        <circle fill="#FFF9C4" cx="30" cy="16" r="3" />
-                                        <polygon fill="#942A09" points="17,17.9 8,31 26,31" />
-                                        <polygon fill="#BF360C" points="28,23.5 22,31 34,31" />
-                                    </svg>
-                                </div>
-                            </button>
 
-                            <button type="button" @click="$refs.unmatchedCameraInput.click()">
-                                <div>
-                                    <svg class="w-8 h-8" viewBox="0 0 1024 1024" class="icon" version="1.1"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path
-                                            d="M732.1 399.3C534.6 356 696.5 82.1 425.9 104.8s-527.2 645.8-46.8 791.7 728-415 353-497.2z"
-                                            fill="#464BD8" />
-                                        <path
-                                            d="M695.5 779.5c-5.7 0-11.3-0.8-16.9-2.3l-402-112.4c-16.1-4.5-29.4-15-37.6-29.5a62 62 0 0 1-5.7-47.5l65-232.6a62.64 62.64 0 0 1 60.1-45.4c5.7 0 11.3 0.8 16.9 2.3L508 349.2c0.3 0.1 0.6 0.1 1 0.1 1.2 0 2.3-0.6 2.9-1.6l21.3-31.5c7.5-11.1 20-17.7 33.4-17.7 3.7 0 7.4 0.5 11 1.5L695 332.9a40.03 40.03 0 0 1 29.5 36.8l1.9 37.6c0.1 1.6 1.1 2.9 2.6 3.3l48.2 13.5c16.1 4.5 29.4 15 37.6 29.5a62 62 0 0 1 5.7 47.5l-65 232.6c-7.4 27-32.1 45.8-60 45.8z"
-                                            fill="#FFFFFF" />
-                                        <path
-                                            d="M566.5 306c3 0 6 0.4 9 1.3L693 340.1a32.87 32.87 0 0 1 24.1 30l1.9 37.7a11 11 0 0 0 8 10.1l48.2 13.5a55.03 55.03 0 0 1 38.2 67.8l-65.1 232.6a55.06 55.06 0 0 1-53 40.2c-4.9 0-9.9-0.7-14.9-2l-402-112.4a55.03 55.03 0 0 1-38.2-67.8l65.1-232.6c6.9-24.2 28.9-40 52.9-40 4.9 0 9.9 0.7 14.9 2l132.7 37.1c1 0.3 2 0.4 3 0.4 3.6 0 7.1-1.8 9.1-4.9l21.3-31.4c6.3-9.2 16.5-14.4 27.3-14.4m0-14.9c-15.9 0-30.6 7.8-39.5 21l-19.7 29.2L377.4 305c-6.2-1.7-12.5-2.6-18.9-2.6a70.4 70.4 0 0 0-41.8 13.9c-12.4 9.2-21.2 22-25.5 36.9v0.1l-65.1 232.6c-10.4 37.1 11.4 75.8 48.5 86.2l402 112.4c6.2 1.7 12.5 2.6 18.9 2.6 31.2 0 58.9-21 67.3-51.1l65-232.6c5-18 2.8-36.9-6.4-53.1-9.2-16.3-24.1-28-42.1-33l-45.5-12.7-1.8-34.9a47.6 47.6 0 0 0-35-43.6l-117.5-32.9a39.3 39.3 0 0 0-13-2.1z"
-                                            fill="#151B28" />
-                                        <path
-                                            d="M686 365.2c2.9 0.8 4.9 3.3 5 6.3l1.9 37.6c0.4 16.2 11.3 30.2 26.9 34.6l48.2 13.5a28.98 28.98 0 0 1 20.1 35.7l-65 232.6c-4.6 15-20.4 23.6-35.5 19.3l-402-112.4a28.98 28.98 0 0 1-20.1-35.7l65.1-232.6a28.87 28.87 0 0 1 35.6-19.8l132.7 37.1c15.6 4.3 32.2-2 40.9-15.6l21-30.7c1.6-2.5 4.7-3.6 7.5-2.8L686 365.2"
-                                            fill="#2AEFC8" />
-                                        <path
-                                            d="M597.6 454.5c56.2 15.7 89 74 73.3 130.2-15.7 56.2-74 89-130.2 73.3-56.2-15.7-89-74-73.3-130.2 15.9-56.1 74-88.8 130.2-73.3m7-25.1c-70.1-19.6-142.8 21.3-162.3 91.4-19.6 70.1 21.3 142.8 91.4 162.3 70.1 19.6 142.8-21.3 162.3-91.4 19.5-70-21.4-142.6-91.4-162.3z m0 0"
-                                            fill="" />
-                                        <path
-                                            d="M580.1 513.2a50.39 50.39 0 0 1-27 97.1 50.44 50.44 0 0 1-35.2-61.9 50.5 50.5 0 0 1 62.2-35.2"
-                                            fill="#514DDF" />
-                                        <path
-                                            d="M568.1 635.9c-28.9 0-55.7-15.6-70-41.4a79.69 79.69 0 0 1 7.6-88.8c20.4-25.4 53.8-36 85-26.8 42 12.3 66.5 56.6 54.6 98.7-8.9 31.4-35.5 54-67.9 57.8-3.1 0.3-6.2 0.5-9.3 0.5z m0-136c-16.7 0-32.7 7.5-43.5 21a55.6 55.6 0 0 0-5.3 61.9c11 19.9 32.7 31.1 55.3 28.5a55.45 55.45 0 0 0 47.3-40.3c8.3-29.4-8.8-60.2-38-68.8-5.2-1.6-10.5-2.3-15.8-2.3zM441.2 310.6L391 296.5c-6.9-1.9-11-9.1-9-16.1 1.9-6.9 9.1-11 16.1-9l50.2 14.1c6.9 1.9 11 9.1 9 16.1-1.9 6.9-9.1 10.9-16.1 9z m0 0M413.5 409.8l-50.2-14.1c-6.9-1.9-11-9.1-9-16.1 1.9-6.9 9.1-11 16.1-9.1l50.2 14.1c6.9 1.9 11 9.1 9 16.1-2 7-9.2 11.1-16.1 9.1z m0 0"
-                                            fill="" />
-                                    </svg>
-                                </div>
-                            </button>
-                            <button type="button" wire:click="save"
-                                class="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400">
-                                Save check
-                            </button>
-                        </div>
-
-                        @if ($showDuplicateWarning)
-                            <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
-                                <p class="font-semibold">Duplicate Check Detected</p>
-                                <p class="mt-1">This product has already been checked in the current session. Are you sure you want to save it again?</p>
-                                
-                                @if(count($duplicateChecks) > 0)
-                                <div class="mt-3 space-y-2">
-                                    <p class="font-medium">Previous Checks:</p>
-                                    @foreach ($duplicateChecks as $dupCheck)
-                                        <div class="rounded bg-rose-100 p-2 text-xs dark:bg-rose-900/40 text-rose-900 dark:text-rose-100">
-                                            Checked by: <span class="font-semibold">{{ data_get($dupCheck, 'checked_by.name', 'Unknown') }}</span> 
-                                            at {{ \Carbon\Carbon::parse($dupCheck['checked_at'])->format('Y-m-d H:i') }}
-                                            <br>
-                                            Result: <span class="font-semibold">{{ $dupCheck['result_status'] }}</span>
-                                            @if ($dupCheck['remark'])
-                                                <br><span class="text-rose-700 dark:text-rose-300">Remark: {{ $dupCheck['remark'] }}</span>
-                                            @endif
+                        <div class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:rounded-3xl sm:p-5">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Comparison form</h4>
+                            <div class="mt-4 grid gap-4">
+                                @forelse ($scanConfigFields as $fieldConfig)
+                                    @php
+                                        $fieldName = $fieldConfig['field'] ?? '';
+                                        $fieldLabel = $fieldConfig['field_name'] ?? ($fieldConfig['field'] ?? 'Field');
+                                        $expectedValue = $selectedProduct ? match ($fieldName) {
+                                            'location_id', 'category_id', 'sub_category_id' => $selectedProduct->{$fieldName},
+                                            'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $selectedProduct->{$fieldName},
+                                            default => $selectedProduct->attributeValues->firstWhere('field_name', $fieldName)?->value,
+                                        } : null;
+                                    @endphp
+                                    <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <p class="break-words font-semibold text-gray-900 dark:text-white">{{ $fieldLabel }}</p>
+                                            <span class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300">
+                                                {{ data_get($fieldConfig, 'compare', false) ? 'Compare' : 'Note' }}
+                                            </span>
                                         </div>
-                                    @endforeach
-                                </div>
-                                @endif
-
-                                <div class="mt-4">
-                                    <button type="button" wire:click="save(true)" class="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">
-                                        Save as duplicate check entry
-                                    </button>
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-
-                    <div class="rounded-3xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Upload preview</h4>
-                        @php
-                            $uploadedAttachments = array_merge($attachments ?? [], $cameraAttachments ?? []);
-                        @endphp
-
-                        @if (count($uploadedAttachments) === 0)
-                            <div
-                                class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-                                <p class="font-semibold">Attachment required for mismatch checks</p>
-                                <p class="mt-1">Please upload at least one photo before saving this record.
-                                    Without an attachment, mismatch checks cannot be saved.</p>
-                            </div>
-                        @endif
-
-                        <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            @forelse ($uploadedAttachments as $attachment)
-                                @php
-                                    $mime = null;
-                                    try {
-                                        $mime = $attachment->getMimeType();
-                                    } catch (\Throwable $e) {
-                                        $mime = null;
-                                    }
-                                    $extension = strtolower(pathinfo($attachment->getClientOriginalName() ?? '', PATHINFO_EXTENSION));
-                                    $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tiff'];
-                                    $showImagePreview = method_exists($attachment, 'temporaryUrl') && (
-                                        ($mime && str_starts_with($mime, 'image/')) || in_array($extension, $imageExtensions, true)
-                                    );
-                                @endphp
-                                <div class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
-                                    @if ($showImagePreview)
-                                        <img src="{{ $attachment->temporaryUrl() }}" alt="Preview"
-                                            class="h-40 w-full object-cover">
-                                    @else
-                                        <div
-                                            class="flex h-40 items-center justify-center bg-gray-50 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-300">
-                                            {{ $attachment->getClientOriginalName() }}
+                                        <div class="mt-4 grid gap-3">
+                                            <div class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                                <span class="block text-xs uppercase tracking-[0.25em] text-gray-400">Expected</span>
+                                                <span class="mt-1 block break-words">{{ $expectedValue ?? 'N/A' }}</span>
+                                            </div>
+                                            <div>
+                                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Actual</label>
+                                                <input wire:model.live="actualValues.{{ $fieldName }}" type="text"
+                                                    class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                                @error("actualValues.{$fieldName}") <p class="mt-2 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                            </div>
                                         </div>
-                                    @endif
-                                </div>
-                            @empty
-                                <p class="text-sm text-gray-500 dark:text-gray-400">Uploaded files will appear here.
-                                </p>
-                            @endforelse
-                        </div>
+                                    </div>
+                                @empty
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">No compare fields in config.</p>
+                                @endforelse
+                            </div>
 
-                        <div class="mt-6">
-                            <p class="text-sm text-gray-500 dark:text-gray-400">This saves as a warning review when no
-                                product match is found.</p>
+                            <div class="mt-6 grid gap-3 sm:flex sm:flex-wrap sm:gap-4">
+                                <label class="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                                    <input x-ref="photoInput" type="file" wire:model="attachments" multiple accept="image/*" class="sr-only">
+                                    <svg class="w-6 h-6 mr-2" viewBox="0 0 48 48" version="1" xmlns="http://www.w3.org/2000/svg"><path fill="#E65100" d="M41,42H13c-2.2,0-4-1.8-4-4V18c0-2.2,1.8-4,4-4h28c2.2,0,4,1.8,4,4v20C45,40.2,43.2,42,41,42z"/><path fill="#F57C00" d="M35,36H7c-2.2,0-4-1.8-4-4V12c0-2.2,1.8-4,4-4h28c2.2,0,4,1.8,4,4v20C39,34.2,37.2,36,35,36z"/><circle fill="#FFF9C4" cx="30" cy="16" r="3"/><polygon fill="#942A09" points="17,17.9 8,31 26,31"/><polygon fill="#BF360C" points="28,23.5 22,31 34,31"/></svg>
+                                    Gallery
+                                </label>
+                                <label class="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                                    <input x-ref="cameraInput" type="file" wire:model="cameraAttachments" multiple accept="image/*" capture="environment" class="sr-only">
+                                    Camera
+                                </label>
+                                <button type="button" wire:click="saveValidation" class="min-h-11 rounded-full bg-emerald-500 px-6 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 sm:ml-auto">
+                                    Save Facts
+                                </button>
+                            </div>
                         </div>
                     </div>
+                @endif
                 </div>
-            @endif
+            </div>
+        </div>
+
+        <!-- Row Actions Quick Modal -->
+        <div x-cloak x-show="showRowActionsModal" x-transition.opacity 
+            class="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
+            <div class="relative w-full max-w-sm rounded-3xl bg-white/90 p-6 shadow-2xl backdrop-blur-lg border border-white/20 dark:bg-gray-900/90 dark:border-gray-800/40" @click.outside="showRowActionsModal = false">
+                <!-- Close button -->
+                <button type="button" @click="showRowActionsModal = false" class="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                
+                <!-- Title -->
+                <div class="text-center mb-6">
+                    <p class="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-1">Scanned Barcode</p>
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white break-all" x-text="activeRowCheck.barcode"></h3>
+                </div>
+
+                <!-- Actions List -->
+                <div class="space-y-3">
+                    <!-- Validation/Facts -->
+                    <button type="button" @click="$wire.openComparison(activeRowCheck.id); showRowActionsModal = false" 
+                        class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div class="text-left">
+                            <p class="font-bold text-slate-950 dark:text-white">Validation Facts</p>
+                            <p class="text-xs text-slate-400">Put actual comparison details</p>
+                        </div>
+                    </button>
+
+                    <!-- Remark/Decision -->
+                    <button type="button" @click="$wire.openRemarkModal(activeRowCheck.id); showRowActionsModal = false" 
+                        class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                            </svg>
+                        </div>
+                        <div class="text-left">
+                            <p class="font-bold text-slate-950 dark:text-white">Add Remark</p>
+                            <p class="text-xs text-slate-400">Add observation & decision</p>
+                        </div>
+                    </button>
+
+                    <!-- Create Product (Conditional: only shown if Unmatched) -->
+                    <template x-if="activeRowCheck.status === 'UNMATCHED'">
+                        <button type="button" @click="$wire.openCreateProduct(activeRowCheck.id); showRowActionsModal = false" 
+                            class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                            </div>
+                            <div class="text-left">
+                                <p class="font-bold text-slate-950 dark:text-white">Create Product</p>
+                                <p class="text-xs text-slate-400">Create new linked product</p>
+                            </div>
+                        </button>
+                    </template>
+
+                    <!-- Delete Check -->
+                    <button type="button" @click="if (confirm('Delete this scanned check? It can be restored if clicked by mistake.')) { $wire.deleteCheck(activeRowCheck.id); showRowActionsModal = false; }" 
+                        class="flex w-full items-center gap-3 rounded-2xl bg-rose-50/60 px-4 py-3.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 dark:bg-rose-950/10 dark:text-rose-400 dark:hover:bg-rose-950/20">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+                        <div class="text-left">
+                            <p class="font-bold text-rose-800 dark:text-rose-300">Delete Check</p>
+                            <p class="text-xs text-rose-400/80">Remove scanned validation check</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

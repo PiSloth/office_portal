@@ -3,18 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Support\Collection;
 use App\Models\DecisionRule;
 use App\Models\Comment;
 
-#[Fillable(['check_session_id', 'scan_config_id', 'product_id', 'checked_by', 'checked_at', 'result_status', 'remark'])]
+#[Fillable(['check_session_id', 'scan_config_id', 'product_id', 'barcode', 'quantity', 'location_id', 'checked_by', 'checked_at', 'result_status', 'remark'])]
 class ProductCheck extends Model
 {
+    use SoftDeletes;
     protected function casts(): array
     {
         return [
             'checked_at' => 'datetime',
+            'quantity' => 'integer',
         ];
     }
 
@@ -31,6 +34,16 @@ class ProductCheck extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function getClosingStockAttribute(): int
+    {
+        return (int) ($this->product?->quantity ?? 0);
+    }
+
+    public function location()
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function checkedBy()

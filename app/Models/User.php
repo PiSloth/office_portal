@@ -44,6 +44,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(ProductCheck::class, 'checked_by');
     }
 
+    public function assignedSessions()
+    {
+        return $this->hasMany(CheckSession::class, 'assigned_user_id');
+    }
+
     public function decisionsAssigned()
     {
         return $this->hasMany(Decision::class, 'assigned_to');

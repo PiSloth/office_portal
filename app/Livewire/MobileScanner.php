@@ -9,7 +9,12 @@ use App\Models\Product;
 use App\Models\ProductAttributeValue;
 use App\Models\ProductCheck;
 use App\Models\ProductCheckValue;
+use App\Models\Location;
+use App\Models\DecisionType;
+use App\Models\Decision;
+use App\Models\Comment;
 use App\Models\ScanConfig;
+use App\Models\ProductType;
 use App\Services\ValidationEngine;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -21,57 +26,86 @@ class MobileScanner extends Component
     use WithFileUploads;
 
     public ?int $checkSessionId = null;
-
     public ?int $scanConfigId = null;
-
     public ?int $productTypeId = null;
 
+    public ?int $selectedLocationId = null;
+    public ?string $newLocationName = null;
+    public ?string $newLocationDescription = null;
+    public bool $showCreateLocationModal = false;
+    
+    public ?int $activeCheckId = null;
+    public ?int $deletedCheckIdToRestore = null;
+    
+    // For create unmatched product
+    public bool $showCreateProductModal = false;
+    public string $createProductName = '';
+    public string $createProductCode = '';
+    public ?int $createProductTypeId = null;
+    public array $createProductDynamicFields = [];
+    public array $createProductDynamicValues = [];
+    
+    // For remark / decision
+    public bool $showRemarkModal = false;
+    public ?string $remarkText = null;
+    public ?int $decisionTypeId = null;
+
     public ?int $matchedProductId = null;
-
     public string $scanCode = '';
-
     public array $actualValues = [];
-
     public array $attachments = [];
-
     public array $cameraAttachments = [];
-
     public array $scanConfigFields = [];
-
     public ?array $lastResult = null;
-
     public ?string $flashMessage = null;
-
     public ?string $flashTone = null;
-
     public ?string $comment = null;
-
     public bool $showDuplicateWarning = false;
-
     public array $duplicateChecks = [];
-
-    public bool $showSelectionModal = false;
-
     public bool $showScannerModal = false;
-
     public bool $showMatchedModal = false;
 
     public function mount(): void
     {
-        // dd(auth()->user()->hasAnyRole(['Super Admin', 'Admin', 'Supervisor', 'Checker']));
         abort_unless(auth()->check() && auth()->user()->hasAnyRole(['super-admin', 'admin', 'manager', 'checker', 'Super Admin', 'Admin', 'Supervisor', 'Checker']), 403);
+        $session = CheckSession::whereIn('status', ['DRAFT', 'OPEN'])->latest('started_at')->first();
+        $this->checkSessionId = $session?->id;
+        $this->productTypeId = $session?->product_type_id;
+        $this->scanConfigId = $session?->scan_config_id;
+        $this->refreshConfigFields();
+        
+        $defaultLocation = Location::where('name', 'Default Location')->first();
+        if (!$defaultLocation) {
+            $defaultLocation = Location::create([
+                'code' => 'DEF-LOC',
+                'name' => 'Default Location',
+                'description' => 'System default location'
+            ]);
+        }
+        $this->selectedLocationId = $defaultLocation->id;
+    }
 
-        $this->checkSessionId = CheckSession::whereIn('status', ['DRAFT', 'OPEN'])->value('id');
+    public function createLocation()
+    {
+        $this->validate([
+            'newLocationName' => 'required|string|max:255',
+            'newLocationDescription' => 'nullable|string'
+        ]);
+
+        $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $this->newLocationName), 0, 8)) . '-' . rand(100, 999);
+        $loc = Location::create([
+            'code' => $code,
+            'name' => $this->newLocationName,
+            'description' => $this->newLocationDescription
+        ]);
+        $this->selectedLocationId = $loc->id;
+        $this->showCreateLocationModal = false;
+        $this->newLocationName = null;
+        $this->newLocationDescription = null;
     }
 
     public function updatedProductTypeId(): void
     {
-        $product = $this->matchedProductId ? Product::find($this->matchedProductId) : null;
-        if (! $product || $product->product_type_id != $this->productTypeId) {
-            $this->matchedProductId = null;
-            $this->actualValues = [];
-        }
-
         $this->scanConfigId = null;
         $this->scanConfigFields = [];
     }
@@ -79,146 +113,268 @@ class MobileScanner extends Component
     public function updatedScanConfigId(): void
     {
         $this->refreshConfigFields();
-
-        if (! empty($this->scanConfigFields)) {
-            $allowedFields = collect($this->scanConfigFields)
-                ->pluck('field')
-                ->filter()
-                ->values()
-                ->all();
-
-            $this->actualValues = array_intersect_key($this->actualValues, array_flip($allowedFields));
-        } else {
-            $this->actualValues = [];
-        }
-
-        $this->prefillActualValues();
-    }
-
-    public function updatedScanCode(): void
-    {
-        $this->matchProductFromCode();
     }
 
     public function handleScan(string $decodedText): void
     {
         $this->scanCode = trim($decodedText);
-        $this->matchProductFromCode();
-    }
-
-    public function save(bool $confirmDuplicate = false): void
-    {
-        if (! $this->checkSessionId || ! $this->productTypeId || ! $this->scanConfigId) {
-            $this->showSelectionModal = true;
-            $this->showMatchedModal = false;
-            $this->showScannerModal = false;
-
+        
+        if (! $this->checkSessionId) {
+            $this->flashMessage = 'No active session selected. Please open a session first.';
+            $this->flashTone = 'warning';
             return;
         }
 
-        // Resolve product from the scanned code WITHOUT triggering prefill/presentation changes
-        $code = trim($this->scanCode);
-        $product = null;
-        if ($code !== '') {
-            $product = Product::with('attributeValues')
-                ->where('code', $code)
-                ->orWhere('barcode', $code)
-                ->orWhere('qr_code', $code)
-                ->first();
+        $code = $this->scanCode;
+        if ($code === '') return;
 
-            $this->matchedProductId = $product?->id;
-        }
+        $product = Product::with('attributeValues')
+            ->where('code', $code)
+            ->orWhere('barcode', $code)
+            ->orWhere('qr_code', $code)
+            ->first();
 
-        // If $product wasn't resolved from code above, fall back to matchedProductId
-        if (! $product) {
-            $product = $this->matchedProductId
-                ? Product::with('attributeValues')->find($this->matchedProductId)
-                : null;
-        }
+        // Check if already checked in this session by this user
+        $existingCheck = ProductCheck::where('check_session_id', $this->checkSessionId)
+            ->where('barcode', $code)
+            ->where('checked_by', auth()->id())
+            ->first();
 
-        if (!$confirmDuplicate) {
-            $duplicates = collect();
+        if ($existingCheck) {
+            $existingCheck->increment('quantity');
+            $existingCheck->touch();
 
+            if ($existingCheck->product?->product_type_id && ! ScanConfig::where('product_type_id', $existingCheck->product->product_type_id)->where('is_active', true)->exists()) {
+                $existingCheck->update(['result_status' => 'PASS']);
+            }
+
+            $this->flashMessage = 'Quantity updated for existing check.';
+            $this->flashTone = 'success';
+        } else {
+            $autoStatus = 'UNMATCHED';
             if ($product) {
-                $duplicates = ProductCheck::with('checkedBy')
-                    ->where('check_session_id', $this->checkSessionId)
-                    ->where('product_id', $product->id)
-                    ->get();
-            } else {
-                $duplicates = ProductCheck::with('checkedBy')
-                    ->where('check_session_id', $this->checkSessionId)
-                    ->whereNull('product_id')
-                    ->where('remark', 'like', "%({$this->scanCode})%")
-                    ->get();
+                $autoStatus = ScanConfig::where('product_type_id', $product->product_type_id)
+                    ->where('is_active', true)
+                    ->exists()
+                    ? 'PENDING'
+                    : 'PASS';
             }
 
-            if ($duplicates->isNotEmpty()) {
-                $this->duplicateChecks = $duplicates->toArray();
-                $this->showDuplicateWarning = true;
-                return;
-            }
+            ProductCheck::create([
+                'check_session_id' => $this->checkSessionId,
+                'scan_config_id' => $this->scanConfigId,
+                'product_id' => $product?->id,
+                'barcode' => $code,
+                'quantity' => 1,
+                'location_id' => $this->selectedLocationId,
+                'checked_by' => auth()->id(),
+                'checked_at' => now(),
+                'result_status' => $autoStatus,
+            ]);
+
+            $this->flashMessage = 'Scanned successfully.';
+            $this->flashTone = 'success';
+        }
+        
+        $this->scanCode = '';
+        $this->showScannerModal = false;
+    }
+
+    public function updateCheckQuantity($checkId, $quantity)
+    {
+        $check = ProductCheck::find($checkId);
+        if ($check && is_numeric($quantity) && $quantity > 0) {
+            $check->update(['quantity' => (int)$quantity]);
+        }
+    }
+
+    public function updateProductName($productId, $name)
+    {
+        $product = Product::find($productId);
+        if ($product && trim($name) !== '') {
+            $product->update(['name' => trim($name)]);
+        }
+    }
+
+    public function processScannedCode(): void
+    {
+        $code = trim($this->scanCode);
+        if ($code === '') {
+            $this->flashMessage = 'Please enter or scan a code before launching.';
+            $this->flashTone = 'warning';
+            return;
         }
 
-        $this->refreshConfigFields();
+        $this->handleScan($code);
+    }
 
-        $validationRules = [
-            'checkSessionId' => ['required', 'exists:check_sessions,id'],
-            'scanConfigId' => ['required', 'exists:scan_configs,id'],
-            'scanCode' => ['required', 'string', 'max:255'],
+    public function deleteCheck(int $checkId): void
+    {
+        $check = ProductCheck::find($checkId);
+        if (! $check) {
+            $this->flashMessage = 'Check not found.';
+            $this->flashTone = 'warning';
+            return;
+        }
+
+        $check->delete();
+        $this->deletedCheckIdToRestore = $check->id;
+        $this->flashMessage = 'Check deleted. You can restore it if this was a mistake.';
+        $this->flashTone = 'warning';
+    }
+
+    public function restoreCheck(int $checkId): void
+    {
+        $check = ProductCheck::withTrashed()->find($checkId);
+        if (! $check || ! $check->trashed()) {
+            $this->flashMessage = 'Nothing to restore.';
+            $this->flashTone = 'warning';
+            return;
+        }
+
+        $check->restore();
+        $this->deletedCheckIdToRestore = null;
+        $this->flashMessage = 'Check restored successfully.';
+        $this->flashTone = 'success';
+    }
+
+    public function openCreateProduct($checkId)
+    {
+        $this->activeCheckId = $checkId;
+        $check = ProductCheck::find($checkId);
+        $this->createProductCode = $check->barcode ?? '';
+        $this->createProductName = '';
+        $this->createProductTypeId = null;
+        $this->createProductDynamicFields = [];
+        $this->createProductDynamicValues = [];
+        $this->showCreateProductModal = true;
+    }
+
+    public function updatedCreateProductTypeId()
+    {
+        $this->createProductDynamicFields = [];
+        $this->createProductDynamicValues = [];
+        
+        if ($this->createProductTypeId) {
+            $fields = \App\Models\ProductTypeField::where('product_type_id', $this->createProductTypeId)
+                ->where('is_active', true)
+                ->where('required', true)
+                ->get();
+            
+            foreach ($fields as $field) {
+                $this->createProductDynamicFields[] = $field->toArray();
+                $this->createProductDynamicValues[$field->field_name] = '';
+            }
+        }
+    }
+
+    public function saveCreatedProduct()
+    {
+        $rules = [
+            'createProductTypeId' => 'required|exists:product_types,id',
+            'createProductCode' => 'required|string|unique:products,code',
+            'createProductName' => 'required|string',
         ];
 
-        if ($product) {
-            $validationRules = array_merge($validationRules, $this->getActualValueValidationRules());
+        foreach ($this->createProductDynamicFields as $field) {
+            $rules['createProductDynamicValues.' . $field['field_name']] = 'required';
         }
 
-        $this->validate($validationRules);
+        $this->validate($rules);
+
+        $type = ProductType::with('categories.subCategories')->find($this->createProductTypeId);
+        $cat = $type->categories->first();
+        
+        $product = Product::create([
+            'product_type_id' => $this->createProductTypeId,
+            'location_id' => $this->selectedLocationId,
+            'category_id' => $cat?->id,
+            'sub_category_id' => $cat?->subCategories->first()?->id,
+            'code' => $this->createProductCode,
+            'barcode' => $this->createProductCode,
+            'name' => $this->createProductName,
+            'status' => 'ACTIVE',
+            'created_during_pickup' => true
+        ]);
+
+        foreach ($this->createProductDynamicValues as $fieldName => $value) {
+            ProductAttributeValue::create([
+                'product_id' => $product->id,
+                'field_name' => $fieldName,
+                'value' => $value
+            ]);
+        }
+
+        if ($this->activeCheckId) {
+            $check = ProductCheck::find($this->activeCheckId);
+            if ($check) {
+                $autoStatus = ScanConfig::where('product_type_id', $product->product_type_id)
+                    ->where('is_active', true)
+                    ->exists()
+                    ? 'PENDING'
+                    : 'PASS';
+
+                $check->update([
+                    'product_id' => $product->id,
+                    'result_status' => $autoStatus,
+                ]);
+            }
+        }
+
+        $this->showCreateProductModal = false;
+        $this->activeCheckId = null;
+        $this->flashMessage = 'Product created and linked.';
+        $this->flashTone = 'success';
+    }
+
+    public function openComparison($checkId)
+    {
+        $this->activeCheckId = $checkId;
+        $check = ProductCheck::with('product.attributeValues')->find($checkId);
+        
+        if (! $check || ! $check->product) {
+            $this->flashMessage = 'Cannot validate unmatched product. Create product first.';
+            $this->flashTone = 'warning';
+            return;
+        }
+
+        $this->matchedProductId = $check->product_id;
+        $this->productTypeId = $check->product->product_type_id;
+
+        if (! $this->scanConfigId) {
+            $firstConfig = ScanConfig::where('product_type_id', $this->productTypeId)
+                ->where('is_active', true)
+                ->first();
+            $this->scanConfigId = $firstConfig?->id;
+        }
+        
+        $this->refreshConfigFields();
+        $this->prefillActualValues();
+        $this->showMatchedModal = true;
+    }
+
+    public function saveValidation()
+    {
+        if (! $this->activeCheckId || ! $this->scanConfigId) return;
+
+        $check = ProductCheck::with('product')->find($this->activeCheckId);
+        if (! $check || ! $check->product) return;
+
+        $this->validate($this->getActualValueValidationRules());
 
         $scanConfig = ScanConfig::findOrFail($this->scanConfigId);
         $uploadedAttachments = array_merge($this->attachments, $this->cameraAttachments);
 
-        if ($product) {
-            $validation = app(ValidationEngine::class)->validate($scanConfig, $product, $this->actualValues);
-        } else {
-            $validation = [
-                'result_status' => 'WARNING',
-                'values' => $this->buildMismatchValues(),
-                'errors' => [
-                    "No matching product was found for the scanned code ({$this->scanCode}). Saved as a manual mismatch review.",
-                ],
-            ];
-        }
+        $validation = app(ValidationEngine::class)->validate($scanConfig, $check->product, $this->actualValues);
 
-        if (!$product && count($uploadedAttachments) === 0) {
-            $this->showDuplicateWarning = false;
-            $this->flashMessage = 'Attachment required: please upload at least one photo before saving an unmatched mismatch check.';
-            $this->flashTone = 'warning';
-            $this->showMatchedModal = true;
-            $this->showScannerModal = false;
-
-            Notification::make()
-                ->title('Attachment required')
-                ->body('Please upload at least one photo before saving an unmatched mismatch check.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        // Add metadata so the view can show who checked, which code and when
-        $validation['checked_by_id'] = auth()->id();
-        $validation['checked_by_name'] = auth()->user()?->name ?? null;
-        $validation['checked_at'] = now()->toDateTimeString();
-        $validation['scanned_code'] = $this->scanCode;
-
-        $check = ProductCheck::create([
-            'check_session_id' => $this->checkSessionId,
+        $check->update([
             'scan_config_id' => $this->scanConfigId,
-            'product_id' => $product?->id,
-            'checked_by' => auth()->id(),
-            'checked_at' => now(),
             'result_status' => $validation['result_status'],
             'remark' => $validation['errors'] ? implode(' | ', $validation['errors']) . ($this->comment ? ' | Comment: ' . $this->comment : '') : $this->comment,
         ]);
+
+        // Clear old values if re-validating
+        ProductCheckValue::where('product_check_id', $check->id)->delete();
 
         foreach ($validation['values'] as $value) {
             ProductCheckValue::create([
@@ -233,7 +389,6 @@ class MobileScanner extends Component
 
         foreach ($uploadedAttachments as $attachment) {
             $storedPath = $attachment->store('attachments/checks', 'public');
-
             Attachment::create([
                 'attachable_type' => ProductCheck::class,
                 'attachable_id' => $check->id,
@@ -247,42 +402,72 @@ class MobileScanner extends Component
 
         event(new ProductChecked($check));
 
-        $this->lastResult = $validation;
-        $this->scanCode = '';
-        $this->matchedProductId = null;
-        $this->actualValues = [];
         $this->showMatchedModal = false;
-        $this->showScannerModal = false;
-        $this->showDuplicateWarning = false;
-        $this->duplicateChecks = [];
-        $this->comment = null;
+        $this->activeCheckId = null;
         $this->attachments = [];
         $this->cameraAttachments = [];
-        $this->dispatch('check-saved');
+        $this->actualValues = [];
+        $this->comment = null;
 
-        $savedNotification = Notification::make()
-            ->title($product ? 'Check saved successfully' : 'Mismatch saved with caution')
-            ->body($product ? 'The matched product check has been stored.' : 'The scan was saved as a manual mismatch review.');
+        $this->flashMessage = 'Check validation saved.';
+        $this->flashTone = $validation['result_status'] === 'PASS' ? 'success' : 'warning';
+    }
 
-        if ($product && $validation['result_status'] === 'PASS') {
-            $savedNotification->success();
-        } else {
-            $savedNotification->warning();
+    public function openRemarkModal($checkId)
+    {
+        $this->activeCheckId = $checkId;
+        $this->remarkText = '';
+        $this->decisionTypeId = null;
+        $this->showRemarkModal = true;
+    }
+
+    public function saveRemark()
+    {
+        if (! $this->activeCheckId) return;
+
+        $check = ProductCheck::find($this->activeCheckId);
+        if ($check) {
+            $decisionId = null;
+            if ($this->decisionTypeId) {
+                $decision = Decision::create([
+                    'product_check_id' => $check->id,
+                    'decision_type_id' => $this->decisionTypeId,
+                    'action_status' => 'OPEN',
+                    'decision_by' => auth()->id(),
+                ]);
+                $decisionId = $decision->id;
+            }
+
+            if ($this->remarkText) {
+                if ($decisionId) {
+                    Comment::create([
+                        'decision_id' => $decisionId,
+                        'user_id' => auth()->id(),
+                        'comment_type' => 'DECISION',
+                        'comment' => $this->remarkText
+                    ]);
+                } else {
+                    // Update check remark if no decision
+                    $check->update([
+                        'remark' => $check->remark ? $check->remark . ' | ' . $this->remarkText : $this->remarkText
+                    ]);
+                }
+            }
         }
 
-        $savedNotification->send();
-
-        $this->flashMessage = null;
-        $this->flashTone = null;
+        $this->showRemarkModal = false;
+        $this->activeCheckId = null;
+        $this->remarkText = null;
+        $this->decisionTypeId = null;
+        
+        $this->flashMessage = 'Remark/Decision added.';
+        $this->flashTone = 'success';
     }
 
     protected function refreshConfigFields(): void
     {
         $this->scanConfigFields = [];
-
-        if (! $this->scanConfigId) {
-            return;
-        }
+        if (! $this->scanConfigId) return;
 
         $scanConfig = ScanConfig::find($this->scanConfigId);
         $this->scanConfigFields = collect(data_get($scanConfig?->config_json, 'fields', []))
@@ -295,152 +480,70 @@ class MobileScanner extends Component
                     'compare' => false,
                     'tolerance' => null,
                 ], $fieldConfig);
-            })
-            ->values()
-            ->all();
-    }
-
-    public function matchProductFromCode(): void
-    {
-        $this->showDuplicateWarning = false;
-        $this->duplicateChecks = [];
-
-        if (! $this->checkSessionId || ! $this->productTypeId || ! $this->scanConfigId) {
-            $this->showSelectionModal = true;
-            $this->showMatchedModal = false;
-            $this->showScannerModal = false;
-
-            // Notification::make()
-            //     ->title('Complete selection first')
-            //     ->body('Please choose the check session, product type, and scan config before saving.')
-            //     ->warning()
-            //     ->send();
-
-            return;
-        }
-
-        $code = trim($this->scanCode);
-
-        if ($code === '') {
-            $this->matchedProductId = null;
-            $this->showMatchedModal = false;
-            return;
-        }
-
-        $product = Product::with('attributeValues')
-            ->where('code', $code)
-            ->orWhere('barcode', $code)
-            ->orWhere('qr_code', $code)
-            ->first();
-
-        $this->matchedProductId = $product?->id;
-        $this->showMatchedModal = true;
-        $this->showScannerModal = false;
-
-        if ($product) {
-            $this->productTypeId = $product->product_type_id;
-
-            // Auto-select scan config if none is selected, or if the current scan config doesn't match the new product type
-            $validConfig = false;
-            if ($this->scanConfigId) {
-                $currentConfig = ScanConfig::find($this->scanConfigId);
-                if ($currentConfig && $currentConfig->product_type_id == $this->productTypeId && $currentConfig->is_active) {
-                    $validConfig = true;
-                }
-            }
-
-            if (! $validConfig) {
-                $firstConfig = ScanConfig::where('product_type_id', $this->productTypeId)
-                    ->where('is_active', true)
-                    ->first();
-                if ($firstConfig) {
-                    $this->scanConfigId = $firstConfig->id;
-                } else {
-                    $this->scanConfigId = null;
-                }
-            }
-
-            $this->refreshConfigFields();
-            $this->prefillActualValues();
-            $this->flashMessage = 'Product matched successfully.';
-            $this->flashTone = 'success';
-        } else {
-            $this->flashMessage = 'No product matched. Please upload a photo for review or scan again.';
-            $this->flashTone = 'warning';
-        }
+            })->values()->all();
     }
 
     protected function prefillActualValues(): void
     {
-        $product = $this->matchedProductId
-            ? Product::with('attributeValues')->find($this->matchedProductId)
-            : null;
-
-        if (! $product) {
-            return;
-        }
+        $product = $this->matchedProductId ? Product::with('attributeValues')->find($this->matchedProductId) : null;
+        if (! $product) return;
 
         foreach ($this->scanConfigFields as $fieldConfig) {
             $fieldName = $fieldConfig['field'] ?? null;
+            if (! $fieldName || ($fieldConfig['source'] ?? 'product') !== 'product') continue;
 
-            if (! $fieldName || ($fieldConfig['source'] ?? 'product') !== 'product') {
-                continue;
-            }
-
-            $this->actualValues[$fieldName] = $this->resolveExpectedValue($product, $fieldName);
+            $this->actualValues[$fieldName] = match ($fieldName) {
+                'location_id', 'category_id', 'sub_category_id' => $product->{$fieldName},
+                'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $product->{$fieldName},
+                default => $product->attributeValues->firstWhere('field_name', $fieldName)?->value,
+            };
         }
-    }
-
-    protected function resolveExpectedValue(Product $product, string $fieldName): mixed
-    {
-        return match ($fieldName) {
-            'location_id', 'category_id', 'sub_category_id' => $product->{$fieldName},
-            'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $product->{$fieldName},
-            default => $product->attributeValues->firstWhere('field_name', $fieldName)?->value,
-        };
     }
 
     protected function getActualValueValidationRules(): array
     {
         $rules = [];
-
         foreach ($this->scanConfigFields as $fieldConfig) {
             $fieldName = $fieldConfig['field'] ?? null;
-            if (! $fieldName) {
-                continue;
+            if ($fieldName) {
+                $rules["actualValues.{$fieldName}"] = $fieldConfig['required'] ? ['required', 'string', 'max:255'] : ['nullable', 'string', 'max:255'];
             }
-
-            $rules["actualValues.{$fieldName}"] = $fieldConfig['required'] ? ['required', 'string', 'max:255'] : ['nullable', 'string', 'max:255'];
         }
-
         return $rules;
-    }
-
-    protected function buildMismatchValues(): array
-    {
-        return collect($this->scanConfigFields)
-            ->map(function (array $fieldConfig) {
-                $fieldName = $fieldConfig['field'] ?? null;
-                $actualValue = $fieldName ? ($this->actualValues[$fieldName] ?? null) : null;
-
-                return [
-                    'field_name' => $fieldName ?? 'Field',
-                    'expected_value' => null,
-                    'actual_value' => $actualValue,
-                    'difference_value' => null,
-                    'status' => $actualValue ? 'WARNING' : 'FAIL',
-                ];
-            })
-            ->filter(fn(array $value) => $value['field_name'] !== null)
-            ->values()
-            ->all();
     }
 
     public function render()
     {
+        $recentChecks = ProductCheck::with(['product.attributeValues', 'location', 'decisions.decisionType'])
+            ->where('check_session_id', $this->checkSessionId)
+            ->where('checked_by', auth()->id())
+            ->orderBy('updated_at', 'desc')
+            ->take(10)
+            ->get();
+            
+        // Calculate record_qty for each check (total checked by other users for the same product in same session)
+        foreach ($recentChecks as $check) {
+            if ($check->product_id) {
+                $check->record_qty = ProductCheck::where('check_session_id', $this->checkSessionId)
+                    ->where('product_id', $check->product_id)
+                    ->where('id', '!=', $check->id) // exclude current
+                    ->sum('quantity');
+                    
+            } else {
+                $check->record_qty = 0;
+            }
+        }
+
+        $recentChecksGrouped = $recentChecks->groupBy(function($item) {
+            return $item->location ? $item->location->name : 'Unknown Location';
+        });
+
         return view('livewire.mobile-scanner', [
             'sessions' => CheckSession::latest('started_at')->get(),
-            'productTypes' => \App\Models\ProductType::where('is_active', true)->orderBy('name')->get(),
+            'locations' => Location::orderBy('name')->get(),
+            'productTypes' => ProductType::where('is_active', true)->orderBy('name')->get(),
+            'decisionTypes' => DecisionType::where('is_active', true)->orderBy('name')->get(),
+            'recentChecksGrouped' => $recentChecksGrouped,
             'scanConfigs' => $this->productTypeId
                 ? ScanConfig::where('product_type_id', $this->productTypeId)->where('is_active', true)->orderBy('name')->get()
                 : collect(),
@@ -448,10 +551,6 @@ class MobileScanner extends Component
                 ? Product::with(['productType', 'location', 'category', 'subCategory', 'attributeValues'])->find($this->matchedProductId)
                 : null,
             'selectedScanConfig' => $this->scanConfigId ? ScanConfig::find($this->scanConfigId) : null,
-            'scanStats' => [
-                'open_sessions' => CheckSession::where('status', 'OPEN')->count(),
-                'active_configs' => ScanConfig::where('is_active', true)->count(),
-            ],
         ])->layout('layouts.app');
     }
 }

@@ -182,6 +182,10 @@ class ProductCheckResource extends Resource
                     ->label('Product Name')
                     ->searchable()
                     ->limit(32),
+                Tables\Columns\TextColumn::make('quantity')
+                    ->label('Quantity')
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('checkSession.name')
                     ->label('Session')
                     ->sortable(),

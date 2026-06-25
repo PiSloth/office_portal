@@ -15,8 +15,10 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'qr_code',
     'name',
     'description',
+    'quantity',
     'status',
-    'import_batch_id'
+    'import_batch_id',
+    'created_during_pickup'
 ])]
 class Product extends Model
 {
