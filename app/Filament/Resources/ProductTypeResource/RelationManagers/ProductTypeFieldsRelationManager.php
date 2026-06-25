@@ -42,6 +42,12 @@ class ProductTypeFieldsRelationManager extends RelationManager
                 Forms\Components\Toggle::make('required')
                     ->label('Is Required Field?')
                     ->default(false),
+                Forms\Components\Toggle::make('show_in_creation_form')
+                    ->label('Show in Create Form?')
+                    ->default(false),
+                Forms\Components\Toggle::make('show_in_table_by_default')
+                    ->label('Show in Scanner Table?')
+                    ->default(false),
                 Forms\Components\Toggle::make('is_active')
                     ->label('Is Field Active?')
                     ->default(true),
@@ -60,6 +66,12 @@ class ProductTypeFieldsRelationManager extends RelationManager
                     ->color('info')
                     ->sortable(),
                 Tables\Columns\IconColumn::make('required')
+                    ->boolean()
+                    ->sortable(),
+                Tables\Columns\IconColumn::make('show_in_creation_form')
+                    ->boolean()
+                    ->sortable(),
+                Tables\Columns\IconColumn::make('show_in_table_by_default')
                     ->boolean()
                     ->sortable(),
                 Tables\Columns\IconColumn::make('is_active')

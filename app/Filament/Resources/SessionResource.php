@@ -72,9 +72,10 @@ class SessionResource extends Resource
                     ->searchable()
                     ->disabled(fn(callable $get) => ! $get('product_type_id'))
                     ->required(),
-                Forms\Components\Select::make('assigned_user_id')
-                    ->label('Assigned User')
-                    ->relationship('assignedUser', 'name')
+                Forms\Components\Select::make('assignedUsers')
+                    ->label('Assigned Users')
+                    ->relationship('assignedUsers', 'name')
+                    ->multiple()
                     ->searchable()
                     ->preload(),
                 Forms\Components\Select::make('status')
@@ -118,9 +119,11 @@ class SessionResource extends Resource
                 Tables\Columns\TextColumn::make('scanConfig.name')
                     ->label('Scan Config')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('assignedUser.name')
-                    ->label('Assigned User')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('assignedUsers.name')
+                    ->label('Assigned Users')
+                    ->listWithLineBreaks()
+                    ->limitList(3)
+                    ->expandableLimitedList(),
                 Tables\Columns\TextColumn::make('startedBy.name')
                     ->label('Started By')
                     ->sortable(),

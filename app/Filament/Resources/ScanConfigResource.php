@@ -106,6 +106,10 @@ class ScanConfigResource extends Resource
                                         ->label('Tolerance (if numeric)')
                                         ->helperText('e.g. 0.02 for weight deviations')
                                         ->visible(fn(Get $get) => $get('compare') === true),
+
+                                    Forms\Components\Toggle::make('is_editable_in_table')
+                                        ->label('Editable in Scanner Table?')
+                                        ->default(false),
                                 ]),
                             ])
                             ->itemLabel(fn(array $state): ?string => $state['field_name'] ?? $state['field'] ?? 'New Field')

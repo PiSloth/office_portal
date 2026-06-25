@@ -44,4 +44,9 @@ class CheckSession extends Model
     {
         return $this->belongsTo(User::class, 'assigned_user_id');
     }
+
+    public function assignedUsers()
+    {
+        return $this->belongsToMany(User::class, 'check_session_user');
+    }
 }

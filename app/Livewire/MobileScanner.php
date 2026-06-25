@@ -64,6 +64,7 @@ class MobileScanner extends Component
     public array $duplicateChecks = [];
     public bool $showScannerModal = false;
     public bool $showMatchedModal = false;
+    public array $productTypeDynamicFields = [];
 
     public function mount(): void
     {
@@ -73,6 +74,7 @@ class MobileScanner extends Component
         $this->productTypeId = $session?->product_type_id;
         $this->scanConfigId = $session?->scan_config_id;
         $this->refreshConfigFields();
+        $this->loadProductTypeDynamicFields();
         
         $defaultLocation = Location::where('name', 'Default Location')->first();
         if (!$defaultLocation) {
@@ -108,6 +110,7 @@ class MobileScanner extends Component
     {
         $this->scanConfigId = null;
         $this->scanConfigFields = [];
+        $this->loadProductTypeDynamicFields();
     }
 
     public function updatedScanConfigId(): void
@@ -144,23 +147,26 @@ class MobileScanner extends Component
             $existingCheck->increment('quantity');
             $existingCheck->touch();
 
-            if ($existingCheck->product?->product_type_id && ! ScanConfig::where('product_type_id', $existingCheck->product->product_type_id)->where('is_active', true)->exists()) {
-                $existingCheck->update(['result_status' => 'PASS']);
+            if ($this->scanConfigId && collect($this->scanConfigFields)->contains('field', 'quantity')) {
+                // If there's a dynamic field called 'quantity', sync the built-in incremented quantity to it
+                // This automatically triggers the ValidationEngine through updateInlineCheckValue
+                $this->updateInlineCheckValue($existingCheck->id, 'quantity', $existingCheck->quantity);
+            } else {
+                if ($existingCheck->product) {
+                    $this->runFullValidation($existingCheck);
+                }
             }
 
             $this->flashMessage = 'Quantity updated for existing check.';
             $this->flashTone = 'success';
         } else {
-            $autoStatus = 'UNMATCHED';
-            if ($product) {
-                $autoStatus = ScanConfig::where('product_type_id', $product->product_type_id)
-                    ->where('is_active', true)
-                    ->exists()
-                    ? 'PENDING'
-                    : 'PASS';
+            $autoStatus = $this->getAutoStatusForProduct($product);
+            $closingStock = $product ? (int) $product->quantity : 0;
+            if (1 !== $closingStock && $autoStatus === 'PASS') {
+                $autoStatus = 'WARNING';
             }
 
-            ProductCheck::create([
+            $newCheck = ProductCheck::create([
                 'check_session_id' => $this->checkSessionId,
                 'scan_config_id' => $this->scanConfigId,
                 'product_id' => $product?->id,
@@ -169,8 +175,18 @@ class MobileScanner extends Component
                 'location_id' => $this->selectedLocationId,
                 'checked_by' => auth()->id(),
                 'checked_at' => now(),
-                'result_status' => $autoStatus,
+                'result_status' => 'PENDING', // Will be resolved right after
             ]);
+            
+            if ($product) {
+                $newCheck->update(['result_status' => $this->resolveCheckStatus($newCheck, $autoStatus)]);
+            } else {
+                $newCheck->update(['result_status' => 'UNMATCHED']);
+            }
+
+            if ($this->scanConfigId && collect($this->scanConfigFields)->contains('field', 'quantity')) {
+                $this->updateInlineCheckValue($newCheck->id, 'quantity', 1);
+            }
 
             $this->flashMessage = 'Scanned successfully.';
             $this->flashTone = 'success';
@@ -182,9 +198,11 @@ class MobileScanner extends Component
 
     public function updateCheckQuantity($checkId, $quantity)
     {
-        $check = ProductCheck::find($checkId);
+        $check = ProductCheck::with(['product.attributeValues', 'checkValues'])->find($checkId);
         if ($check && is_numeric($quantity) && $quantity > 0) {
-            $check->update(['quantity' => (int)$quantity]);
+            $check->quantity = (int)$quantity;
+            $check->save();
+            $this->runFullValidation($check);
         }
     }
 
@@ -244,9 +262,8 @@ class MobileScanner extends Component
         $check = ProductCheck::find($checkId);
         $this->createProductCode = $check->barcode ?? '';
         $this->createProductName = '';
-        $this->createProductTypeId = null;
-        $this->createProductDynamicFields = [];
-        $this->createProductDynamicValues = [];
+        $this->createProductTypeId = $this->productTypeId;
+        $this->updatedCreateProductTypeId();
         $this->showCreateProductModal = true;
     }
 
@@ -258,7 +275,7 @@ class MobileScanner extends Component
         if ($this->createProductTypeId) {
             $fields = \App\Models\ProductTypeField::where('product_type_id', $this->createProductTypeId)
                 ->where('is_active', true)
-                ->where('required', true)
+                ->where('show_in_creation_form', true)
                 ->get();
             
             foreach ($fields as $field) {
@@ -308,11 +325,7 @@ class MobileScanner extends Component
         if ($this->activeCheckId) {
             $check = ProductCheck::find($this->activeCheckId);
             if ($check) {
-                $autoStatus = ScanConfig::where('product_type_id', $product->product_type_id)
-                    ->where('is_active', true)
-                    ->exists()
-                    ? 'PENDING'
-                    : 'PASS';
+                $autoStatus = $this->getAutoStatusForProduct($product);
 
                 $check->update([
                     'product_id' => $product->id,
@@ -365,26 +378,11 @@ class MobileScanner extends Component
         $scanConfig = ScanConfig::findOrFail($this->scanConfigId);
         $uploadedAttachments = array_merge($this->attachments, $this->cameraAttachments);
 
-        $validation = app(ValidationEngine::class)->validate($scanConfig, $check->product, $this->actualValues);
+        $this->runFullValidation($check, $this->actualValues);
 
-        $check->update([
-            'scan_config_id' => $this->scanConfigId,
-            'result_status' => $validation['result_status'],
-            'remark' => $validation['errors'] ? implode(' | ', $validation['errors']) . ($this->comment ? ' | Comment: ' . $this->comment : '') : $this->comment,
-        ]);
-
-        // Clear old values if re-validating
-        ProductCheckValue::where('product_check_id', $check->id)->delete();
-
-        foreach ($validation['values'] as $value) {
-            ProductCheckValue::create([
-                'product_check_id' => $check->id,
-                'field_name' => $value['field_name'],
-                'expected_value' => $value['expected_value'],
-                'actual_value' => $value['actual_value'],
-                'difference_value' => $value['difference_value'],
-                'status' => $value['status'],
-            ]);
+        if ($this->comment) {
+            $check->remark = $check->remark ? $check->remark . ' | Comment: ' . $this->comment : 'Comment: ' . $this->comment;
+            $check->save();
         }
 
         foreach ($uploadedAttachments as $attachment) {
@@ -479,8 +477,33 @@ class MobileScanner extends Component
                     'required' => false,
                     'compare' => false,
                     'tolerance' => null,
+                    'is_editable_in_table' => false,
                 ], $fieldConfig);
             })->values()->all();
+    }
+
+    protected function loadProductTypeDynamicFields(): void
+    {
+        $this->productTypeDynamicFields = [];
+        if ($this->productTypeId) {
+            $this->productTypeDynamicFields = \App\Models\ProductTypeField::where('product_type_id', $this->productTypeId)
+                ->where('is_active', true)
+                ->get()
+                ->toArray();
+        }
+    }
+
+    public function updateInlineCheckValue($checkId, $fieldName, $value)
+    {
+        $check = ProductCheck::with(['product.attributeValues', 'checkValues'])->find($checkId);
+        if (! $check || ! $check->product) return;
+
+        if ($fieldName === 'quantity' && is_numeric($value)) {
+            $check->quantity = (int)$value;
+            $check->save();
+        }
+
+        $this->runFullValidation($check, [$fieldName => $value]);
     }
 
     protected function prefillActualValues(): void
@@ -512,9 +535,113 @@ class MobileScanner extends Component
         return $rules;
     }
 
+    protected function getAutoStatusForProduct(?Product $product): string
+    {
+        if (!$product) {
+            return 'UNMATCHED';
+        }
+
+        $scanConfig = ScanConfig::where('product_type_id', $product->product_type_id)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$scanConfig) {
+            return 'PASS';
+        }
+
+        $fields = data_get($scanConfig->config_json, 'fields', []);
+        $hasCompareFields = collect($fields)->contains(function ($field) {
+            return data_get($field, 'compare', false) == true;
+        });
+
+        return $hasCompareFields ? 'PENDING' : 'PASS';
+    }
+
+    protected function resolveCheckStatus(ProductCheck $check, ?string $baseStatus = 'PASS'): string
+    {
+        if (!$check->product) {
+            return 'UNMATCHED';
+        }
+
+        if ($baseStatus === 'FAIL') {
+            return 'FAIL';
+        }
+
+        $closingStock = (int) $check->product->quantity;
+        
+        $otherUsersQty = \App\Models\ProductCheck::where('check_session_id', $check->check_session_id)
+            ->where('product_id', $check->product_id)
+            ->where('id', '!=', $check->id)
+            ->sum('quantity');
+
+        if (((int) $check->quantity + (int) $otherUsersQty) !== $closingStock) {
+            return 'FAIL'; // Quantity mismatch overrides PASS/PENDING to FAIL
+        }
+
+        return $baseStatus;
+    }
+
+    protected function runFullValidation(ProductCheck $check, array $inlineOverrides = []): void
+    {
+        if (! $check->product) return;
+        
+        $scanConfig = $this->scanConfigId ? ScanConfig::find($this->scanConfigId) : null;
+        
+        $baseStatus = 'PASS';
+        $errors = [];
+        
+        if ($scanConfig) {
+            $actualValues = [];
+            foreach (data_get($scanConfig->config_json, 'fields', []) as $fieldConfig) {
+                $fName = $fieldConfig['field'] ?? null;
+                if (! $fName || ($fieldConfig['source'] ?? 'product') !== 'product') continue;
+                
+                $actualValues[$fName] = match ($fName) {
+                    'location_id', 'category_id', 'sub_category_id' => $check->product->{$fName},
+                    'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $check->product->{$fName},
+                    default => $check->product->attributeValues->firstWhere('field_name', $fName)?->value,
+                };
+            }
+            
+            $existingValues = ProductCheckValue::where('product_check_id', $check->id)->get();
+            foreach ($existingValues as $ev) {
+                $actualValues[$ev->field_name] = $ev->actual_value;
+            }
+            
+            foreach ($inlineOverrides as $k => $v) {
+                $actualValues[$k] = $v;
+            }
+            
+            $validation = app(ValidationEngine::class)->validate($scanConfig, $check->product, $actualValues);
+            $baseStatus = $validation['result_status'];
+            $errors = $validation['errors'] ?? [];
+            
+            ProductCheckValue::where('product_check_id', $check->id)->delete();
+            foreach ($validation['values'] as $val) {
+                ProductCheckValue::create([
+                    'product_check_id' => $check->id,
+                    'field_name' => $val['field_name'],
+                    'expected_value' => $val['expected_value'],
+                    'actual_value' => $val['actual_value'],
+                    'difference_value' => $val['difference_value'],
+                    'status' => $val['status'],
+                ]);
+            }
+        }
+        
+        $check->result_status = $this->resolveCheckStatus($check, $baseStatus);
+        $check->remark = $errors ? implode(' | ', $errors) : null;
+        if ($scanConfig) {
+            $check->scan_config_id = $scanConfig->id;
+        }
+        $check->save();
+        
+        event(new ProductChecked($check));
+    }
+
     public function render()
     {
-        $recentChecks = ProductCheck::with(['product.attributeValues', 'location', 'decisions.decisionType'])
+        $recentChecks = ProductCheck::with(['product.attributeValues', 'location', 'decisions.decisionType', 'checkValues'])
             ->where('check_session_id', $this->checkSessionId)
             ->where('checked_by', auth()->id())
             ->orderBy('updated_at', 'desc')

@@ -12,11 +12,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductCheckExportService
 {
-    public function downloadAll(): StreamedResponse
+    public function downloadAll(?\Illuminate\Database\Eloquent\Builder $query = null): StreamedResponse
     {
         $filename = 'checked-products-' . now()->format('Y-m-d-His') . '.xlsx';
 
-        return response()->streamDownload(function () {
+        return response()->streamDownload(function () use ($query) {
             $writer = new Writer();
             $writer->openToFile('php://output');
 
@@ -26,7 +26,7 @@ class ProductCheckExportService
                 ->setBackgroundColor(Color::rgb(31, 41, 55));
 
             $fieldNames = $this->getDistinctFieldNames();
-            $this->writeMasterSheet($writer, $headerStyle, $fieldNames);
+            $this->writeMasterSheet($writer, $headerStyle, $fieldNames, $query);
 
             $writer->close();
         }, $filename, [
@@ -34,7 +34,7 @@ class ProductCheckExportService
         ]);
     }
 
-    protected function writeMasterSheet(Writer $writer, Style $headerStyle, array $fieldNames): void
+    protected function writeMasterSheet(Writer $writer, Style $headerStyle, array $fieldNames, ?\Illuminate\Database\Eloquent\Builder $query = null): void
     {
         $writer->addNewSheetAndMakeItCurrent();
         $writer->getCurrentSheet()->setName('Master Checks');
@@ -64,7 +64,9 @@ class ProductCheckExportService
 
         $writer->addRow(Row::fromValues($headers, $headerStyle));
 
-        ProductCheck::with([
+        $query = $query ?? ProductCheck::query();
+
+        $query->with([
             'checkSession',
             'product',
             'checkedBy',

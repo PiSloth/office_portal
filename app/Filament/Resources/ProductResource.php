@@ -83,6 +83,10 @@ class ProductResource extends Resource
                             ->maxLength(255),
                         Forms\Components\TextInput::make('qr_code')
                             ->maxLength(255),
+                        Forms\Components\TextInput::make('quantity')
+                            ->numeric()
+                            ->default(0)
+                            ->required(),
                         Forms\Components\Textarea::make('description')
                             ->maxLength(65535)
                             ->columnSpanFull(),
@@ -144,39 +148,125 @@ class ProductResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable(),
-                Tables\Columns\TextColumn::make('code')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('productType.name')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('location.code')->label('Location')->sortable(),
-                Tables\Columns\TextColumn::make('status')
-                    ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'ACTIVE' => 'success',
-                        'SUSPENDED' => 'danger',
-                        default => 'gray',
+        $columns = [
+            Tables\Columns\TextColumn::make('id')->sortable(),
+            Tables\Columns\TextColumn::make('code')->searchable()->sortable(),
+            Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
+            Tables\Columns\TextColumn::make('productType.name')->searchable()->sortable(),
+            Tables\Columns\TextColumn::make('location.code')->label('Location'),
+            Tables\Columns\TextColumn::make('category.name')->label('Category'),
+            Tables\Columns\TextColumn::make('subCategory.name')->label('Sub-Category'),
+            Tables\Columns\TextColumn::make('quantity')
+                ->label('Quantity')
+                ->sortable()
+                ->formatStateUsing(fn($state) => $state ?? 0),
+            Tables\Columns\TextColumn::make('barcode')->searchable()->sortable(),
+            Tables\Columns\TextColumn::make('qr_code')->searchable()->sortable(),
+            Tables\Columns\TextColumn::make('created_at')
+                ->dateTime()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('updated_at')
+                ->dateTime()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('created_by')
+                ->label('Created By')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('updated_by')
+                ->label('Updated By')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('status')
+                ->badge()
+                ->color(fn(string $state): string => match ($state) {
+                    'ACTIVE' => 'success',
+                    'SUSPENDED' => 'danger',
+                    default => 'gray',
+                })
+                ->sortable(),
+            Tables\Columns\TextColumn::make('created_at')
+                ->dateTime()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('updated_at')
+                ->dateTime()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('created_by')
+                ->label('Created By')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('updated_by')
+                ->label('Updated By')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('status')
+                ->badge()
+                ->color(fn(string $state): string => match ($state) {
+                    'ACTIVE' => 'success',
+                    'SUSPENDED' => 'danger',
+                    default => 'gray',
+                })
+                ->sortable(),
+            Tables\Columns\TextColumn::make('created_during_pickup')
+                ->label('Created During Pickup')
+                ->badge()
+                ->formatStateUsing(fn(bool $state): string => $state ? 'Yes' : '-')
+                ->color(fn(bool $state): string => $state ? 'success' : 'gray')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('status')
+                ->badge()
+                ->color(fn(string $state): string => match ($state) {
+                    'ACTIVE' => 'success',
+                    'SUSPENDED' => 'danger',
+                    default => 'gray',
+                })
+                ->sortable(),
+            Tables\Columns\TextColumn::make('created_at')
+                ->dateTime()
+                ->toggleable(isToggledHiddenByDefault: true),
+        ];
+
+        try {
+            $dynamicFields = \App\Models\ProductTypeField::query()
+                ->select(['field_name', 'field_label'])
+                ->distinct()
+                ->get();
+
+            foreach ($dynamicFields as $field) {
+                $columns[] = Tables\Columns\TextColumn::make('attr_' . $field->field_name)
+                    ->label($field->field_label)
+                    ->state(function (\App\Models\Product $record) use ($field) {
+                        $val = $record->attributeValues->where('field_name', $field->field_name)->first();
+                        return $val ? $val->value : '-';
                     })
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
+                    ->toggleable(isToggledHiddenByDefault: true);
+            }
+        } catch (\Exception $e) {
+            // Ignore during migrations
+        }
+
+        return $table
+            ->columns($columns)
             ->filters([
                 Tables\Filters\SelectFilter::make('productType')
                     ->relationship('productType', 'name'),
                 Tables\Filters\SelectFilter::make('location')
                     ->relationship('location', 'code'),
             ])
-            ->actions([
+            ->recordActions([
                 Actions\EditAction::make(),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 Actions\BulkActionGroup::make([
                     Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->with('attributeValues');
     }
 
     public static function getPages(): array

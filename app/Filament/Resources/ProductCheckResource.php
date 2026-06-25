@@ -171,8 +171,7 @@ class ProductCheckResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
+        $columns = [
                 Tables\Columns\TextColumn::make('id')->sortable(),
                 Tables\Columns\TextColumn::make('product.code')
                     ->label('Product')
@@ -210,7 +209,31 @@ class ProductCheckResource extends Resource
                 Tables\Columns\TextColumn::make('remark')
                     ->limit(40)
                     ->toggleable(isToggledHiddenByDefault: true),
-            ])
+        ];
+
+        try {
+            $dynamicFields = \App\Models\ProductCheckValue::query()
+                ->select('field_name')
+                ->whereNotNull('field_name')
+                ->distinct()
+                ->pluck('field_name')
+                ->toArray();
+
+            foreach ($dynamicFields as $fieldName) {
+                $columns[] = Tables\Columns\TextColumn::make('check_value_' . $fieldName)
+                    ->label(ucfirst(str_replace(['_', '-'], ' ', $fieldName)))
+                    ->state(function (ProductCheck $record) use ($fieldName) {
+                        $val = $record->checkValues->where('field_name', $fieldName)->first();
+                        return $val ? $val->actual_value : '-';
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true);
+            }
+        } catch (\Exception $e) {
+            // Ignore during migrations
+        }
+
+        return $table
+            ->columns($columns)
             ->filters([
                 Tables\Filters\SelectFilter::make('check_session_id')
                     ->label('Session')
@@ -249,8 +272,8 @@ class ProductCheckResource extends Resource
                     ->label('Export XLSX')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
-                    ->action(function () {
-                        return app(ProductCheckExportService::class)->downloadAll();
+                    ->action(function ($livewire) {
+                        return app(ProductCheckExportService::class)->downloadAll($livewire->getFilteredTableQuery());
                     }),
             ])
             ->actions([
@@ -276,6 +299,7 @@ class ProductCheckResource extends Resource
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getEloquentQuery()
+            ->with('checkValues')
             ->orderByRaw("CASE result_status WHEN 'FAIL' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'PASS' THEN 2 ELSE 3 END")
             ->orderByDesc('checked_at');
     }
