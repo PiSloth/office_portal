@@ -1,0 +1,146 @@
+<?php
+
+namespace App\Filament\Stock\Resources;
+
+use App\Filament\Stock\Resources\DecisionResource\Pages;
+use App\Filament\Resources\Concerns\HasPermissionGates;
+use App\Filament\Stock\Resources\DecisionResource\RelationManagers\AttachmentsRelationManager;
+use App\Filament\Stock\Resources\DecisionResource\RelationManagers\CommentsRelationManager;
+use App\Filament\Stock\Resources\DecisionResource\RelationManagers\HistoriesRelationManager;
+use App\Models\Decision;
+use BackedEnum;
+use Filament\Actions;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables;
+use Filament\Tables\Table;
+use UnitEnum;
+
+class DecisionResource extends Resource
+{
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'decisions';
+
+    protected static ?string $model = Decision::class;
+
+    protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-flag';
+
+    protected static UnitEnum|string|null $navigationGroup = 'Decision Management';
+
+    protected static ?string $navigationLabel = 'Decisions';
+
+    public static function form(Schema $schema): Schema
+    {
+        return $schema->schema([
+            Section::make('Decision')->schema([
+                Forms\Components\Select::make('product_check_id')
+                    ->relationship('productCheck', 'id')
+                    ->required()
+                    ->searchable(),
+                Forms\Components\Select::make('decision_type_id')
+                    ->relationship('decisionType', 'name')
+                    ->required()
+                    ->searchable(),
+                Forms\Components\Select::make('action_status')
+                    ->options([
+                        'OPEN' => 'Open',
+                        'IN_PROGRESS' => 'In Progress',
+                        'DONE' => 'Done',
+                        'REJECTED' => 'Rejected',
+                    ])
+                    ->required(),
+                Forms\Components\Select::make('assigned_to')
+                    ->relationship('assignedTo', 'name')
+                    ->searchable()
+                    ->nullable(),
+                Forms\Components\Textarea::make('remark')
+                    ->columnSpanFull(),
+                Forms\Components\Hidden::make('decision_by')
+                    ->default(fn() => auth()->id()),
+            ])->columns(2),
+        ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('id')->sortable(),
+                Tables\Columns\TextColumn::make('productCheck.id')
+                    ->label('Check ID')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('productCheck.product.code')
+                    ->label('Product Code')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('decisionType.name')
+                    ->label('Decision Type')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('action_status')
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'OPEN' => 'warning',
+                        'IN_PROGRESS' => 'info',
+                        'DONE' => 'success',
+                        'REJECTED' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('assignedTo.name')
+                    ->label('Assigned To')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('decisionBy.name')
+                    ->label('Decision By')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable(),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('action_status')
+                    ->options([
+                        'OPEN' => 'Open',
+                        'IN_PROGRESS' => 'In Progress',
+                        'DONE' => 'Done',
+                        'REJECTED' => 'Rejected',
+                    ]),
+                Tables\Filters\SelectFilter::make('decision_type_id')
+                    ->label('Decision Type')
+                    ->relationship('decisionType', 'name'),
+            ])
+            ->actions([
+                Actions\ViewAction::make(),
+                Actions\EditAction::make(),
+                Actions\Action::make('open_check')
+                    ->label('View Check')
+                    ->icon('heroicon-o-clipboard-document-check')
+                    ->url(fn(Decision $record) => ProductCheckResource::getUrl('view', ['record' => $record->product_check_id])),
+            ])
+            ->bulkActions([
+                Actions\BulkActionGroup::make([
+                    Actions\DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            CommentsRelationManager::class,
+            HistoriesRelationManager::class,
+            AttachmentsRelationManager::class,
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListDecisions::route('/'),
+            'view' => Pages\ViewDecision::route('/{record}'),
+            'edit' => Pages\EditDecision::route('/{record}/edit'),
+        ];
+    }
+}

@@ -97,7 +97,12 @@ class ProductImportService
                 $locationCode = trim($rowData['location_code'] ?? '');
                 $barcode = trim($rowData['barcode'] ?? '') ?: null;
                 $qrCode = trim($rowData['qr_code'] ?? '') ?: null;
+                $quantity = trim($rowData['quantity'] ?? '0');
                 $description = trim($rowData['description'] ?? '') ?: null;
+
+                if (!is_numeric($quantity)) {
+                    $errors[] = "Quantity must be a numeric value.";
+                }
 
                 if (empty($code)) {
                     $errors[] = "Product code is required.";
@@ -183,6 +188,7 @@ class ProductImportService
                     'qr_code' => $qrCode,
                     'name' => $name,
                     'description' => $description,
+                    'quantity' => (int) $quantity,
                     'status' => 'ACTIVE',
                     'import_batch_id' => $batch->id,
                 ]);

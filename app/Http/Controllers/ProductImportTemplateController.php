@@ -29,6 +29,7 @@ class ProductImportTemplateController extends Controller
             'location_code',
             'barcode',
             'qr_code',
+            'quantity',
             'description',
         ];
 
@@ -47,6 +48,7 @@ class ProductImportTemplateController extends Controller
             'LOC-001',
             '1234567890123',
             'QR-1001',
+            '100',
             'Imported from the template file',
         ];
 

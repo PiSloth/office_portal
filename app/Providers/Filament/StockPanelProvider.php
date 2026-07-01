@@ -6,7 +6,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Navigation\MenuItem;
+use App\Filament\Stock\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -19,44 +19,41 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class AdminPanelProvider extends PanelProvider
+class StockPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->default()
-            ->id('admin')
-            ->path('admin')
+            ->id('stock')
+            ->path('stock')
             ->login()
             ->profile()
             ->favicon(asset('favicon.svg'))
             ->userMenuItems([
-                'profile' => MenuItem::make()
+                'profile' => \Filament\Navigation\MenuItem::make()
                     ->label('Profile & Settings')
                     ->icon('heroicon-o-user-circle')
                     ->url(fn (): ?string => filament()->getProfileUrl()),
             ])
             ->colors([
-                'primary' => '#7531bc',
-                'secondary' => '#fc950f',
-                'gray' => \Filament\Support\Colors\Color::Slate,
+                'primary' => Color::Amber,
             ])
             ->navigationItems([
                 \Filament\Navigation\NavigationItem::make('Back to Portal')
                     ->url(fn (): string => route('dashboard'))
                     ->icon('heroicon-o-arrow-left-on-rectangle')
                     ->sort(-1),
-                \Filament\Navigation\NavigationItem::make('Stock App')
-                    ->url('/stock')
-                    ->icon('heroicon-o-archive-box')
-                    ->sort(1),
+                \Filament\Navigation\NavigationItem::make('System Admin')
+                    ->url('/admin')
+                    ->icon('heroicon-o-cog-8-tooth')
+                    ->sort(999),
             ])
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
+            ->discoverResources(in: app_path('Filament/Stock/Resources'), for: 'App\Filament\Stock\Resources')
+            ->discoverPages(in: app_path('Filament/Stock/Pages'), for: 'App\Filament\Stock\Pages')
             ->pages([
-                \Filament\Pages\Dashboard::class,
+                Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
+            ->discoverWidgets(in: app_path('Filament/Stock/Widgets'), for: 'App\Filament\Stock\Widgets')
             ->widgets([
                 AccountWidget::class,
                 FilamentInfoWidget::class,
