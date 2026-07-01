@@ -1165,7 +1165,7 @@ if ($isCompare) {
 
                             @this.set('scanCode', decodedText);
                             @this.set('showScannerModal', false);
-                            @this.call('matchProductFromCode');
+                            @this.call('processScannedCode');
                             window.dispatchEvent(new CustomEvent('mobile-scanner-stop'));
                         },
                         (errorMessage) => {
