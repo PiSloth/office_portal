@@ -34,9 +34,9 @@ class MultiplierSeeder extends Seeder
             'multiplier_oth_10' => '0.580007',
             'multiplier_oth_8' => '0.455013',
             'multiplier_oth_4' => '0.205022',
-            
+
             // Standard parameters
-            'gram_per_kyat' => '16.606',
+            'gram_per_kyat' => '16.3293',
         ];
 
         foreach ($parameters as $key => $value) {
