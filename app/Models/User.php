@@ -13,7 +13,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'status', 'last_login_at'])]
+#[Fillable(['name', 'email', 'password', 'status', 'last_login_at', 'branch_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
@@ -57,6 +57,11 @@ class User extends Authenticatable implements FilamentUser
     public function decisionsCreated()
     {
         return $this->hasMany(Decision::class, 'decision_by');
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function canAccessPanel(Panel $panel): bool

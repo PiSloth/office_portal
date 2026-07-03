@@ -80,6 +80,10 @@ class UserResource extends Resource
                                     ])
                                     ->default('ACTIVE')
                                     ->required(),
+                                Forms\Components\Select::make('branch_id')
+                                    ->relationship('branch', 'name')
+                                    ->label('Branch')
+                                    ->placeholder('Select Branch'),
                             ])->columns(2),
                         ]),
                     Tab::make('Roles')
@@ -118,6 +122,10 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('id')->sortable(),
                 Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('email')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('branch.name')
+                    ->label('Branch')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('roles.name')->badge()->label('Roles')->limit(3),
                 Tables\Columns\TextColumn::make('permissions.name')->badge()->label('Direct Permissions')->limit(3),
                 Tables\Columns\TextColumn::make('status')

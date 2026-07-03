@@ -53,6 +53,51 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('supervisor', SupervisorDashboard::class)->name('supervisor.dashboard');
     Route::get('import-guide', fn () => view('import-guide'))->name('import.guide');
     Route::get('product-import-template', ProductImportTemplateController::class)->name('product-import.template');
+    
+    Route::get('purchase-requests/report/print', function (\Illuminate\Http\Request $request) {
+        $branchId = $request->query('branch_id');
+        $date = $request->query('date');
+        
+        $query = \App\Modules\Purchase\Models\PurchaseItem::with(['purchaseRequest.branch', 'purchaseRequest.creator', 'productType'])
+            ->whereHas('purchaseRequest', function ($q) use ($branchId, $date) {
+                if ($branchId) {
+                    $q->where('branch_id', $branchId);
+                }
+                if ($date) {
+                    $q->whereDate('created_at', $date);
+                }
+            });
+
+        $items = $query->get();
+        
+        $branchName = 'All Locations';
+        if ($branchId) {
+            $branch = \App\Models\Branch::find($branchId);
+            if ($branch) {
+                $branchName = $branch->name;
+            }
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('purchase-report-print', [
+            'items' => $items,
+            'branchName' => $branchName,
+            'date' => $date,
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->stream('purchased-items-report.pdf');
+    })->name('purchase-requests.report.print');
+
+    Route::get('purchase-requests/{record}/print', function (\App\Modules\Purchase\Models\PurchaseRequest $record) {
+        $record->load(['branch', 'workflowState', 'items.productType', 'items.validationHistories.user', 'creator', 'statusUpdater']);
+        
+        \App\Modules\Purchase\Models\PurchaseRequestPrintLog::create([
+            'purchase_request_id' => $record->id,
+            'user_id' => auth()->id(),
+            'printed_at' => now(),
+        ]);
+
+        return view('purchase-print', ['record' => $record]);
+    })->name('purchase-requests.print');
 });
 
 Route::view('profile', 'profile')
