@@ -6,7 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class WorkflowTransition extends Model
 {
-    protected $fillable = ['workflow_id', 'from_state_id', 'to_state_id', 'action_name', 'required_permission', 'validation_rule_set_id'];
+    protected $fillable = ['workflow_id', 'from_state_id', 'to_state_id', 'action_name', 'required_permission', 'validation_rule_set_id', 'checklist_id'];
+
+    public function checklist()
+    {
+        return $this->belongsTo(\App\Modules\Core\Workflow\Models\Checklist::class, 'checklist_id');
+    }
 
     public function validationRuleSet()
     {

@@ -29,10 +29,10 @@ class PurchaseModuleSeeder extends Seeder
         $stateRejected = WorkflowState::create(['workflow_id' => $workflow->id, 'name' => 'Rejected', 'color' => 'danger', 'is_end' => true]);
         $statePaid = WorkflowState::create(['workflow_id' => $workflow->id, 'name' => 'Paid', 'color' => 'success', 'is_end' => true]);
 
-        WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateDraft->id, 'to_state_id' => $stateSubmitted->id, 'action_name' => 'Submit']);
-        WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateSubmitted->id, 'to_state_id' => $stateVerified->id, 'action_name' => 'Verify']);
-        WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateSubmitted->id, 'to_state_id' => $stateRejected->id, 'action_name' => 'Reject']);
-        WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateVerified->id, 'to_state_id' => $statePaid->id, 'action_name' => 'Pay']);
+        $transitionSubmit = WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateDraft->id, 'to_state_id' => $stateSubmitted->id, 'action_name' => 'Submit']);
+        $transitionVerify = WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateSubmitted->id, 'to_state_id' => $stateVerified->id, 'action_name' => 'Verify']);
+        $transitionReject = WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateSubmitted->id, 'to_state_id' => $stateRejected->id, 'action_name' => 'Reject']);
+        $transitionPay    = WorkflowTransition::create(['workflow_id' => $workflow->id, 'from_state_id' => $stateVerified->id, 'to_state_id' => $statePaid->id, 'action_name' => 'Pay']);
 
         // ---------------------------------------------------
         // 2. CALCULATION ENGINE
@@ -90,5 +90,44 @@ class PurchaseModuleSeeder extends Seeder
             'tolerance' => 0,
             'is_required' => true,
         ]);
+
+        // Associate validation rules with Verify transition
+        $transitionVerify->update(['validation_rule_set_id' => $ruleSet->id]);
+
+        // ---------------------------------------------------
+        // 4. WORKFLOW TRANSITION CHECKLISTS
+        // ---------------------------------------------------
+        $jewelryProductType = \App\Models\ProductType::where('code', 'JEWELRY')->orWhere('name', 'jewelry')->first();
+        $productTypeId = $jewelryProductType?->id;
+
+        // 4.1 Submit Transition Checklist
+        $checklistSubmit = \App\Modules\Core\Workflow\Models\Checklist::create([
+            'product_type_id' => $productTypeId,
+            'name' => 'Submit Checklist',
+            'description' => 'Checks required before submitting the purchase request.',
+        ]);
+        \App\Modules\Core\Workflow\Models\ChecklistItem::create(['checklist_id' => $checklistSubmit->id, 'label' => 'Confirm customer identity card details matches name', 'is_required' => true, 'is_active' => true]);
+        \App\Modules\Core\Workflow\Models\ChecklistItem::create(['checklist_id' => $checklistSubmit->id, 'label' => 'Clean the jewelry items to remove dirt before weighing', 'is_required' => false, 'is_active' => true]);
+        $transitionSubmit->update(['checklist_id' => $checklistSubmit->id]);
+
+        // 4.2 Verify Transition Checklist
+        $checklistVerify = \App\Modules\Core\Workflow\Models\Checklist::create([
+            'product_type_id' => $productTypeId,
+            'name' => 'Verify Checklist',
+            'description' => 'Checks required during the verifier inspection stage.',
+        ]);
+        \App\Modules\Core\Workflow\Models\ChecklistItem::create(['checklist_id' => $checklistVerify->id, 'label' => 'Acid testing performed to confirm gold carat value', 'is_required' => true, 'is_active' => true]);
+        \App\Modules\Core\Workflow\Models\ChecklistItem::create(['checklist_id' => $checklistVerify->id, 'label' => 'Gold hallmark stamp inspected under magnifying glass', 'is_required' => true, 'is_active' => true]);
+        $transitionVerify->update(['checklist_id' => $checklistVerify->id]);
+
+        // 4.3 Pay Transition Checklist
+        $checklistPay = \App\Modules\Core\Workflow\Models\Checklist::create([
+            'product_type_id' => $productTypeId,
+            'name' => 'Payment Checklist',
+            'description' => 'Checks required before finalizing the payout to the customer.',
+        ]);
+        \App\Modules\Core\Workflow\Models\ChecklistItem::create(['checklist_id' => $checklistPay->id, 'label' => 'Double count physical currency cash count against total voucher amount', 'is_required' => true, 'is_active' => true]);
+        \App\Modules\Core\Workflow\Models\ChecklistItem::create(['checklist_id' => $checklistPay->id, 'label' => 'Secure customer physical signature on printed voucher copy', 'is_required' => true, 'is_active' => true]);
+        $transitionPay->update(['checklist_id' => $checklistPay->id]);
     }
 }

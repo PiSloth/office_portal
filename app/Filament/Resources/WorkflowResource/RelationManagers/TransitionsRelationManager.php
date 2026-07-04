@@ -37,6 +37,10 @@ class TransitionsRelationManager extends RelationManager
                     ->label('Validation Rule Set')
                     ->options(\App\Modules\Core\Validation\Models\ValidationRuleSet::pluck('name', 'id'))
                     ->nullable(),
+                Select::make('checklist_id')
+                    ->label('Transition Checklist')
+                    ->options(\App\Modules\Core\Workflow\Models\Checklist::pluck('name', 'id'))
+                    ->nullable(),
             ]);
     }
 
@@ -58,6 +62,9 @@ class TransitionsRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('validationRuleSet.name')
                     ->label('Validation Rule Set')
+                    ->sortable(),
+                TextColumn::make('checklist.name')
+                    ->label('Checklist')
                     ->sortable(),
             ])
             ->filters([

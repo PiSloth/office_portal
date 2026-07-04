@@ -25,6 +25,19 @@ class EditPurchaseRequest extends EditRecord
             $rules = collect();
             $startStepIndex = 1;
 
+            // Load Checklist items if configured
+            $hasChecklist = false;
+            $checklistItems = collect();
+            if ($transition->checklist_id) {
+                $checklist = \App\Modules\Core\Workflow\Models\Checklist::find($transition->checklist_id);
+                if ($checklist) {
+                    $checklistItems = $checklist->items()->where('is_active', true)->get();
+                    if ($checklistItems->isNotEmpty()) {
+                        $hasChecklist = true;
+                    }
+                }
+            }
+
             if ($transition->validation_rule_set_id) {
                 $ruleSet = \App\Modules\Core\Validation\Models\ValidationRuleSet::find($transition->validation_rule_set_id);
                 if ($ruleSet && $ruleSet->rules->isNotEmpty() && $record->items->isNotEmpty()) {
@@ -199,6 +212,25 @@ class EditPurchaseRequest extends EditRecord
                 }
             }
 
+            // Append Checklist Step if hasRules and hasChecklist
+            if ($hasRules && $hasChecklist) {
+                $checklistStepSchema = [];
+                foreach ($checklistItems as $checkItem) {
+                    $existingChecked = \App\Modules\Purchase\Models\PurchaseRequestChecklist::where('purchase_request_id', $record->id)
+                        ->where('checklist_item_id', $checkItem->id)
+                        ->value('is_checked') ?? false;
+
+                    $checklistStepSchema[] = \Filament\Forms\Components\Checkbox::make("checklist_item_{$checkItem->id}")
+                        ->label($checkItem->label)
+                        ->default($existingChecked)
+                        ->required();
+                }
+                
+                $steps[] = \Filament\Schemas\Components\Wizard\Step::make("step_checklist")
+                    ->label("Verification Checklist")
+                    ->schema($checklistStepSchema);
+            }
+
             $action = Actions\Action::make('transition_' . $transition->id)
                 ->label($transition->action_name)
                 ->color($transition->action_name === 'Reject' ? 'danger' : 'success');
@@ -206,7 +238,7 @@ class EditPurchaseRequest extends EditRecord
             if ($hasRules) {
                 $action->steps($steps)
                     ->startOnStep($startStepIndex)
-                    ->action(function (array $data) use ($record, $transition, $rules) {
+                    ->action(function (array $data) use ($record, $transition, $rules, $hasChecklist, $checklistItems) {
                         $allPassed = true;
                         $validationManager = new \App\Modules\Core\Validation\Services\ValidationManager();
 
@@ -241,6 +273,20 @@ class EditPurchaseRequest extends EditRecord
                             }
                         }
 
+                        // Save Checklist States
+                        if ($hasChecklist) {
+                            foreach ($checklistItems as $checkItem) {
+                                $isChecked = (bool) ($data["checklist_item_{$checkItem->id}"] ?? false);
+                                \App\Modules\Purchase\Models\PurchaseRequestChecklist::updateOrCreate([
+                                    'purchase_request_id' => $record->id,
+                                    'checklist_item_id' => $checkItem->id,
+                                ], [
+                                    'is_checked' => $isChecked,
+                                    'user_id' => auth()->id(),
+                                ]);
+                            }
+                        }
+
                         if ($allPassed) {
                             $record->workflow_state_id = $transition->to_state_id;
                             $record->status_updated_by_id = auth()->id();
@@ -264,25 +310,72 @@ class EditPurchaseRequest extends EditRecord
                         }
                     });
             } else {
-                $action->requiresConfirmation()
-                    ->action(function () use ($record, $transition) {
-                        $record->status_updated_by_id = auth()->id();
-                        $manager = new \App\Modules\Core\Workflow\Services\WorkflowManager();
-                        if ($manager->transition($record, $transition, auth()->user())) {
-                            \Filament\Notifications\Notification::make()
-                                ->title("Request transitioned to {$record->workflowState->name}")
-                                ->success()
-                                ->send();
+                // No validation rules but might have Checklist
+                if ($hasChecklist) {
+                    $formSchema = [];
+                    foreach ($checklistItems as $checkItem) {
+                        $existingChecked = \App\Modules\Purchase\Models\PurchaseRequestChecklist::where('purchase_request_id', $record->id)
+                            ->where('checklist_item_id', $checkItem->id)
+                            ->value('is_checked') ?? false;
 
-                            $this->redirect(static::getResource()::getUrl('edit', ['record' => $record]));
-                        } else {
-                            \Filament\Notifications\Notification::make()
-                                ->title("Failed to transition request")
-                                ->body("Validation rules may have failed or you do not have permission.")
-                                ->danger()
-                                ->send();
-                        }
-                    });
+                        $formSchema[] = \Filament\Forms\Components\Checkbox::make("checklist_item_{$checkItem->id}")
+                            ->label($checkItem->label)
+                            ->default($existingChecked)
+                            ->required();
+                    }
+                    
+                    $action->form($formSchema)
+                        ->action(function (array $data) use ($record, $transition, $checklistItems) {
+                            // Save Checklist States
+                            foreach ($checklistItems as $checkItem) {
+                                $isChecked = (bool) ($data["checklist_item_{$checkItem->id}"] ?? false);
+                                \App\Modules\Purchase\Models\PurchaseRequestChecklist::updateOrCreate([
+                                    'purchase_request_id' => $record->id,
+                                    'checklist_item_id' => $checkItem->id,
+                                ], [
+                                    'is_checked' => $isChecked,
+                                    'user_id' => auth()->id(),
+                                ]);
+                            }
+
+                            $record->status_updated_by_id = auth()->id();
+                            $manager = new \App\Modules\Core\Workflow\Services\WorkflowManager();
+                            if ($manager->transition($record, $transition, auth()->user())) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title("Request transitioned to {$record->workflowState->name}")
+                                    ->success()
+                                    ->send();
+
+                                $this->redirect(static::getResource()::getUrl('edit', ['record' => $record]));
+                            } else {
+                                \Filament\Notifications\Notification::make()
+                                    ->title("Failed to transition request")
+                                    ->body("Validation rules may have failed or you do not have permission.")
+                                    ->danger()
+                                    ->send();
+                            }
+                        });
+                } else {
+                    $action->requiresConfirmation()
+                        ->action(function () use ($record, $transition) {
+                            $record->status_updated_by_id = auth()->id();
+                            $manager = new \App\Modules\Core\Workflow\Services\WorkflowManager();
+                            if ($manager->transition($record, $transition, auth()->user())) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title("Request transitioned to {$record->workflowState->name}")
+                                    ->success()
+                                    ->send();
+
+                                $this->redirect(static::getResource()::getUrl('edit', ['record' => $record]));
+                            } else {
+                                \Filament\Notifications\Notification::make()
+                                    ->title("Failed to transition request")
+                                    ->body("Validation rules may have failed or you do not have permission.")
+                                    ->danger()
+                                    ->send();
+                            }
+                        });
+                }
             }
 
             $actions[] = $action;
@@ -298,6 +391,96 @@ class EditPurchaseRequest extends EditRecord
 
         // 3. Settings Dropdown Button Group (Settings icon only) containing print history and delete
         $actions[] = Actions\ActionGroup::make([
+            Actions\Action::make('view_overall_checklist')
+            ->label('Workflow Checklist')
+            ->icon('heroicon-o-clipboard-document-check')
+            ->color('gray')
+            ->modalHeading(fn() => "Workflow Checklist for Request {$this->record->purchase_number}")
+            ->modalWidth('4xl')
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close')
+            ->form(function () use ($record) {
+                return [
+                    \Filament\Forms\Components\Placeholder::make('overall_checklist')
+                        ->hiddenLabel()
+                        ->content(function () use ($record) {
+                            $productTypeId = $record->product_type_id;
+                            $workflow = \App\Modules\Core\Workflow\Models\Workflow::where('product_type_id', $productTypeId)
+                                ->where('is_active', true)
+                                ->first();
+                            if (!$workflow) {
+                                $workflow = \App\Modules\Core\Workflow\Models\Workflow::first();
+                            }
+                            
+                            if (!$workflow) {
+                                return 'No workflow configured.';
+                            }
+                            
+                            $transitions = $workflow->transitions()->with('checklist.items', 'fromState', 'toState')->get();
+                            
+                            $html = '<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-sm">';
+                            $html .= '<thead><tr class="border-b border-gray-200 dark:border-gray-800 text-gray-400 font-semibold">';
+                            $html .= '<th class="py-2 pr-4">Workflow Stage</th>';
+                            $html .= '<th class="py-2 px-4">Checklist Task</th>';
+                            $html .= '<th class="py-2 px-4">Status</th>';
+                            $html .= '<th class="py-2 px-4">Checked By</th>';
+                            $html .= '<th class="py-2 px-4">Checked At</th>';
+                            $html .= '</tr></thead><tbody>';
+                            
+                            $hasChecklist = false;
+                            
+                            foreach ($transitions as $transition) {
+                                if (!$transition->checklist || $transition->checklist->items->where('is_active', true)->isEmpty()) {
+                                    continue;
+                                }
+                                
+                                $hasChecklist = true;
+                                $stageName = e($transition->action_name) . ' (' . e($transition->fromState->name) . ' ➔ ' . e($transition->toState->name) . ')';
+                                
+                                foreach ($transition->checklist->items as $item) {
+                                    if (!$item->is_active) continue;
+                                    
+                                    $checkedRecord = \App\Modules\Purchase\Models\PurchaseRequestChecklist::where('purchase_request_id', $record->id)
+                                        ->where('checklist_item_id', $item->id)
+                                        ->first();
+                                        
+                                    $isChecked = $checkedRecord?->is_checked ?? false;
+                                    
+                                    $statusIcon = $isChecked 
+                                        ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-400">✓ Completed</span>'
+                                        : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400">✗ Pending</span>';
+                                        
+                                    $textClass = $isChecked 
+                                        ? 'text-gray-800 dark:text-gray-200 line-through decoration-success-500/50' 
+                                        : 'text-gray-750 dark:text-gray-300';
+                                        
+                                    $requiredLabel = $item->is_required 
+                                        ? ' <span class="text-[10px] text-danger-500 font-semibold">(Required)</span>' 
+                                        : '';
+                                        
+                                    $checkedBy = $isChecked && $checkedRecord?->user ? e($checkedRecord->user->name) : '-';
+                                    $checkedAt = $isChecked && $checkedRecord?->updated_at ? $checkedRecord->updated_at->format('d M Y, h:i A') : '-';
+
+                                    $html .= '<tr class="border-b border-gray-100 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">';
+                                    $html .= '<td class="py-3 pr-4 font-semibold text-gray-600 dark:text-gray-400">' . $stageName . '</td>';
+                                    $html .= '<td class="py-3 px-4 ' . $textClass . '">' . e($item->label) . $requiredLabel . '</td>';
+                                    $html .= '<td class="py-3 px-4">' . $statusIcon . '</td>';
+                                    $html .= '<td class="py-3 px-4">' . $checkedBy . '</td>';
+                                    $html .= '<td class="py-3 px-4 text-xs text-gray-500">' . $checkedAt . '</td>';
+                                    $html .= '</tr>';
+                                }
+                            }
+                            
+                            if (!$hasChecklist) {
+                                return new \Illuminate\Support\HtmlString('<div class="text-center py-4 text-gray-500">No checklists configured for this request workflow.</div>');
+                            }
+                            
+                            $html .= '</tbody></table></div>';
+                            return new \Illuminate\Support\HtmlString($html);
+                        })
+                ];
+            }),
+
             // 1. History Action
         Actions\Action::make('view_history')
             ->label('History')
