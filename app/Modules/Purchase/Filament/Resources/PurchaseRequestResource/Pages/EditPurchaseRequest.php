@@ -17,69 +17,6 @@ class EditPurchaseRequest extends EditRecord
 
         $actions = [];
 
-        // 1. History Action
-        $actions[] = Actions\Action::make('view_history')
-            ->label('History')
-            ->icon('heroicon-o-clock')
-            ->color('gray')
-            ->modalHeading(fn() => "Calculation History for Request #{$this->record->id}")
-            ->modalWidth('5xl')
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Close')
-            ->form(function () {
-                return [
-                    \Filament\Forms\Components\Placeholder::make('history_log')
-                        ->hiddenLabel()
-                        ->content(function () {
-                            $histories = \App\Modules\Core\Calculation\Models\CalculationHistory::whereHasMorph(
-                                'calculatable',
-                                [\App\Modules\Purchase\Models\PurchaseItem::class],
-                                fn($query) => $query->where('purchase_request_id', $this->record->id)
-                            )->with('user', 'calculatable.productType')->latest()->get();
-
-                            if ($histories->isEmpty()) {
-                                return new \Illuminate\Support\HtmlString('<div class="text-center py-4 text-gray-500">No calculation history recorded yet.</div>');
-                            }
-
-                            $html = '<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-sm">';
-                            $html .= '<thead><tr class="border-b border-gray-200 dark:border-gray-800 text-gray-400 font-semibold">';
-                            $html .= '<th class="py-2 pr-4">Date/Time</th>';
-                            $html .= '<th class="py-2 px-4">Operator</th>';
-                            $html .= '<th class="py-2 px-4">Product Name</th>';
-                            $html .= '<th class="py-2 px-4">Gold Grade</th>';
-                            $html .= '<th class="py-2 px-4">Weight</th>';
-                            $html .= '<th class="py-2 px-4">Price</th>';
-                            $html .= '</tr></thead><tbody>';
-
-                            foreach ($histories as $history) {
-                                $inputs = $history->input_snapshot_json ?? [];
-                                $productName = $inputs['product_name'] ?? '-';
-                                $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
-                                $weight = ($inputs['goldWeightGram'] ?? '0') . ' g';
-                                if (!empty($inputs['kyat']) || !empty($inputs['pae']) || !empty($inputs['yawe'])) {
-                                    $weight = ($inputs['kyat'] ?? 0) . 'ကျပ် ' . ($inputs['pae'] ?? 0) . 'ပဲ ' . ($inputs['yawe'] ?? 0) . 'ရွေး';
-                                }
-                                $date = $history->created_at->format('d M Y, h:i A');
-                                $operator = $history->user?->name ?? 'System';
-                                $price = number_format($history->total_amount) . ' MMK';
-
-                                $html .= '<tr class="border-b border-gray-100 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">';
-                                $html .= '<td class="py-3 pr-4 font-medium">' . e($date) . '</td>';
-                                $html .= '<td class="py-3 px-4">' . e($operator) . '</td>';
-                                $html .= '<td class="py-3 px-4">' . e($productName) . '</td>';
-                                $html .= '<td class="py-3 px-4">' . e($goldGrade) . '</td>';
-                                $html .= '<td class="py-3 px-4">' . e($weight) . '</td>';
-                                $html .= '<td class="py-3 px-4 font-semibold text-success-600">' . e($price) . '</td>';
-                                $html .= '</tr>';
-                            }
-
-                            $html .= '</tbody></table></div>';
-
-                            return new \Illuminate\Support\HtmlString($html);
-                        })
-                ];
-            });
-
         // 2. Dynamic Workflow Transitions
         $transitions = \App\Modules\Core\Workflow\Models\WorkflowTransition::where('from_state_id', $record->workflow_state_id)->get();
         foreach ($transitions as $transition) {
@@ -351,7 +288,7 @@ class EditPurchaseRequest extends EditRecord
             $actions[] = $action;
         }
 
-        // 2.5 Print Voucher Action
+        // 2.5 Standalone Print Voucher Action
         $actions[] = Actions\Action::make('print_voucher')
             ->label('Print Voucher')
             ->icon('heroicon-o-printer')
@@ -359,42 +296,76 @@ class EditPurchaseRequest extends EditRecord
             ->url(fn() => route('purchase-requests.print', ['record' => $this->record]))
             ->openUrlInNewTab();
 
-        // 2.7 Print History Action
-        $actions[] = Actions\Action::make('view_print_history')
-            ->label('Print Logs')
-            ->icon('heroicon-o-document-magnifying-glass')
+        // 3. Settings Dropdown Button Group (Settings icon only) containing print history and delete
+        $actions[] = Actions\ActionGroup::make([
+            // 1. History Action
+        Actions\Action::make('view_history')
+            ->label('History')
+            ->icon('heroicon-o-clock')
             ->color('gray')
-            ->modalHeading(fn() => "Print History for Request {$this->record->purchase_number}")
-            ->modalWidth('3xl')
+            ->modalHeading(fn() => "Calculation History for Request #{$this->record->id}")
+            ->modalWidth('5xl')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->form(function () {
                 return [
-                    \Filament\Forms\Components\Placeholder::make('print_logs')
+                    \Filament\Forms\Components\Placeholder::make('history_log')
                         ->hiddenLabel()
                         ->content(function () {
-                            $logs = \App\Modules\Purchase\Models\PurchaseRequestPrintLog::where('purchase_request_id', $this->record->id)
-                                ->with('user')
-                                ->latest()
-                                ->get();
+                            $histories = \App\Modules\Core\Calculation\Models\CalculationHistory::whereHasMorph(
+                                'calculatable',
+                                [\App\Modules\Purchase\Models\PurchaseItem::class],
+                                fn($query) => $query->where('purchase_request_id', $this->record->id)
+                            )->with('user', 'calculatable.productType')->latest()->get();
 
-                            if ($logs->isEmpty()) {
-                                return new \Illuminate\Support\HtmlString('<div class="text-center py-4 text-gray-500">No print logs recorded yet.</div>');
+                            if ($histories->isEmpty()) {
+                                return new \Illuminate\Support\HtmlString('<div class="text-center py-4 text-gray-500">No calculation history recorded yet.</div>');
                             }
 
                             $html = '<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-sm">';
                             $html .= '<thead><tr class="border-b border-gray-200 dark:border-gray-800 text-gray-400 font-semibold">';
-                            $html .= '<th class="py-2 pr-4">Printed At</th>';
-                            $html .= '<th class="py-2 px-4">Printed By</th>';
+                            $html .= '<th class="py-2 pr-4">Date/Time</th>';
+                            $html .= '<th class="py-2 px-4">Operator</th>';
+                            $html .= '<th class="py-2 px-4">Product Name</th>';
+                            $html .= '<th class="py-2 px-4">Weight</th>';
+                            $html .= '<th class="py-2 px-4">Gold Grade</th>';
+                            $html .= '<th class="py-2 px-4">Qty</th>';
+                            $html .= '<th class="py-2 px-4">အလဲအထပ်</th>';
+                            $html .= '<th class="py-2 px-4">ရ/မရ</th>';
+                            $html .= '<th class="py-2 px-4">Deduction</th>';
+                            $html .= '<th class="py-2 px-4">Price</th>';
+                            $html .= '<th class="py-2 px-4">Remark</th>';
                             $html .= '</tr></thead><tbody>';
 
-                            foreach ($logs as $log) {
-                                $date = $log->printed_at->format('d M Y, h:i A');
-                                $printedBy = $log->user?->name ?? 'System';
+                            foreach ($histories as $history) {
+                                $inputs = $history->input_snapshot_json ?? [];
+                                $productName = $inputs['product_name'] ?? '-';
+                                $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
+                                $weight = ($inputs['goldWeightGram'] ?? '0') . ' g';
+                                if (!empty($inputs['kyat']) || !empty($inputs['pae']) || !empty($inputs['yawe'])) {
+                                    $weight = ($inputs['kyat'] ?? 0) . 'ကျပ် ' . ($inputs['pae'] ?? 0) . 'ပဲ ' . ($inputs['yawe'] ?? 0) . 'ရွေး (' . ($inputs['goldWeightGram'] ?? '0') . ' g)';
+                                }
+                                $date = $history->created_at->format('d M Y, h:i A');
+                                $operator = $history->user?->name ?? 'System';
+                                $price = number_format($history->total_amount) . ' MMK';
+                                $qty = $inputs['quantity'] ?? 1;
+                                $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : 'ဆိုင်ထည် (No)';
+                                $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
+                                $deduction = ($inputs['percent'] ?? 0) . '%';
+                                $remark = $inputs['remark'] ?? '-';
 
                                 $html .= '<tr class="border-b border-gray-100 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">';
                                 $html .= '<td class="py-3 pr-4 font-medium">' . e($date) . '</td>';
-                                $html .= '<td class="py-3 px-4">' . e($printedBy) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($operator) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($productName) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($weight) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($goldGrade) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($qty) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($reChange) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($isGood) . '</td>';
+                                $html .= '<td class="py-3 px-4">' . e($deduction) . '</td>';
+                                $html .= '<td class="py-3 px-4 font-semibold text-success-600">' . e($price) . '</td>';
+                                $html .= '<td class="py-3 px-4 text-gray-500">' . e($remark) . '</td>';
                                 $html .= '</tr>';
                             }
 
@@ -403,10 +374,62 @@ class EditPurchaseRequest extends EditRecord
                             return new \Illuminate\Support\HtmlString($html);
                         })
                 ];
-            });
+            }),
 
-        // 3. Delete Action
-        $actions[] = Actions\DeleteAction::make();
+            Actions\Action::make('view_print_history')
+                ->label('Print Logs')
+                ->icon('heroicon-o-document-magnifying-glass')
+                ->color('gray')
+                ->modalHeading(fn() => "Print History for Request {$this->record->purchase_number}")
+                ->modalWidth('3xl')
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Close')
+                ->form(function () {
+                    return [
+                        \Filament\Forms\Components\Placeholder::make('print_logs')
+                            ->hiddenLabel()
+                            ->content(function () {
+                                $logs = \App\Modules\Purchase\Models\PurchaseRequestPrintLog::where('purchase_request_id', $this->record->id)
+                                    ->with('user')
+                                    ->latest()
+                                    ->get();
+
+                                if ($logs->isEmpty()) {
+                                    return new \Illuminate\Support\HtmlString('<div class="text-center py-4 text-gray-500">No print logs recorded yet.</div>');
+                                }
+
+                                $html = '<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-sm">';
+                                $html .= '<thead><tr class="border-b border-gray-200 dark:border-gray-800 text-gray-400 font-semibold">';
+                                $html .= '<th class="py-2 pr-4">Printed At</th>';
+                                $html .= '<th class="py-2 px-4">Printed By</th>';
+                                $html .= '</tr></thead><tbody>';
+
+                                foreach ($logs as $log) {
+                                    $date = $log->printed_at->format('d M Y, h:i A');
+                                    $printedBy = $log->user?->name ?? 'System';
+
+                                    $html .= '<tr class="border-b border-gray-100 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">';
+                                    $html .= '<td class="py-3 pr-4 font-medium">' . e($date) . '</td>';
+                                    $html .= '<td class="py-3 px-4">' . e($printedBy) . '</td>';
+                                    $html .= '</tr>';
+                                }
+
+                                $html .= '</tbody></table></div>';
+
+                                return new \Illuminate\Support\HtmlString($html);
+                            })
+                    ];
+                }),
+
+            Actions\DeleteAction::make()
+                ->label('Delete')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->visible(fn (): bool => auth()->user()?->can('purchase-requests.delete') ?? false),
+        ])
+        ->icon('heroicon-m-cog-6-tooth')
+        ->color('gray')
+        ->button();
 
         return $actions;
     }

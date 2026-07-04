@@ -31,44 +31,109 @@ class PurchaseRequestResource extends Resource
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Section::make('Customer Details')->schema([
-                    Forms\Components\Placeholder::make('purchase_number')
-                        ->label('Purchase Number')
-                        ->content(fn ($record) => $record?->purchase_number ?? 'PR-Draft')
-                        ->visible(fn ($record) => $record !== null && $record->exists),
-                    Forms\Components\Placeholder::make('branch_name')
-                        ->label('Branch')
-                        ->content(fn($record) => $record?->branch?->name ?? auth()->user()?->branch?->name ?? 'No Branch'),
-                    Forms\Components\Hidden::make('branch_id')
-                        ->default(fn() => auth()->user()?->branch_id),
-                    Forms\Components\Select::make('product_type_id')
-                        ->relationship('productType', 'name')
-                        ->required()
-                        ->live()
-                        ->hidden(fn ($record) => $record !== null && $record->exists)
-                        ->default(fn () => \App\Models\ProductType::where('code', 'JEWELRY')->orWhere('name', 'jewelry')->first()?->id),
-                    Forms\Components\Placeholder::make('product_type_name')
-                        ->label('Product Type')
-                        ->content(fn ($record) => $record?->productType?->name ?? '-')
-                        ->visible(fn ($record) => $record !== null && $record->exists),
-                    Forms\Components\TextInput::make('customer_name')
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('customer_phone')
-                        ->tel()
-                        ->maxLength(255),
-                    Forms\Components\Textarea::make('customer_address')
-                        ->maxLength(500)
-                        ->rows(2)
-                        ->columnSpanFull(),
-                    Forms\Components\Select::make('workflow_state_id')
-                        ->relationship('workflowState', 'name')
-                        ->disabled() // Managed by WorkflowEngine
-                        ->dehydrated(false),
-                    Forms\Components\TextInput::make('total_amount')
-                        ->numeric()
-                        ->default(0.00)
-                        ->disabled(),
-                ])->columns(2),
+                \Filament\Schemas\Components\Section::make('Customer Details')
+                    ->headerActions([
+                        \Filament\Actions\Action::make('edit_customer')
+                            ->label('Edit Customer Info')
+                            ->icon('heroicon-m-pencil-square')
+                            ->modalHeading('Update Customer Information')
+                            ->modalWidth('md')
+                            ->form([
+                                Forms\Components\TextInput::make('customer_name')
+                                    ->label('Customer Name')
+                                    ->required()
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('customer_phone')
+                                    ->label('Phone Number')
+                                    ->tel()
+                                    ->maxLength(255),
+                                Forms\Components\Textarea::make('customer_address')
+                                    ->label('Address')
+                                    ->maxLength(500)
+                                    ->rows(3),
+                            ])
+                            ->mountUsing(function (\Filament\Schemas\Schema $form, \Filament\Schemas\Components\Utilities\Get $get) {
+                                $form->fill([
+                                    'customer_name' => $get('customer_name'),
+                                    'customer_phone' => $get('customer_phone'),
+                                    'customer_address' => $get('customer_address'),
+                                ]);
+                            })
+                            ->action(function (array $data, \Filament\Schemas\Components\Utilities\Set $set) {
+                                $set('customer_name', $data['customer_name']);
+                                $set('customer_phone', $data['customer_phone']);
+                                $set('customer_address', $data['customer_address']);
+                            })
+                    ])
+                    ->schema([
+                        // Hidden fields to store state
+                        Forms\Components\Hidden::make('customer_name')
+                            ->required()
+                            ->live(),
+                        Forms\Components\Hidden::make('customer_phone')
+                            ->live(),
+                        Forms\Components\Hidden::make('customer_address')
+                            ->live(),
+                        Forms\Components\Hidden::make('branch_id')
+                            ->default(fn() => auth()->user()?->branch_id),
+                        Forms\Components\Hidden::make('product_type_id')
+                            ->default(fn () => \App\Models\ProductType::where('code', 'JEWELRY')->orWhere('name', 'jewelry')->first()?->id),
+
+                        \Filament\Schemas\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\Placeholder::make('purchase_number')
+                                    ->label('Purchase Number')
+                                    ->content(fn ($record) => $record?->purchase_number ?? 'PR-Draft')
+                                    ->visible(fn ($record) => $record !== null && $record->exists),
+                                Forms\Components\Placeholder::make('branch_name')
+                                    ->label('Branch')
+                                    ->content(fn($record) => $record?->branch?->name ?? auth()->user()?->branch?->name ?? 'No Branch'),
+                                Forms\Components\Placeholder::make('product_type_name')
+                                    ->label('Product Type')
+                                    ->content(fn ($record) => $record?->productType?->name ?? '-')
+                                    ->visible(fn ($record) => $record !== null && $record->exists),
+                                Forms\Components\Placeholder::make('workflow_state_name')
+                                    ->label('Status')
+                                    ->content(function ($record) {
+                                        $state = $record?->workflowState;
+                                        if (!$state) {
+                                            return new \Illuminate\Support\HtmlString('<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">Draft</span>');
+                                        }
+                                        $name = $state->name;
+                                        $color = $state->color ?: 'gray';
+                                        
+                                        $classes = match($color) {
+                                            'blue' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200',
+                                            'success' => 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200',
+                                            'danger' => 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200',
+                                            'warning' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200',
+                                            default => 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+                                        };
+                                        
+                                        return new \Illuminate\Support\HtmlString('<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ' . $classes . '">' . e($name) . '</span>');
+                                    }),
+                                Forms\Components\Placeholder::make('total_amount_disp')
+                                    ->label('Total Cost')
+                                    ->content(fn ($record) => number_format($record?->total_amount ?? 0) . ' MMK'),
+                            ]),
+
+                        Forms\Components\Placeholder::make('customer_info_card')
+                            ->hiddenLabel()
+                            ->content(function ($record, \Filament\Schemas\Components\Utilities\Get $get) {
+                                $name = $get('customer_name') ?: $record?->customer_name ?: 'Not Provided';
+                                $phone = $get('customer_phone') ?: $record?->customer_phone ?: 'Not Provided';
+                                $address = $get('customer_address') ?: $record?->customer_address ?: 'Not Provided';
+
+                                $html = '<div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800 space-y-2 text-sm max-w-md shadow-sm">';
+                                $html .= '<h3 class="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">Customer Contact Info</h3>';
+                                $html .= '<hr class="border-gray-200 dark:border-gray-800" />';
+                                $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">Customer Name:</span> <strong class="text-gray-800 dark:text-gray-100 block text-base mt-0.5">' . e($name) . '</strong></div>';
+                                $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">Phone Number:</span> <span class="text-gray-800 dark:text-gray-200 block font-semibold mt-0.5">' . e($phone) . '</span></div>';
+                                $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">Address:</span> <span class="text-gray-700 dark:text-gray-300 block text-xs mt-0.5 whitespace-pre-line">' . e($address) . '</span></div>';
+                                $html .= '</div>';
+                                return new \Illuminate\Support\HtmlString($html);
+                            }),
+                    ]),
 
                 \Filament\Schemas\Components\Section::make('Purchase Items (Calculator)')
                     ->columnSpan('full')
@@ -1058,9 +1123,12 @@ class PurchaseRequestResource extends Resource
                                     $html .= '<th class="py-2 pr-4">Date/Time</th>';
                                     $html .= '<th class="py-2 px-4">Operator</th>';
                                     $html .= '<th class="py-2 px-4">Product Name</th>';
-                                    $html .= '<th class="py-2 px-4">Gold Grade</th>';
                                     $html .= '<th class="py-2 px-4">Weight</th>';
+                                    $html .= '<th class="py-2 px-4">Gold Grade</th>';
                                     $html .= '<th class="py-2 px-4">Qty</th>';
+                                    $html .= '<th class="py-2 px-4">အလဲအထပ်</th>';
+                                    $html .= '<th class="py-2 px-4">ရ/မရ</th>';
+                                    $html .= '<th class="py-2 px-4">Deduction</th>';
                                     $html .= '<th class="py-2 px-4">Price</th>';
                                     $html .= '<th class="py-2 px-4">Remark</th>';
                                     $html .= '</tr></thead><tbody>';
@@ -1071,21 +1139,27 @@ class PurchaseRequestResource extends Resource
                                         $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
                                         $weight = ($inputs['goldWeightGram'] ?? '0') . ' g';
                                         if (!empty($inputs['kyat']) || !empty($inputs['pae']) || !empty($inputs['yawe'])) {
-                                            $weight = ($inputs['kyat'] ?? 0) . 'ကျပ် ' . ($inputs['pae'] ?? 0) . 'ပဲ ' . ($inputs['yawe'] ?? 0) . 'ရွေး';
+                                            $weight = ($inputs['kyat'] ?? 0) . 'ကျပ် ' . ($inputs['pae'] ?? 0) . 'ပဲ ' . ($inputs['yawe'] ?? 0) . 'ရွေး (' . ($inputs['goldWeightGram'] ?? '0') . ' g)';
                                         }
                                         $date = $history->created_at->format('d M Y, h:i A');
                                         $operator = $history->user?->name ?? 'System';
                                         $price = number_format($history->total_amount) . ' MMK';
                                         $qty = $inputs['quantity'] ?? 1;
+                                        $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : 'ဆိုင်ထည် (No)';
+                                        $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
+                                        $deduction = ($inputs['percent'] ?? 0) . '%';
                                         $remark = $inputs['remark'] ?? '-';
 
                                         $html .= '<tr class="border-b border-gray-100 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">';
                                         $html .= '<td class="py-3 pr-4 font-medium">' . e($date) . '</td>';
                                         $html .= '<td class="py-3 px-4">' . e($operator) . '</td>';
                                         $html .= '<td class="py-3 px-4">' . e($productName) . '</td>';
-                                        $html .= '<td class="py-3 px-4">' . e($goldGrade) . '</td>';
                                         $html .= '<td class="py-3 px-4">' . e($weight) . '</td>';
+                                        $html .= '<td class="py-3 px-4">' . e($goldGrade) . '</td>';
                                         $html .= '<td class="py-3 px-4">' . e($qty) . '</td>';
+                                        $html .= '<td class="py-3 px-4">' . e($reChange) . '</td>';
+                                        $html .= '<td class="py-3 px-4">' . e($isGood) . '</td>';
+                                        $html .= '<td class="py-3 px-4">' . e($deduction) . '</td>';
                                         $html .= '<td class="py-3 px-4 font-semibold text-success-600">' . e($price) . '</td>';
                                         $html .= '<td class="py-3 px-4 text-gray-500">' . e($remark) . '</td>';
                                         $html .= '</tr>';
