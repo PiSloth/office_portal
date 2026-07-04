@@ -85,4 +85,10 @@ class PurchaseRequest extends Model
             
         return 'PR-' . $branchCode . '/' . $date->format('ymd') . str_pad($seq, 3, '0', STR_PAD_LEFT);
     }
+
+    public function updateTotalAmount(): void
+    {
+        $total = $this->items()->sum('calculated_price');
+        $this->updateQuietly(['total_amount' => $total]);
+    }
 }

@@ -23,6 +23,23 @@ class PurchaseItem extends Model
         'dynamic_fields_json' => 'array',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function ($item) {
+            if ($item->purchaseRequest) {
+                $item->purchaseRequest->updateTotalAmount();
+            }
+        });
+
+        static::deleted(function ($item) {
+            if ($item->purchaseRequest) {
+                $item->purchaseRequest->updateTotalAmount();
+            }
+        });
+    }
+
     public function purchaseRequest()
     {
         return $this->belongsTo(PurchaseRequest::class);
