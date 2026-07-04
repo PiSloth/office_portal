@@ -92,6 +92,10 @@ class PurchaseRequestResource extends Resource
                                     Forms\Components\Hidden::make('purchase_type')
                                         ->default('gb_product'),
 
+                                    Forms\Components\Toggle::make('is_good')
+                                        ->label('ရ/မရ')
+                                        ->default(false),
+
                                     Forms\Components\Select::make('reChange')
                                         ->label('အလဲအထပ်လုပ်မှာလား?')
                                         ->options([
@@ -198,6 +202,7 @@ class PurchaseRequestResource extends Resource
                                         'goldWeightGram' => $data['goldWeightGram'] ?? 0,
                                         'percent' => blank($data['percent'] ?? null) ? 0 : $data['percent'],
                                         'reChange' => $data['reChange'] ?? '0',
+                                        'is_good' => (bool) ($data['is_good'] ?? false),
                                         'quantity' => $data['quantity'] ?? 1,
                                         'remark' => $data['remark'] ?? '',
                                     ]
@@ -278,6 +283,10 @@ class PurchaseRequestResource extends Resource
 
                                     Forms\Components\Hidden::make('purchase_type')
                                         ->default('other_product'),
+
+                                    Forms\Components\Toggle::make('is_good')
+                                        ->label('ရ/မရ')
+                                        ->default(false),
 
                                     Forms\Components\Select::make('reChange')
                                         ->label('အလဲအထပ်လုပ်မှာလား?')
@@ -385,6 +394,7 @@ class PurchaseRequestResource extends Resource
                                         'goldWeightGram' => $data['goldWeightGram'] ?? 0,
                                         'percent' => blank($data['percent'] ?? null) ? 0 : $data['percent'],
                                         'reChange' => $data['reChange'] ?? '0',
+                                        'is_good' => (bool) ($data['is_good'] ?? false),
                                         'quantity' => $data['quantity'] ?? 1,
                                         'remark' => $data['remark'] ?? '',
                                     ]
@@ -505,6 +515,13 @@ class PurchaseRequestResource extends Resource
                                     ->label('Deduction (%)')
                                     ->content(fn(\Filament\Schemas\Components\Utilities\Get $get) => ($get('dynamic_fields_json.percent') ?? '0') . '%'),
 
+                                Forms\Components\Placeholder::make('is_good')
+                                    ->label('ရ/မရ')
+                                    ->content(function (\Filament\Schemas\Components\Utilities\Get $get) {
+                                        $isGood = $get('dynamic_fields_json.is_good') ?? false;
+                                        return $isGood ? 'ရ' : 'မရ';
+                                    }),
+
                                 Forms\Components\Placeholder::make('validation_status')
                                     ->label('Verification')
                                     ->content(function ($record) {
@@ -551,6 +568,10 @@ class PurchaseRequestResource extends Resource
 
                                                     Forms\Components\Hidden::make('purchase_type')
                                                         ->default($purchaseType),
+
+                                                    Forms\Components\Toggle::make('is_good')
+                                                        ->label('ရ/မရ')
+                                                        ->default(false),
 
                                                     Forms\Components\Select::make('reChange')
                                                         ->label('အလဲအထပ်လုပ်မှာလား?')
@@ -663,6 +684,7 @@ class PurchaseRequestResource extends Resource
                                                 'goldWeightGram' => $data['goldWeightGram'] ?? 0,
                                                 'percent' => blank($data['percent'] ?? null) ? 0 : $data['percent'],
                                                 'reChange' => $data['reChange'] ?? '0',
+                                                'is_good' => (bool) ($data['is_good'] ?? false),
                                                 'quantity' => $data['quantity'] ?? 1,
                                                 'remark' => $data['remark'] ?? '',
                                             ]);
@@ -749,6 +771,7 @@ class PurchaseRequestResource extends Resource
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Weight (Gram)'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('ကျောက်ချိန်'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Deduction (%)'),
+                                \Filament\Forms\Components\Repeater\TableColumn::make('ရ/မရ'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Verification'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Actual Price'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Actions'),

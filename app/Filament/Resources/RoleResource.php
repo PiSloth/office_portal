@@ -65,6 +65,7 @@ class RoleResource extends Resource
                 Forms\Components\Select::make('permissions')
                     ->label('Permissions')
                     ->multiple()
+                    ->relationship('permissions', 'name')
                     ->searchable()
                     ->options(fn(): array => self::permittedPermissionOptions())
                     ->helperText('Only permissions you already own can be assigned unless you have roles.assign or permissions.manage.'),

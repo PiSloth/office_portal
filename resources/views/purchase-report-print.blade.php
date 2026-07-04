@@ -175,14 +175,15 @@
         <thead>
             <tr>
                 <th style="width: 4%;" class="text-center">#</th>
-                <th style="width: 12%;">PR No.</th>
-                <th style="width: 15%;">Customer Name</th>
-                <th style="width: 12%;">Customer Phone</th>
-                <th style="width: 20%;">Product Name</th>
+                <th style="width: 11%;">PR No.</th>
+                <th style="width: 14%;">Customer Name</th>
+                <th style="width: 11%;">Customer Phone</th>
+                <th style="width: 18%;">Product Name</th>
                 <th style="width: 8%;">Gold Grade</th>
-                <th style="width: 10%;" class="text-right">Weight (Gram)</th>
-                <th style="width: 13%;">Weight (K/P/Y)</th>
+                <th style="width: 8%;" class="text-right">Weight (Gram)</th>
+                <th style="width: 12%;">Weight (K/P/Y)</th>
                 <th style="width: 4%;" class="text-center">Qty</th>
+                <th style="width: 8%;" class="text-center">ရ/မရ</th>
                 <th style="width: 12%;" class="text-right">Price</th>
             </tr>
         </thead>
@@ -210,11 +211,12 @@
                     <td class="text-right">{{ $weightGram }}</td>
                     <td>{{ $weightKpy }}</td>
                     <td class="text-center">{{ $qty }}</td>
+                    <td class="text-center">{{ ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ' }}</td>
                     <td class="text-right" style="font-weight: bold;">{{ $price }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="10" class="text-center py-8 text-gray-500">No purchased items found matching the selected filters.</td>
+                    <td colspan="11" class="text-center py-8 text-gray-500">No purchased items found matching the selected filters.</td>
                 </tr>
             @endforelse
             
@@ -224,6 +226,7 @@
                     <td class="text-right">{{ number_format($totalGrams, 2) }} g</td>
                     <td>{{ $totalKyat }}ကျပ် {{ $totalPae }}ပဲ {{ $totalYawe }}ရွေး</td>
                     <td class="text-center">{{ $totalQty }}</td>
+                    <td></td>
                     <td class="text-right" style="color: #10b981;">{{ number_format($totalPrice) }} MMK</td>
                 </tr>
             @endif

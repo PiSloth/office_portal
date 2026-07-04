@@ -136,10 +136,56 @@ class EditPurchaseRequest extends EditRecord
                             // If rule is required, user must input the related value and system evaluates PASS/FAIL.
                             // If not required, verifier manually selects Correct/Fail.
                             if ($rule->is_required) {
-                                $stepSchema[] = \Filament\Forms\Components\TextInput::make("verify_input_{$item->id}_{$rule->id}")
-                                    ->label("Enter Actual Value")
-                                    ->default($existingHistory?->input_value)
-                                    ->required();
+                                $fieldType = 'text';
+                                $fieldName = $rule->field_name;
+
+                                $numericFields = ['kyat', 'pae', 'yawe', 'kyaukWeight', 'goldWeightGram', 'percent', 'quantity', 'total_amount'];
+                                $booleanFields = ['is_good'];
+
+                                if (in_array($fieldName, $numericFields, true)) {
+                                    $fieldType = 'number';
+                                } elseif (in_array($fieldName, $booleanFields, true)) {
+                                    $fieldType = 'boolean';
+                                } else {
+                                    $productTypeId = $record->product_type_id;
+                                    if ($productTypeId) {
+                                        $dbField = \App\Models\ProductTypeField::query()
+                                            ->where('product_type_id', $productTypeId)
+                                            ->where('field_name', $fieldName)
+                                            ->first();
+                                        if ($dbField && $dbField->field_type) {
+                                            $type = strtolower($dbField->field_type);
+                                            if (in_array($type, ['number', 'numeric', 'integer', 'float', 'decimal'])) {
+                                                $fieldType = 'number';
+                                            } elseif (in_array($type, ['boolean', 'toggle', 'switch', 'checkbox'])) {
+                                                $fieldType = 'boolean';
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if ($fieldType === 'number') {
+                                    $stepSchema[] = \Filament\Forms\Components\TextInput::make("verify_input_{$item->id}_{$rule->id}")
+                                        ->label("Enter Actual " . ($rule->label ?: $rule->field_name))
+                                        ->numeric()
+                                        ->default($existingHistory?->input_value)
+                                        ->required();
+                                } elseif ($fieldType === 'boolean') {
+                                    $stepSchema[] = \Filament\Forms\Components\Radio::make("verify_input_{$item->id}_{$rule->id}")
+                                        ->label($rule->label ?: $rule->field_name)
+                                        ->options([
+                                            '1' => 'ရ',
+                                            '0' => 'မရ',
+                                        ])
+                                        ->inline()
+                                        ->default(blank($existingHistory?->input_value) ? '0' : (string)intval(filter_var($existingHistory?->input_value, FILTER_VALIDATE_BOOLEAN)))
+                                        ->required();
+                                } else {
+                                    $stepSchema[] = \Filament\Forms\Components\TextInput::make("verify_input_{$item->id}_{$rule->id}")
+                                        ->label("Enter Actual " . ($rule->label ?: $rule->field_name))
+                                        ->default($existingHistory?->input_value)
+                                        ->required();
+                                }
                             } else {
                                 $stepSchema[] = \Filament\Forms\Components\Radio::make("verify_{$item->id}_{$rule->id}")
                                     ->label("Verification Status")

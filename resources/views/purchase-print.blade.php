@@ -397,7 +397,12 @@
                         <div class="checklist-item">
                             <div class="checkbox"></div>
                             <div class="checklist-details">
-                                <div class="checklist-name">{{ $productName }} ({{ $weightGram }})</div>
+                                <div class="checklist-name">
+                                    {{ $productName }} ({{ $weightGram }})
+                                    <span style="float: right; font-weight: bold; border: 1px solid #9ca3af; padding: 0px 3px; border-radius: 2px;">
+                                        {{ ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ' }}
+                                    </span>
+                                </div>
                                 <div class="checklist-sub">Qty: {{ $qty }} | {{ $goldGrade }}</div>
                                 <div class="checklist-sub">{{ $weightKpy }}</div>
                                 @if (!empty($remark))

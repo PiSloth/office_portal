@@ -105,6 +105,10 @@ class ValidationManager
 
     public function evaluate($input, $expected, $operator, $tolerance): bool
     {
+        if (is_bool($expected)) {
+            $input = filter_var($input, FILTER_VALIDATE_BOOLEAN);
+        }
+
         if ($operator === 'equals') {
             return $input == $expected;
         }

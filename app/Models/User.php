@@ -89,6 +89,8 @@ class User extends Authenticatable implements FilamentUser
             'Supervisor',
             'checker',
             'Checker',
+            'purchaser',
+            'Purchaser',
         ];
     }
 

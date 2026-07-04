@@ -105,6 +105,7 @@ class ValidationRuleSetResource extends Resource
             'customer_name' => 'Customer Name',
             'customer_phone' => 'Customer Phone',
             'total_amount' => 'Total Amount',
+            'quantity' => 'Quantity',
         ];
 
         if (! $productTypeId) {
@@ -138,6 +139,7 @@ class ValidationRuleSetResource extends Resource
                 'goldWeightGram' => 'Gold Weight Gram (g)',
                 'percent' => 'Percent Deduction (%)',
                 'reChange' => 'Re-change (အလဲအထပ်)',
+                'is_good' => 'ရ/မရ',
             ];
             $dynamicFields = array_merge($dynamicFields, $jewelryCalculatorFields);
         }
