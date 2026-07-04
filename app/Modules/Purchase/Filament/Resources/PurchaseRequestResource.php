@@ -92,7 +92,7 @@ class PurchaseRequestResource extends Resource
                                     Forms\Components\Hidden::make('purchase_type')
                                         ->default('gb_product'),
 
-                                    Forms\Components\Toggle::make('is_good')
+                                    Forms\Components\Toggle::make('is_good')->offColor('danger')->onColor('success')
                                         ->label('ရ/မရ')
                                         ->default(false),
 
@@ -284,7 +284,7 @@ class PurchaseRequestResource extends Resource
                                     Forms\Components\Hidden::make('purchase_type')
                                         ->default('other_product'),
 
-                                    Forms\Components\Toggle::make('is_good')
+                                    Forms\Components\Toggle::make('is_good')->offColor('danger')->onColor('success')
                                         ->label('ရ/မရ')
                                         ->default(false),
 
@@ -569,7 +569,7 @@ class PurchaseRequestResource extends Resource
                                                     Forms\Components\Hidden::make('purchase_type')
                                                         ->default($purchaseType),
 
-                                                    Forms\Components\Toggle::make('is_good')
+                                                    Forms\Components\Toggle::make('is_good')->offColor('danger')->onColor('success')
                                                         ->label('ရ/မရ')
                                                         ->default(false),
 
