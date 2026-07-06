@@ -77,21 +77,21 @@ class PurchaseRequestResource extends Resource
                         Forms\Components\Hidden::make('branch_id')
                             ->default(fn() => auth()->user()?->branch_id),
                         Forms\Components\Hidden::make('product_type_id')
-                            ->default(fn () => \App\Models\ProductType::where('code', 'JEWELRY')->orWhere('name', 'jewelry')->first()?->id),
+                            ->default(fn() => \App\Models\ProductType::where('code', 'JEWELRY')->orWhere('name', 'jewelry')->first()?->id),
 
                         \Filament\Schemas\Components\Grid::make(3)
                             ->schema([
                                 Forms\Components\Placeholder::make('purchase_number')
                                     ->label('Purchase Number')
-                                    ->content(fn ($record) => $record?->purchase_number ?? 'PR-Draft')
-                                    ->visible(fn ($record) => $record !== null && $record->exists),
+                                    ->content(fn($record) => $record?->purchase_number ?? 'PR-Draft')
+                                    ->visible(fn($record) => $record !== null && $record->exists),
                                 Forms\Components\Placeholder::make('branch_name')
                                     ->label('Branch')
                                     ->content(fn($record) => $record?->branch?->name ?? auth()->user()?->branch?->name ?? 'No Branch'),
                                 Forms\Components\Placeholder::make('product_type_name')
                                     ->label('Product Type')
-                                    ->content(fn ($record) => $record?->productType?->name ?? '-')
-                                    ->visible(fn ($record) => $record !== null && $record->exists),
+                                    ->content(fn($record) => $record?->productType?->name ?? '-')
+                                    ->visible(fn($record) => $record !== null && $record->exists),
                                 Forms\Components\Placeholder::make('workflow_state_name')
                                     ->label('Status')
                                     ->content(function ($record) {
@@ -101,20 +101,20 @@ class PurchaseRequestResource extends Resource
                                         }
                                         $name = $state->name;
                                         $color = $state->color ?: 'gray';
-                                        
-                                        $classes = match($color) {
+
+                                        $classes = match ($color) {
                                             'blue' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200',
                                             'success' => 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200',
                                             'danger' => 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200',
                                             'warning' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200',
                                             default => 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
                                         };
-                                        
+
                                         return new \Illuminate\Support\HtmlString('<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ' . $classes . '">' . e($name) . '</span>');
                                     }),
                                 Forms\Components\Placeholder::make('total_amount_disp')
                                     ->label('Total Cost')
-                                    ->content(fn ($record) => number_format($record?->total_amount ?? 0) . ' MMK'),
+                                    ->content(fn($record) => number_format($record?->total_amount ?? 0) . ' MMK'),
                             ]),
 
                         Forms\Components\Placeholder::make('customer_info_card')
@@ -525,12 +525,94 @@ class PurchaseRequestResource extends Resource
                             }),
                     ])
                     ->schema([
+                        Forms\Components\Placeholder::make('calculator_table_styles')
+                            ->label('')
+                            ->hiddenLabel()
+                            ->content(new \Illuminate\Support\HtmlString('
+                                <style>
+                                    .calculator-table-repeater > table {
+                                        display: table !important;
+                                        width: 100% !important;
+                                    }
+                                    .calculator-table-repeater > table > thead {
+                                        display: table-header-group !important;
+                                    }
+                                    .calculator-table-repeater > table > tbody {
+                                        display: table-row-group !important;
+                                    }
+                                    .calculator-table-repeater > table > tbody > tr {
+                                        display: table-row !important;
+                                        padding: 0 !important;
+                                    }
+                                    .calculator-table-repeater > table > tbody > tr > td {
+                                        display: table-cell !important;
+                                        padding: 0.5rem 0.75rem !important;
+                                        vertical-align: middle !important;
+                                    }
+                                    .calculator-table-repeater > table > thead > tr > th {
+                                        display: table-cell !important;
+                                        padding: 0.5rem 0.75rem !important;
+                                        vertical-align: middle !important;
+                                    }
+                                    .calculator-table-repeater .fi-fo-field-label-content,
+                                    .calculator-table-repeater .fi-in-entry-label {
+                                        display: none !important;
+                                    }
+                                    .calculator-table-repeater > table > tbody > tr > td.fi-hidden {
+                                        display: table-cell !important;
+                                    }
+                                    .calculator-table-repeater .fi-fo-table-repeater-actions {
+                                        padding: 0.5rem 0.75rem !important;
+                                    }
+                                    .custom-badge {
+                                        display: inline-flex !important;
+                                        align-items: center !important;
+                                        padding: 0.25rem 0.75rem !important;
+                                        font-size: 0.75rem !important;
+                                        font-weight: 700 !important;
+                                        text-transform: uppercase !important;
+                                        letter-spacing: 0.05em !important;
+                                        border-radius: 9999px !important;
+                                        white-space: nowrap !important;
+                                    }
+                                    .custom-badge-gray {
+                                        background-color: #f3f4f6 !important;
+                                        color: #1f2937 !important;
+                                        border: 1px solid #d1d5db !important;
+                                    }
+                                    .dark .custom-badge-gray {
+                                        background-color: #374151 !important;
+                                        color: #f3f4f6 !important;
+                                        border: 1px solid #4b5563 !important;
+                                    }
+                                    .custom-badge-red {
+                                        background-color: #fee2e2 !important;
+                                        color: #991b1b !important;
+                                        border: 1px solid #fecaca !important;
+                                    }
+                                    .dark .custom-badge-red {
+                                        background-color: rgba(153, 27, 27, 0.4) !important;
+                                        color: #fecaca !important;
+                                        border: 1px solid rgba(239, 68, 68, 0.4) !important;
+                                    }
+                                    .custom-badge-green {
+                                        background-color: #d1fae5 !important;
+                                        color: #065f46 !important;
+                                        border: 1px solid #a7f3d0 !important;
+                                    }
+                                    .dark .custom-badge-green {
+                                        background-color: rgba(6, 95, 70, 0.4) !important;
+                                        color: #a7f3d0 !important;
+                                        border: 1px solid rgba(16, 185, 129, 0.4) !important;
+                                    }
+                                </style>
+                            ')),
                         Forms\Components\Repeater::make('items')
                             ->relationship()
                             ->addable(false) // Disable inline create button
                             ->deletable(fn($record) => !self::isAllVerified($record))
                             ->extraAttributes([
-                                'class' => 'overflow-x-auto block w-full max-w-full min-w-0',
+                                'class' => 'overflow-x-auto block w-full max-w-full min-w-0 calculator-table-repeater',
                                 'style' => 'overflow-x: auto; display: block; max-width: 100%; min-width: 0;',
                             ])
                             ->schema([
@@ -569,22 +651,24 @@ class PurchaseRequestResource extends Resource
                                     }),
 
                                 Forms\Components\Placeholder::make('weight')
-                                    ->label('Weight (Gram)')
+                                    ->label('(g)')
                                     ->content(fn(\Filament\Schemas\Components\Utilities\Get $get) => $get('dynamic_fields_json.goldWeightGram') ?? '-'),
 
                                 Forms\Components\Placeholder::make('kyauk_weight')
-                                    ->label('ကျောက်ချိန်')
+                                    ->label('ကျောက်')
                                     ->content(fn(\Filament\Schemas\Components\Utilities\Get $get) => $get('dynamic_fields_json.kyaukWeight') ?? '-'),
 
                                 Forms\Components\Placeholder::make('deduction')
-                                    ->label('Deduction (%)')
+                                    ->label('(%)')
                                     ->content(fn(\Filament\Schemas\Components\Utilities\Get $get) => ($get('dynamic_fields_json.percent') ?? '0') . '%'),
 
                                 Forms\Components\Placeholder::make('is_good')
                                     ->label('ရ/မရ')
                                     ->content(function (\Filament\Schemas\Components\Utilities\Get $get) {
                                         $isGood = $get('dynamic_fields_json.is_good') ?? false;
-                                        return $isGood ? 'ရ' : 'မရ';
+                                        return $isGood
+                                            ? new \Illuminate\Support\HtmlString('<span class="custom-badge custom-badge-green">ရ</span>')
+                                            : new \Illuminate\Support\HtmlString('<span class="custom-badge custom-badge-red">မရ</span>');
                                     }),
 
                                 Forms\Components\Placeholder::make('validation_status')
@@ -595,16 +679,16 @@ class PurchaseRequestResource extends Resource
                                         }
                                         $histories = $record->validationHistories;
                                         if ($histories->isEmpty()) {
-                                            return new \Illuminate\Support\HtmlString('<span class="text-gray-500">Pending</span>');
+                                            return new \Illuminate\Support\HtmlString('<span class="custom-badge custom-badge-gray">Pending</span>');
                                         }
 
                                         $passed = $histories->where('status', 'PASS')->count();
                                         $failed = $histories->where('status', 'FAIL')->count();
 
                                         if ($failed > 0) {
-                                            return new \Illuminate\Support\HtmlString("<span class=\"text-danger-600 font-semibold\">{$passed} Correct / {$failed} Fail</span>");
+                                            return new \Illuminate\Support\HtmlString("<span class=\"custom-badge custom-badge-red\">{$passed} Pass / {$failed} Fail</span>");
                                         }
-                                        return new \Illuminate\Support\HtmlString("<span class=\"text-success-600 font-semibold\">{$passed} Correct</span>");
+                                        return new \Illuminate\Support\HtmlString("<span class=\"custom-badge custom-badge-green\">{$passed} Pass</span>");
                                     }),
 
                                 Forms\Components\Placeholder::make('actual_price')
@@ -833,12 +917,12 @@ class PurchaseRequestResource extends Resource
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Product Type'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Product Name'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Gold Grade'),
-                                \Filament\Forms\Components\Repeater\TableColumn::make('Weight (Gram)'),
-                                \Filament\Forms\Components\Repeater\TableColumn::make('ကျောက်ချိန်'),
-                                \Filament\Forms\Components\Repeater\TableColumn::make('Deduction (%)'),
+                                \Filament\Forms\Components\Repeater\TableColumn::make('(Gram)'),
+                                \Filament\Forms\Components\Repeater\TableColumn::make('ကျောက်'),
+                                \Filament\Forms\Components\Repeater\TableColumn::make('(%)'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('ရ/မရ'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Verification'),
-                                \Filament\Forms\Components\Repeater\TableColumn::make('Actual Price'),
+                                \Filament\Forms\Components\Repeater\TableColumn::make('Price'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Actions'),
                             ])
                             ->afterCreate(function (\Illuminate\Database\Eloquent\Model $record, array $data) {
