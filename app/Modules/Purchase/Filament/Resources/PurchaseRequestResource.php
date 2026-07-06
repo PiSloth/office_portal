@@ -922,7 +922,7 @@ class PurchaseRequestResource extends Resource
                                 \Filament\Forms\Components\Repeater\TableColumn::make('(%)'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('ရ/မရ'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Verification'),
-                                \Filament\Forms\Components\Repeater\TableColumn::make('Price'),
+                                \Filament\Forms\Components\Repeater\TableColumn::make('Actual Price'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Actions'),
                             ])
                             ->afterCreate(function (\Illuminate\Database\Eloquent\Model $record, array $data) {
