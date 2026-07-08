@@ -17,7 +17,9 @@ class WorkflowRequestsChartWidget extends ChartWidget
 
     protected ?string $heading = 'Purchase Requests by Workflow State';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int | string | array $columnSpan = 1;
+
+    protected ?string $maxHeight = '300px';
 
     protected function getType(): string
     {
@@ -31,7 +33,7 @@ class WorkflowRequestsChartWidget extends ChartWidget
                 ->label('Branch')
                 ->options([
                     'all' => 'All Branches',
-                    ...Branch::pluck('name', 'id')->all(),
+                    ...Branch::pluck('code', 'id')->all(),
                 ])
                 ->default('all')
                 ->searchable(),
@@ -73,9 +75,13 @@ class WorkflowRequestsChartWidget extends ChartWidget
 
         $labels = [];
         $data = [];
-        foreach ($states as $state) {
+        $backgroundColors = [];
+        $palette = ['#7531bc', '#fc950f', '#2AEFC8', '#22c55e', '#ef4444', '#0ea5e9', '#eab308', '#ec4899', '#8b5cf6', '#6b7280'];
+
+        foreach ($states as $index => $state) {
             $labels[] = $state->name;
             $data[] = $counts[$state->id] ?? 0;
+            $backgroundColors[] = $state->color ?: $palette[$index % count($palette)];
         }
 
         return [
@@ -83,11 +89,26 @@ class WorkflowRequestsChartWidget extends ChartWidget
                 [
                     'label' => 'Requests Count',
                     'data' => $data,
-                    'backgroundColor' => '#2aeFC8',
-                    'borderColor' => '#0ea5e9',
+                    'backgroundColor' => $backgroundColors,
+                    'borderColor' => $backgroundColors,
                 ],
             ],
             'labels' => $labels,
+        ];
+    }
+
+    protected function getOptions(): array
+    {
+        return [
+            'responsive' => true,
+            'scales' => [
+                'y' => [
+                    'beginAtZero' => true,
+                    'ticks' => [
+                        'precision' => 0,
+                    ],
+                ],
+            ],
         ];
     }
 }
