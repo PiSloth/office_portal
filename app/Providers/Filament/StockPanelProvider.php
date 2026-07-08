@@ -43,6 +43,10 @@ class StockPanelProvider extends PanelProvider
                     ->url(fn (): string => route('dashboard'))
                     ->icon('heroicon-o-arrow-left-on-rectangle')
                     ->sort(-1),
+                \Filament\Navigation\NavigationItem::make('Repurchase App')
+                    ->url('/repurchase')
+                    ->icon('heroicon-o-shopping-bag')
+                    ->sort(2),
                 \Filament\Navigation\NavigationItem::make('System Admin')
                     ->url('/admin')
                     ->icon('heroicon-o-cog-8-tooth')
