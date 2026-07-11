@@ -31,7 +31,7 @@ class EditPurchaseRequest extends EditRecord
             if ($transition->checklist_id) {
                 $checklist = \App\Modules\Core\Workflow\Models\Checklist::find($transition->checklist_id);
                 if ($checklist) {
-                    $checklistItems = $checklist->items()->where('is_active', true)->get();
+                    $checklistItems = $checklist->items()->where('is_active', true)->orderBy('sort_order', 'asc')->get();
                     if ($checklistItems->isNotEmpty()) {
                         $hasChecklist = true;
                     }

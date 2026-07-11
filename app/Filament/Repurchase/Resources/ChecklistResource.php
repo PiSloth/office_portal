@@ -34,23 +34,58 @@ class ChecklistResource extends Resource
                     ->nullable()
                     ->helperText('Optional: Scope this checklist to a specific product type.'),
 
-                \Filament\Schemas\Components\Section::make('Checklist Items')
+                 \Filament\Schemas\Components\Section::make('Checklist Items')
+                    ->columnSpanFull()
                     ->schema([
+                        \Filament\Schemas\Components\Grid::make(12)
+                            ->schema([
+                                \Filament\Forms\Components\Placeholder::make('header_label')
+                                    ->hiddenLabel()
+                                    ->content('Label')
+                                    ->columnSpan(5),
+                                \Filament\Forms\Components\Placeholder::make('header_sort_order')
+                                    ->hiddenLabel()
+                                    ->content('Sort Order')
+                                    ->columnSpan(3),
+                                \Filament\Forms\Components\Placeholder::make('header_required')
+                                    ->hiddenLabel()
+                                    ->content('Required')
+                                    ->columnSpan(2),
+                                \Filament\Forms\Components\Placeholder::make('header_active')
+                                    ->hiddenLabel()
+                                    ->content('Active')
+                                    ->columnSpan(2),
+                            ])
+                            ->extraAttributes(['class' => 'font-semibold border-b pb-2 mb-2 hidden md:grid']),
+
                         Forms\Components\Repeater::make('items')
                             ->relationship()
+                            ->reorderable('sort_order')
                             ->schema([
                                 Forms\Components\TextInput::make('label')
                                     ->required()
                                     ->maxLength(255)
-                                    ->columnSpan(2),
+                                    ->hiddenLabel()
+                                    ->columnSpan(5),
+                                Forms\Components\TextInput::make('sort_order')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->hiddenLabel()
+                                    ->columnSpan(3),
                                 Forms\Components\Toggle::make('is_required')
                                     ->label('Required')
-                                    ->default(true),
+                                    ->inline(false)
+                                    ->default(true)
+                                    ->hiddenLabel()
+                                    ->columnSpan(2),
                                 Forms\Components\Toggle::make('is_active')
                                     ->label('Active')
-                                    ->default(true),
+                                    ->inline(false)
+                                    ->default(true)
+                                    ->hiddenLabel()
+                                    ->columnSpan(2),
                             ])
-                            ->columns(4)
+                            ->columns(12)
                             ->itemLabel(fn(array $state): ?string => $state['label'] ?? 'New Checklist Item'),
                     ])
             ]);
