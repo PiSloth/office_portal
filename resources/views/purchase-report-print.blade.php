@@ -12,19 +12,19 @@
             margin-right: 10mm;
         }
         @font-face {
-            font-family: 'Padauk';
-            src: url('{{ storage_path("fonts/Padauk-Regular.ttf") }}') format('truetype');
+            font-family: 'Zawgyi-One';
+            src: url('{{ storage_path("fonts/Zawgyi-One.ttf") }}') format('truetype');
             font-weight: normal;
             font-style: normal;
         }
         @font-face {
-            font-family: 'Padauk';
-            src: url('{{ storage_path("fonts/Padauk-Bold.ttf") }}') format('truetype');
+            font-family: 'Zawgyi-One';
+            src: url('{{ storage_path("fonts/Zawgyi-One.ttf") }}') format('truetype');
             font-weight: bold;
             font-style: normal;
         }
         body {
-            font-family: 'Padauk', sans-serif;
+            font-family: 'Zawgyi-One', sans-serif;
             font-size: 10px;
             color: #1f2937;
             line-height: 1.4;
@@ -152,18 +152,18 @@
         $dateText = $date ? \Carbon\Carbon::parse($date)->format('d M Y') : 'All Dates';
     @endphp
 
-    <!-- Repeating Header across pages using table-based layout compatible with Dompdf -->
+     <!-- Repeating Header across pages using table-based layout compatible with Dompdf -->
     <div class="report-header">
         <table class="report-header-table">
             <tr>
                 <td style="width: 70%; vertical-align: top;">
                     <h1 class="report-title">Purchased Items Report</h1>
-                    <div class="report-subtitle">
-                        Location: {{ $branchName }} | Report Date: {{ $dateText }}
+                     <div class="report-subtitle">
+                        Location: {{ \Rabbit::uni2zg($branchName) }} | Report Date: {{ $dateText }}
                     </div>
                 </td>
                 <td style="width: 30%; vertical-align: top;" class="report-meta">
-                    <div>Printed By: <strong>{{ $printedBy }}</strong></div>
+                    <div>Printed By: <strong>{{ \Rabbit::uni2zg($printedBy) }}</strong></div>
                     <div>Printed At: <strong>{{ $printedTime }}</strong></div>
                     <div>Page: <strong><span class="page-number"></span></strong></div>
                 </td>
@@ -183,7 +183,7 @@
                 <th style="width: 8%;" class="text-right">Weight (Gram)</th>
                 <th style="width: 12%;">Weight (K/P/Y)</th>
                 <th style="width: 4%;" class="text-center">Qty</th>
-                <th style="width: 8%;" class="text-center">ရ/မရ</th>
+                <th style="width: 8%;" class="text-center">{{ \Rabbit::uni2zg('ရ/မရ') }}</th>
                 <th style="width: 12%;" class="text-right">Price</th>
             </tr>
         </thead>
@@ -204,14 +204,14 @@
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td><strong>{{ $item->purchaseRequest?->purchase_number ?? '-' }}</strong></td>
-                    <td>{{ $item->purchaseRequest?->customer_name ?? '-' }}</td>
+                    <td>{{ \Rabbit::uni2zg($item->purchaseRequest?->customer_name ?? '-') }}</td>
                     <td>{{ $item->purchaseRequest?->customer_phone ?? '-' }}</td>
-                    <td><strong>{{ $productName }}</strong></td>
-                    <td>{{ $goldGrade }}</td>
+                    <td><strong>{{ \Rabbit::uni2zg($productName) }}</strong></td>
+                    <td>{{ \Rabbit::uni2zg($goldGrade) }}</td>
                     <td class="text-right">{{ $weightGram }}</td>
-                    <td>{{ $weightKpy }}</td>
+                    <td>{{ \Rabbit::uni2zg($weightKpy) }}</td>
                     <td class="text-center">{{ $qty }}</td>
-                    <td class="text-center">{{ ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ' }}</td>
+                    <td class="text-center">{{ \Rabbit::uni2zg(($inputs['is_good'] ?? false) ? 'ရ' : 'မရ') }}</td>
                     <td class="text-right" style="font-weight: bold;">{{ $price }}</td>
                 </tr>
             @empty
@@ -224,7 +224,7 @@
                 <tr class="total-row">
                     <td colspan="6" class="text-right">Grand Total:</td>
                     <td class="text-right">{{ number_format($totalGrams, 2) }} g</td>
-                    <td>{{ $totalKyat }}ကျပ် {{ $totalPae }}ပဲ {{ $totalYawe }}ရွေး</td>
+                    <td>{{ \Rabbit::uni2zg("{$totalKyat}ကျပ် {$totalPae}ပဲ {$totalYawe}ရွေး") }}</td>
                     <td class="text-center">{{ $totalQty }}</td>
                     <td></td>
                     <td class="text-right" style="color: #10b981;">{{ number_format($totalPrice) }} MMK</td>

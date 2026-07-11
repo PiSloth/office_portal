@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7ff4f4763a0a98ca18055eb3b461983d",
+    "content-hash": "99509ac4535fc2039b4a4133605526fd",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -5048,6 +5048,61 @@
                 "source": "https://github.com/bobthecow/psysh/tree/v0.12.23"
             },
             "time": "2026-05-23T13:41:31+00:00"
+        },
+        {
+            "name": "rabbit-converter/rabbit-php",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Rabbit-Converter/Rabbit-PHP.git",
+                "reference": "ea8de6422949e0d4de11b073bac4037647dd6760"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Rabbit-Converter/Rabbit-PHP/zipball/ea8de6422949e0d4de11b073bac4037647dd6760",
+                "reference": "ea8de6422949e0d4de11b073bac4037647dd6760",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "~4.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "src/Rabbit.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Saturngod",
+                    "email": "me@saturngod.net"
+                },
+                {
+                    "name": "Nyan Lynn Htut",
+                    "email": "nyanlynnhtut@hexcores.com"
+                }
+            ],
+            "description": "Another Zawgyi <=> Unicode Converter",
+            "homepage": "http://saturngod.github.io/Rabbit",
+            "keywords": [
+                "converter",
+                "myanmar-font",
+                "unicode",
+                "zawgyi"
+            ],
+            "support": {
+                "issues": "https://github.com/Rabbit-Converter/Rabbit-PHP/issues",
+                "source": "https://github.com/Rabbit-Converter/Rabbit-PHP/tree/master"
+            },
+            "time": "2020-05-15T05:57:32+00:00"
         },
         {
             "name": "ralouphie/getallheaders",
@@ -11192,7 +11247,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "rabbit-converter/rabbit-php": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
