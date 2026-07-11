@@ -59,7 +59,7 @@ class ChecklistResource extends Resource
                             ->extraAttributes(['class' => 'font-semibold border-b pb-2 mb-2 hidden md:grid']),
 
                         Forms\Components\Repeater::make('items')
-                            ->relationship()
+                            ->relationship(modifyQueryUsing: fn ($query) => $query->orderBy('sort_order', 'asc'))
                             ->reorderable('sort_order')
                             ->schema([
                                 Forms\Components\TextInput::make('label')
