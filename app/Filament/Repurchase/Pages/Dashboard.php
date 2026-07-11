@@ -8,6 +8,7 @@ use App\Filament\Repurchase\Widgets\GoldGradeRepurchaseChartWidget;
 use App\Filament\Repurchase\Widgets\GoldGradeRepurchaseTableWidget;
 use App\Filament\Repurchase\Widgets\FailedValidationFieldsChartWidget;
 use App\Filament\Repurchase\Widgets\PurchaseDecisionStatusChartWidget;
+use App\Filament\Repurchase\Widgets\MissingGoldPriceAnnouncementsWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
@@ -16,9 +17,10 @@ class Dashboard extends BaseDashboard
     {
         return [
             RepurchaseStatsWidget::class,
+            MissingGoldPriceAnnouncementsWidget::class,
+            GoldGradeRepurchaseTableWidget::class,
             WorkflowRequestsChartWidget::class,
             GoldGradeRepurchaseChartWidget::class,
-            GoldGradeRepurchaseTableWidget::class,
             FailedValidationFieldsChartWidget::class,
             PurchaseDecisionStatusChartWidget::class,
         ];

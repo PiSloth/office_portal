@@ -22,6 +22,29 @@ class PurchaseDecisionResource extends Resource
     {
         return $schema
             ->components([
+                \Filament\Schemas\Components\Section::make('Original Validation Failure Reference')
+                    ->schema([
+                        Forms\Components\Placeholder::make('failed_fields')
+                            ->label('Failed Fields')
+                            ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->pluck('field_name')->unique()->join(', ') ?? '-'),
+                        Forms\Components\Placeholder::make('expected_values')
+                            ->label('Expected Values')
+                            ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->expected_value}")->join(' | ') ?? '-'),
+                        Forms\Components\Placeholder::make('actual_values')
+                            ->label('Actual Values')
+                            ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->actual_value}")->join(' | ') ?? '-'),
+                        Forms\Components\Placeholder::make('checked_by')
+                            ->label('Who Checked / Checked By')
+                            ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => $fc->whoChecked?->name)->filter()->unique()->join(', ') ?? '-'),
+                        Forms\Components\Placeholder::make('check_remarks')
+                            ->label('Check Remarks')
+                            ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->remark}")->join(' | ') ?? '-')
+                            ->columnSpan(2),
+                    ])
+                    ->columns(3)
+                    ->visible(fn (?PurchaseDecision $record) => $record !== null)
+                    ->columnSpanFull(),
+
                 Forms\Components\Select::make('purchase_request_id')
                     ->relationship('purchaseRequest', 'id')
                     ->getOptionLabelFromRecordUsing(fn ($record) => $record->purchase_number)
@@ -72,6 +95,22 @@ class PurchaseDecisionResource extends Resource
                     ->label('Branch')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('failed_fields')
+                    ->label('Failed Fields')
+                    ->state(fn (PurchaseDecision $record): string => $record->purchaseRequest?->failChecks?->pluck('field_name')->unique()->join(', ') ?? '-'),
+                Tables\Columns\TextColumn::make('expected_values')
+                    ->label('Expected Values')
+                    ->state(fn (PurchaseDecision $record): string => $record->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->expected_value}")->join(' | ') ?? '-'),
+                Tables\Columns\TextColumn::make('actual_values')
+                    ->label('Actual Values')
+                    ->state(fn (PurchaseDecision $record): string => $record->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->actual_value}")->join(' | ') ?? '-'),
+                Tables\Columns\TextColumn::make('checked_by')
+                    ->label('Checked By')
+                    ->state(fn (PurchaseDecision $record): string => $record->purchaseRequest?->failChecks?->map(fn($fc) => $fc->whoChecked?->name)->filter()->unique()->join(', ') ?? '-'),
+                Tables\Columns\TextColumn::make('check_remarks')
+                    ->label('Check Remarks')
+                    ->state(fn (PurchaseDecision $record): string => $record->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->remark}")->join(' | ') ?? '-')
+                    ->limit(50),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {

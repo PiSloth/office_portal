@@ -65,6 +65,11 @@ class PurchaseRequest extends Model
         return $this->hasOne(PurchaseDecision::class);
     }
 
+    public function failChecks()
+    {
+        return $this->hasMany(FailCheck::class);
+    }
+
     public function printLogs()
     {
         return $this->hasMany(PurchaseRequestPrintLog::class);
