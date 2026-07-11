@@ -1268,6 +1268,7 @@ class PurchaseRequestResource extends Resource
                     }),
                 \Filament\Actions\EditAction::make(),
             ])
+            ->defaultSort('id', 'desc')
             ->bulkActions([
                 \Filament\Actions\BulkActionGroup::make([
                     \Filament\Actions\DeleteBulkAction::make(),

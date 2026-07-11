@@ -39,7 +39,7 @@ class GoldGradeRepurchaseChartWidget extends ChartWidget
                 ->searchable(),
             DatePicker::make('start_date')
                 ->label('Start Date')
-                ->default(now()->startOfMonth()),
+                ->default(now()),
             DatePicker::make('end_date')
                 ->label('End Date')
                 ->default(now()),
@@ -49,7 +49,7 @@ class GoldGradeRepurchaseChartWidget extends ChartWidget
     protected function getData(): array
     {
         $branchId = $this->filters['branch_id'] ?? 'all';
-        $startDate = Carbon::parse($this->filters['start_date'] ?? now()->startOfMonth())->startOfDay();
+        $startDate = Carbon::parse($this->filters['start_date'] ?? now())->startOfDay();
         $endDate = Carbon::parse($this->filters['end_date'] ?? now())->endOfDay();
 
         $gradeLabels = [
