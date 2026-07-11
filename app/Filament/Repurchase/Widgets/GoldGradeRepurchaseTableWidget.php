@@ -47,6 +47,7 @@ class GoldGradeRepurchaseTableWidget extends TableWidget
                     ->havingRaw("grade IS NOT NULL AND grade != ''");
 
                 return PurchaseItem::query()
+                    ->withTrashed()
                     ->fromSub($subquery, 'purchase_items');
             })
             ->columns([
@@ -99,7 +100,7 @@ class GoldGradeRepurchaseTableWidget extends TableWidget
                             ->label('End Date')
                             ->default(now()),
                     ])
-            ], layout: FiltersLayout::AboveContent)
+            ])
             ->defaultSort('total_gram', 'desc')
             ->paginated(false);
     }

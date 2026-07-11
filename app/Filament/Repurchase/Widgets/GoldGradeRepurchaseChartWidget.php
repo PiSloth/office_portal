@@ -138,6 +138,20 @@ class GoldGradeRepurchaseChartWidget extends ChartWidget
 
     protected function getOptions(): array
     {
+        $gradeLabels = [
+            '16' => '16 ပဲ',
+            '15' => '15 ပဲ',
+            '14.2' => 'ဒင်္ဂါး (14.2)',
+            '14' => '14 ပဲ',
+            '13' => '13 ပဲ',
+            '12' => '12 ပဲ',
+            '10' => '10 ပဲ',
+            '8' => '8 ပဲ',
+            '4' => '4 ပဲ',
+        ];
+        $reversedLabels = array_flip($gradeLabels);
+        $gradeMapJson = json_encode($reversedLabels);
+
         return [
             'responsive' => true,
             'scales' => [
@@ -145,6 +159,19 @@ class GoldGradeRepurchaseChartWidget extends ChartWidget
                     'beginAtZero' => true,
                 ],
             ],
+            'onClick' => \Filament\Support\RawJs::make("
+                (event, activeElements, chart) => {
+                    if (activeElements.length > 0) {
+                        const activeElement = activeElements[0];
+                        const label = chart.data.labels[activeElement.index];
+                        const gradeMap = {$gradeMapJson};
+                        const gradeVal = gradeMap[label];
+                        if (gradeVal) {
+                            window.location.href = '/repurchase/purchase-requests?tableFilters[gold_grade][value]=' + gradeVal;
+                        }
+                    }
+                }
+            "),
         ];
     }
 }

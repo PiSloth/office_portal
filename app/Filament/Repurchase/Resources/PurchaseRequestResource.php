@@ -1166,7 +1166,8 @@ class PurchaseRequestResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('purchase_number')
-                    ->label('Purchase No'),
+                    ->label('Purchase No')
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('branch.name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('productType.name')
@@ -1187,7 +1188,53 @@ class PurchaseRequestResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('branch_id')
+                    ->label('Branch')
+                    ->options(\App\Models\Branch::pluck('name', 'id'))
+                    ->default(fn () => auth()->user()?->branch_id),
+                Tables\Filters\SelectFilter::make('workflow_state_id')
+                    ->label('Status')
+                    ->relationship('workflowState', 'name'),
+                Tables\Filters\SelectFilter::make('gold_grade')
+                    ->label('Gold Grade')
+                    ->options([
+                        '16' => '16 ပဲ',
+                        '15' => '15 ပဲ',
+                        '14.2' => 'ဒင်္ဂါး (14.2)',
+                        '14' => '14 ပဲ',
+                        '13' => '13 ပဲ',
+                        '12' => '12 ပဲ',
+                        '10' => '10 ပဲ',
+                        '8' => '8 ပဲ',
+                        '4' => '4 ပဲ',
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        if ($data['value']) {
+                            $query->whereHas('items', function ($q) use ($data) {
+                                $q->whereRaw("json_unquote(json_extract(dynamic_fields_json, '$.goldList')) = ?", [$data['value']]);
+                            });
+                        }
+                    }),
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')
+                            ->label('Start Date')
+                            ->default(now()),
+                        Forms\Components\DatePicker::make('created_until')
+                            ->label('End Date')
+                            ->default(now()),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 \Filament\Actions\Action::make('view_history')

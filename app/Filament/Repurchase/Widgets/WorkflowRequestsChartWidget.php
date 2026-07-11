@@ -99,6 +99,15 @@ class WorkflowRequestsChartWidget extends ChartWidget
 
     protected function getOptions(): array
     {
+        $states = \App\Modules\Core\Workflow\Models\WorkflowState::where('is_end', false)
+            ->orWhereNull('is_end')
+            ->get();
+        $stateMap = [];
+        foreach ($states as $state) {
+            $stateMap[$state->name] = $state->id;
+        }
+        $stateMapJson = json_encode($stateMap);
+
         return [
             'responsive' => true,
             'scales' => [
@@ -109,6 +118,19 @@ class WorkflowRequestsChartWidget extends ChartWidget
                     ],
                 ],
             ],
+            'onClick' => \Filament\Support\RawJs::make("
+                (event, activeElements, chart) => {
+                    if (activeElements.length > 0) {
+                        const activeElement = activeElements[0];
+                        const label = chart.data.labels[activeElement.index];
+                        const stateMap = {$stateMapJson};
+                        const stateId = stateMap[label];
+                        if (stateId) {
+                            window.location.href = '/repurchase/purchase-requests?tableFilters[workflow_state_id][value]=' + stateId;
+                        }
+                    }
+                }
+            "),
         ];
     }
 }
