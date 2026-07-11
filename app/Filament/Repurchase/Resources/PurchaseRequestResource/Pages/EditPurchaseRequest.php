@@ -41,13 +41,34 @@ class EditPurchaseRequest extends EditRecord
             if ($transition->validation_rule_set_id) {
                 $ruleSet = \App\Modules\Core\Validation\Models\ValidationRuleSet::find($transition->validation_rule_set_id);
                 if ($ruleSet && $ruleSet->rules->isNotEmpty() && $record->items->isNotEmpty()) {
-                    $hasRules = true;
+                    $hasRules = false;
                     $rules = $ruleSet->rules;
 
                     $stepIndex = 1;
                     $foundNextUnchecked = false;
+                    $activeRulesCount = 0;
                     foreach ($record->items as $itemIndex => $item) {
                         foreach ($rules as $ruleIndex => $rule) {
+                            $validationManager = new \App\Modules\Core\Validation\Services\ValidationManager();
+                            $expectedVal = $validationManager->resolveExpectedValue($rule->expected_source ?: $rule->field_name, $item);
+
+                            // Skip if is_skip_zero is true and expected value is 0
+                            if ($rule->is_skip_zero && ($expectedVal === 0 || $expectedVal === 0.0 || $expectedVal === '0' || $expectedVal === '0.00')) {
+                                continue;
+                            }
+
+                            // Skip if is_based_grade is true and grade does not match
+                            if ($rule->is_based_grade) {
+                                $itemGrade = $item->dynamic_fields_json['goldList'] ?? null;
+                                $allowedGrades = $rule->grades_json ?? [];
+                                if (!in_array((string)$itemGrade, array_map('strval', $allowedGrades), true)) {
+                                    continue;
+                                }
+                            }
+
+                            $activeRulesCount++;
+                            $hasRules = true;
+
                             // Check if this user already has a validation history for this item and this rule
                             $hasHistory = \App\Modules\Core\Validation\Models\ValidationHistory::where('validatable_type', get_class($item))
                                 ->where('validatable_id', $item->id)
@@ -66,9 +87,6 @@ class EditPurchaseRequest extends EditRecord
                                 ->where('user_id', auth()->id())
                                 ->latest()
                                 ->first();
-
-                            $validationManager = new \App\Modules\Core\Validation\Services\ValidationManager();
-                            $expectedVal = $validationManager->resolveExpectedValue($rule->expected_source ?: $rule->field_name, $item);
 
                             $stepSchema = [
                                 \Filament\Forms\Components\Placeholder::make("info_{$item->id}_{$rule->id}")
@@ -244,8 +262,23 @@ class EditPurchaseRequest extends EditRecord
 
                         foreach ($record->items as $item) {
                             foreach ($rules as $rule) {
-                                $remarks = $data["remarks_{$item->id}_{$rule->id}"] ?? null;
                                 $expectedValue = $validationManager->resolveExpectedValue($rule->expected_source ?: $rule->field_name, $item);
+
+                                // Skip if is_skip_zero is true and expected value is 0
+                                if ($rule->is_skip_zero && ($expectedValue === 0 || $expectedValue === 0.0 || $expectedValue === '0' || $expectedValue === '0.00')) {
+                                    continue;
+                                }
+
+                                // Skip if is_based_grade is true and grade does not match
+                                if ($rule->is_based_grade) {
+                                    $itemGrade = $item->dynamic_fields_json['goldList'] ?? null;
+                                    $allowedGrades = $rule->grades_json ?? [];
+                                    if (!in_array((string)$itemGrade, array_map('strval', $allowedGrades), true)) {
+                                        continue;
+                                    }
+                                }
+
+                                $remarks = $data["remarks_{$item->id}_{$rule->id}"] ?? null;
 
                                 if ($rule->is_required) {
                                     $inputValue = $data["verify_input_{$item->id}_{$rule->id}"] ?? null;

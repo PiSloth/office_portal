@@ -164,20 +164,23 @@ class PurchaseRequestResource extends Resource
                                          ->live()
                                         ->default(false),
 
-                                    Forms\Components\Select::make('reChange')
-                                        ->label('အလဲအထပ်လုပ်မှာလား?')
-                                        ->options([
-                                            '0' => 'ဆိုင်ထည် (No)',
-                                            '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
-                                        ])
-                                        ->default('0')
-                                        ->live(),
+                                    \Filament\Schemas\Components\Grid::make(2)
+                                        ->schema([
+                                            Forms\Components\Select::make('goldList')
+                                                ->label('Grade of Gold')
+                                                ->options(self::getGoldGradeOptions('gb_product'))
+                                                ->required()
+                                                ->live(),
 
-                                    Forms\Components\Select::make('goldList')
-                                        ->label('Grade of Gold')
-                                        ->options(self::getGoldGradeOptions('gb_product'))
-                                        ->required()
-                                        ->live(),
+                                            Forms\Components\Select::make('reChange')
+                                                ->label('အလဲအထပ်လုပ်မှာလား?')
+                                                ->options([
+                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                    '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
+                                                ])
+                                                ->default('0')
+                                                ->live(),
+                                        ]),
 
                                     \Filament\Schemas\Components\Grid::make(3)
                                         ->schema([
@@ -208,7 +211,8 @@ class PurchaseRequestResource extends Resource
                                                 ->default(0)
                                                 ->live(onBlur: true)
                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                        ]),
+                                        ])
+                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
 
                                     \Filament\Schemas\Components\Grid::make(1)
                                         ->schema([
@@ -219,22 +223,34 @@ class PurchaseRequestResource extends Resource
                                                 ->live(onBlur: true)
                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                        ])
+                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => !in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
+
+                                    \Filament\Schemas\Components\Grid::make(3)
+                                        ->schema([
+                                            Forms\Components\TextInput::make('percent')
+                                                ->numeric()
+                                                ->label('Percent Deduction')
+                                                ->suffix('%')
+                                                ->default(0)
+                                                ->live(onBlur: true)
+                                                ->helperText(new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>'))
+                                                ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်းလျော့ထည့်ရန်')
+                                                ->extraInputAttributes([
+                                                    'onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }',
+                                                    'title' => 'ရာခိုင်နှုန်းလျော့ထည့်ရန်',
+                                                ])
+                                                ->extraAttributes(['class' => 'percent-field']),
+
+                                            Forms\Components\TextInput::make('quantity')
+                                                ->numeric()
+                                                ->label('အရေအတွက်')
+                                                ->suffix('qty')
+                                                ->required()
+                                                ->default(1)
+                                                ->minValue(1)
+                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
                                         ]),
-
-                                    Forms\Components\TextInput::make('percent')
-                                        ->numeric()
-                                        ->label('Percent Deduction (%)')
-                                        ->default(0)
-                                        ->live(onBlur: true)
-                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-
-                                    Forms\Components\TextInput::make('quantity')
-                                        ->numeric()
-                                        ->label('Quantity')
-                                        ->required()
-                                        ->default(1)
-                                        ->minValue(1)
-                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
 
                                     Forms\Components\Textarea::make('remark')
                                         ->label('Remark')
@@ -360,20 +376,23 @@ class PurchaseRequestResource extends Resource
                                          ->live()
                                         ->default(false),
 
-                                    Forms\Components\Select::make('reChange')
-                                        ->label('အလဲအထပ်လုပ်မှာလား?')
-                                        ->options([
-                                            '0' => 'ဆိုင်ထည် (No)',
-                                            '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
-                                        ])
-                                        ->default('0')
-                                        ->live(),
+                                    \Filament\Schemas\Components\Grid::make(2)
+                                        ->schema([
+                                            Forms\Components\Select::make('goldList')
+                                                ->label('Grade of Gold')
+                                                ->options(self::getGoldGradeOptions('other_product'))
+                                                ->required()
+                                                ->live(),
 
-                                    Forms\Components\Select::make('goldList')
-                                        ->label('Grade of Gold')
-                                        ->options(self::getGoldGradeOptions('other_product'))
-                                        ->required()
-                                        ->live(),
+                                            Forms\Components\Select::make('reChange')
+                                                ->label('အလဲအထပ်လုပ်မှာလား?')
+                                                ->options([
+                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                    '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
+                                                ])
+                                                ->default('0')
+                                                ->live(),
+                                        ]),
 
                                     \Filament\Schemas\Components\Grid::make(3)
                                         ->schema([
@@ -404,7 +423,8 @@ class PurchaseRequestResource extends Resource
                                                 ->default(0)
                                                 ->live(onBlur: true)
                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                        ]),
+                                        ])
+                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
 
                                     \Filament\Schemas\Components\Grid::make(1)
                                         ->schema([
@@ -415,22 +435,34 @@ class PurchaseRequestResource extends Resource
                                                 ->live(onBlur: true)
                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                        ])
+                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => !in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
+
+                                    \Filament\Schemas\Components\Grid::make(3)
+                                        ->schema([
+                                            Forms\Components\TextInput::make('percent')
+                                                ->numeric()
+                                                ->label('Percent Deduction')
+                                                ->suffix('%')
+                                                ->default(0)
+                                                ->live(onBlur: true)
+                                                ->helperText(new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>'))
+                                                ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်းလျော့ထည့်ရန်')
+                                                ->extraInputAttributes([
+                                                    'onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }',
+                                                    'title' => 'ရာခိုင်နှုန်းလျော့ထည့်ရန်',
+                                                ])
+                                                ->extraAttributes(['class' => 'percent-field']),
+
+                                            Forms\Components\TextInput::make('quantity')
+                                                ->numeric()
+                                                ->label('အရေအတွက်')
+                                                ->suffix('qty')
+                                                ->required()
+                                                ->default(1)
+                                                ->minValue(1)
+                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
                                         ]),
-
-                                    Forms\Components\TextInput::make('percent')
-                                        ->numeric()
-                                        ->label('Percent Deduction (%)')
-                                        ->default(0)
-                                        ->live(onBlur: true)
-                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-
-                                    Forms\Components\TextInput::make('quantity')
-                                        ->numeric()
-                                        ->label('Quantity')
-                                        ->required()
-                                        ->default(1)
-                                        ->minValue(1)
-                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
 
                                     Forms\Components\Textarea::make('remark')
                                         ->label('Remark')
@@ -612,6 +644,16 @@ class PurchaseRequestResource extends Resource
                                         color: #a7f3d0 !important;
                                         border: 1px solid rgba(16, 185, 129, 0.4) !important;
                                     }
+                                    .percent-info-text {
+                                        display: none;
+                                        color: #ef4444 !important;
+                                        font-size: 0.8rem;
+                                        margin-top: 4px;
+                                        font-weight: 600;
+                                    }
+                                    .percent-field:focus-within .percent-info-text {
+                                        display: block !important;
+                                    }
                                 </style>
                             ')),
                         Forms\Components\Repeater::make('items')
@@ -733,20 +775,23 @@ class PurchaseRequestResource extends Resource
                                                         ->live()
                                                         ->default(false),
 
-                                                    Forms\Components\Select::make('reChange')
-                                                        ->label('အလဲအထပ်လုပ်မှာလား?')
-                                                        ->options([
-                                                            '0' => 'ဆိုင်ထည် (No)',
-                                                            '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
-                                                        ])
-                                                        ->default('0')
-                                                        ->live(),
+                                                    \Filament\Schemas\Components\Grid::make(2)
+                                                        ->schema([
+                                                            Forms\Components\Select::make('goldList')
+                                                                ->label('Grade of Gold')
+                                                                ->options(self::getGoldGradeOptions($purchaseType))
+                                                                ->required()
+                                                                ->live(),
 
-                                                    Forms\Components\Select::make('goldList')
-                                                        ->label('Grade of Gold')
-                                                        ->options(self::getGoldGradeOptions($purchaseType))
-                                                        ->required()
-                                                        ->live(),
+                                                            Forms\Components\Select::make('reChange')
+                                                                ->label('အလဲအထပ်လုပ်မှာလား?')
+                                                                ->options([
+                                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                                    '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
+                                                                ])
+                                                                ->default('0')
+                                                                ->live(),
+                                                        ]),
 
                                                     \Filament\Schemas\Components\Grid::make(3)
                                                         ->schema([
@@ -777,7 +822,8 @@ class PurchaseRequestResource extends Resource
                                                                 ->default(0)
                                                                 ->live(onBlur: true)
                                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                                        ]),
+                                                        ])
+                                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
 
                                                     \Filament\Schemas\Components\Grid::make(1)
                                                         ->schema([
@@ -788,22 +834,34 @@ class PurchaseRequestResource extends Resource
                                                                 ->live(onBlur: true)
                                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
                                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                                        ])
+                                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => !in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
+
+                                                    \Filament\Schemas\Components\Grid::make(3)
+                                                        ->schema([
+                                                            Forms\Components\TextInput::make('percent')
+                                                                ->numeric()
+                                                                ->label('Percent Deduction')
+                                                                ->suffix('%')
+                                                                ->default(0)
+                                                                ->live(onBlur: true)
+                                                                ->helperText(new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>'))
+                                                                ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်းလျော့ထည့်ရန်')
+                                                                ->extraInputAttributes([
+                                                                    'onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }',
+                                                                    'title' => 'ရာခိုင်နှုန်းလျော့ထည့်ရန်',
+                                                                ])
+                                                                ->extraAttributes(['class' => 'percent-field']),
+
+                                                            Forms\Components\TextInput::make('quantity')
+                                                                ->numeric()
+                                                                ->label('အရေအတွက်')
+                                                                ->suffix('qty')
+                                                                ->required()
+                                                                ->default(1)
+                                                                ->minValue(1)
+                                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
                                                         ]),
-
-                                                    Forms\Components\TextInput::make('percent')
-                                                        ->numeric()
-                                                        ->label('Percent Deduction (%)')
-                                                        ->default(0)
-                                                        ->live(onBlur: true)
-                                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-
-                                                    Forms\Components\TextInput::make('quantity')
-                                                        ->numeric()
-                                                        ->label('Quantity')
-                                                        ->required()
-                                                        ->default(1)
-                                                        ->minValue(1)
-                                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
 
                                                     Forms\Components\Textarea::make('remark')
                                                         ->label('Remark')

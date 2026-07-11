@@ -31,16 +31,44 @@ class ValidationRuleSetResource extends Resource
                     ->helperText('Associate this rule set with a specific product type.'),
 
                 \Filament\Schemas\Components\Section::make('Rules')
+                    ->columnSpanFull()
                     ->schema([
+                        \Filament\Schemas\Components\Grid::make(12)
+                            ->schema([
+                                \Filament\Forms\Components\Placeholder::make('header_label')
+                                    ->hiddenLabel()
+                                    ->content('Rule Label')
+                                    ->columnSpan(3),
+                                \Filament\Forms\Components\Placeholder::make('header_field')
+                                    ->hiddenLabel()
+                                    ->content('Field Name')
+                                    ->columnSpan(3),
+                                \Filament\Forms\Components\Placeholder::make('header_operator')
+                                    ->hiddenLabel()
+                                    ->content('Operator')
+                                    ->columnSpan(2),
+                                \Filament\Forms\Components\Placeholder::make('header_expected')
+                                    ->hiddenLabel()
+                                    ->content('Expected Source')
+                                    ->columnSpan(3),
+                                \Filament\Forms\Components\Placeholder::make('header_tolerance')
+                                    ->hiddenLabel()
+                                    ->content('Tolerance')
+                                    ->columnSpan(1),
+                            ])
+                            ->extraAttributes(['class' => 'font-semibold border-b pb-2 mb-2 hidden md:grid']),
+
                         Forms\Components\Repeater::make('rules')
                             ->relationship()
+                            ->columnSpanFull()
                             ->schema([
                                 Forms\Components\TextInput::make('label')
-                                    ->label('Rule Label')
                                     ->placeholder('e.g. Check Gold Grade')
                                     ->maxLength(255)
                                     ->live(debounce: 500)
-                                    ->columnSpanFull(),
+                                    ->hiddenLabel()
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'A user-friendly label describing what this rule checks.')
+                                    ->columnSpan(3),
                                 Forms\Components\Select::make('field_name')
                                     ->required()
                                     ->searchable()
@@ -48,7 +76,10 @@ class ValidationRuleSetResource extends Resource
                                     ->options(function (callable $get) {
                                         $productTypeId = self::getProductTypeIdFromState($get);
                                         return self::getFieldOptions($productTypeId);
-                                    }),
+                                    })
+                                    ->hiddenLabel()
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'The system key of the field from the purchase request to be validated.')
+                                    ->columnSpan(3),
                                 Forms\Components\Select::make('operator')
                                     ->required()
                                     ->options([
@@ -58,20 +89,67 @@ class ValidationRuleSetResource extends Resource
                                         'less_than' => 'Less Than',
                                     ])
                                     ->default('equals')
-                                    ->live(),
+                                    ->live()
+                                    ->hiddenLabel()
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Comparison method to use when matching actual value against expected value.')
+                                    ->columnSpan(2),
                                 Forms\Components\TextInput::make('expected_source')
-                                    ->label('Expected Value / Source')
-                                    ->helperText('Hardcoded expected value or dynamic field source.'),
+                                    ->placeholder('Expected value / field source')
+                                    ->hiddenLabel()
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'The expected target value, or another field name key to extract value dynamically.')
+                                    ->columnSpan(3),
                                 Forms\Components\TextInput::make('tolerance')
                                     ->numeric()
-                                    ->label('Tolerance')
-                                    ->visible(fn(callable $get) => $get('operator') === 'tolerance'),
+                                    ->placeholder('Tolerance')
+                                    ->visible(fn(callable $get) => $get('operator') === 'tolerance')
+                                    ->hiddenLabel()
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Allowed numeric offset or variance (e.g. 0.05).')
+                                    ->columnSpan(1),
                                 Forms\Components\Toggle::make('is_required')
-                                    ->default(false),
+                                    ->label('Required')
+                                    ->inline(false)
+                                    ->default(false)
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'If active, the system automatically checks input against expected value. If inactive, verifier manually marks Pass/Fail.')
+                                    ->columnSpan(2),
                                 Forms\Components\Toggle::make('is_editable')
-                                    ->default(true),
+                                    ->label('Editable')
+                                    ->inline(false)
+                                    ->default(true)
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Controls whether the verifier is allowed to modify the checked value field during validation.')
+                                    ->columnSpan(2),
+                                Forms\Components\Toggle::make('is_based_grade')
+                                    ->label('Based Grade')
+                                    ->inline(false)
+                                    ->live()
+                                    ->default(false)
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Filters this rule so that it only runs for items matching specific gold grades.')
+                                    ->columnSpan(2),
+                                Forms\Components\Select::make('grades_json')
+                                    ->label('Grades')
+                                    ->multiple()
+                                    ->options([
+                                        '16' => '16 ပဲ',
+                                        '15' => '15 ပဲ',
+                                        '14.2' => 'ဒင်္ဂါး (14.2)',
+                                        '14' => '14 ပဲ',
+                                        '13' => '13 ပဲ',
+                                        '12' => '12 ပဲ',
+                                        '10' => '10 ပဲ',
+                                        '8' => '8 ပဲ',
+                                        '4' => '4 ပဲ',
+                                    ])
+                                    ->visible(fn(callable $get) => $get('is_based_grade') === true)
+                                    ->required(fn(callable $get) => $get('is_based_grade') === true)
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'List of gold grades this rule applies to.')
+                                    ->columnSpan(4),
+                                Forms\Components\Toggle::make('is_skip_zero')
+                                    ->label('Skip 0')
+                                    ->inline(false)
+                                    ->default(false)
+                                    ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'If active, this rule is completely skipped if the expected value resolves to 0.')
+                                    ->columnSpan(2),
                             ])
-                            ->columns(2)
+                            ->columns(12)
                             ->itemLabel(fn(array $state): ?string => ($state['label'] ?? $state['field_name'] ?? 'New Rule') . ' (' . ($state['operator'] ?? '') . ')'),
                     ])
             ]);
