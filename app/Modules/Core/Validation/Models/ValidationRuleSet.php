@@ -6,7 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class ValidationRuleSet extends Model
 {
-    protected $fillable = ['name', 'description', 'product_type_id'];
+    protected $fillable = ['name', 'description', 'product_type_id', 'is_push_decision'];
+
+    protected $casts = [
+        'is_push_decision' => 'boolean',
+    ];
 
     public function rules()
     {

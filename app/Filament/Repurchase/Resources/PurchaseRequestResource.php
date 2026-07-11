@@ -114,6 +114,46 @@ class PurchaseRequestResource extends Resource
                                 Forms\Components\Placeholder::make('total_amount_disp')
                                     ->label('Total Cost')
                                     ->content(fn($record) => number_format($record?->total_amount ?? 0) . ' MMK'),
+                                Forms\Components\Placeholder::make('view_decision')
+                                    ->label('Related Decision')
+                                    ->visible(fn($record) => $record !== null && $record->purchaseDecision !== null)
+                                    ->content('Click view details button to read action details.')
+                                    ->hintAction(
+                                        \Filament\Actions\Action::make('view_decision_modal')
+                                            ->label('View Details')
+                                            ->icon('heroicon-o-shield-exclamation')
+                                            ->color('warning')
+                                            ->modalSubmitAction(false)
+                                            ->modalCancelActionLabel('Close')
+                                            ->modalHeading('Related Purchase Decision')
+                                            ->form(fn ($record) => [
+                                                Forms\Components\TextInput::make('status')
+                                                    ->default($record->purchaseDecision?->status)
+                                                    ->disabled()
+                                                    ->label('Decision Status'),
+                                                Forms\Components\Textarea::make('remark')
+                                                    ->default($record->purchaseDecision?->remark)
+                                                    ->disabled()
+                                                    ->label('Remarks / Action Taken'),
+                                                Forms\Components\Placeholder::make('attachments_info')
+                                                    ->label('Proof of Resolution (Images)')
+                                                    ->content(function () use ($record) {
+                                                        $attachments = $record->purchaseDecision?->attachments;
+                                                        if (!$attachments || $attachments->isEmpty()) {
+                                                            return 'No attachments uploaded.';
+                                                        }
+                                                        $html = '<div class="space-y-2">';
+                                                        foreach ($attachments as $att) {
+                                                            $url = asset('storage/' . $att->file_path);
+                                                            $html .= '<div class="flex items-center space-x-2">';
+                                                            $html .= '<a href="' . e($url) . '" target="_blank" class="text-teal-600 dark:text-teal-400 underline font-semibold">' . e($att->file_name) . '</a>';
+                                                            $html .= '</div>';
+                                                        }
+                                                        $html .= '</div>';
+                                                        return new \Illuminate\Support\HtmlString($html);
+                                                    }),
+                                            ])
+                                    ),
                             ]),
 
                         Forms\Components\Placeholder::make('customer_info_card')
@@ -1194,6 +1234,9 @@ class PurchaseRequestResource extends Resource
                 ->whereHas('toState', fn($q) => $q->where('name', 'Verified'))
                 ->first();
             if ($transition && $transition->validation_rule_set_id) {
+                if (!$transition->block_on_fail) {
+                    return true;
+                }
                 $ruleSet = \App\Modules\Core\Validation\Models\ValidationRuleSet::find($transition->validation_rule_set_id);
             }
         }
@@ -1237,6 +1280,16 @@ class PurchaseRequestResource extends Resource
                 Tables\Columns\TextColumn::make('workflowState.name')
                     ->badge()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('purchaseDecision.status')
+                    ->label('Decision Status')
+                    ->badge()
+                    ->color(fn ($state): string => match ($state) {
+                        'open' => 'warning',
+                        'closed' => 'success',
+                        default => 'gray',
+                    })
+                    ->placeholder('None')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('total_amount')
                     ->numeric()
                     ->sortable(),
@@ -1253,6 +1306,24 @@ class PurchaseRequestResource extends Resource
                 Tables\Filters\SelectFilter::make('workflow_state_id')
                     ->label('Status')
                     ->relationship('workflowState', 'name'),
+                Tables\Filters\SelectFilter::make('decision_status')
+                    ->label('Decision Status')
+                    ->options([
+                        'open' => 'Open',
+                        'closed' => 'Closed',
+                        'none' => 'None',
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        if ($data['value']) {
+                            if ($data['value'] === 'none') {
+                                $query->whereDoesHave('purchaseDecision');
+                            } else {
+                                $query->whereHas('purchaseDecision', function ($q) use ($data) {
+                                    $q->where('status', $data['value']);
+                                });
+                            }
+                        }
+                    }),
                 Tables\Filters\SelectFilter::make('gold_grade')
                     ->label('Gold Grade')
                     ->options([

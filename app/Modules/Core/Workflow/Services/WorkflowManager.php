@@ -42,7 +42,9 @@ class WorkflowManager
                 $validationManager = new \App\Modules\Core\Validation\Services\ValidationManager();
                 $inputs = $model->toArray();
                 if (!$validationManager->validate($model, $ruleSet, $inputs, $user?->getKey())) {
-                    return false;
+                    if ($transition->block_on_fail) {
+                        return false;
+                    }
                 }
             }
         }

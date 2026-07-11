@@ -41,6 +41,9 @@ class TransitionsRelationManager extends RelationManager
                     ->label('Transition Checklist')
                     ->options(\App\Modules\Core\Workflow\Models\Checklist::pluck('name', 'id'))
                     ->nullable(),
+                \Filament\Forms\Components\Toggle::make('block_on_fail')
+                    ->label('Block Transition on Validation Fail')
+                    ->default(true),
             ]);
     }
 
@@ -65,6 +68,10 @@ class TransitionsRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('checklist.name')
                     ->label('Checklist')
+                    ->sortable(),
+                \Filament\Tables\Columns\IconColumn::make('block_on_fail')
+                    ->label('Block on Fail')
+                    ->boolean()
                     ->sortable(),
             ])
             ->filters([

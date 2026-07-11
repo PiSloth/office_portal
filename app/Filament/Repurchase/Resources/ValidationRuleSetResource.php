@@ -29,6 +29,10 @@ class ValidationRuleSetResource extends Resource
                     ->live()
                     ->required()
                     ->helperText('Associate this rule set with a specific product type.'),
+                Forms\Components\Toggle::make('is_push_decision')
+                    ->label('Push to Decision on Fail')
+                    ->helperText('If a check fails, create a purchase decision resource with status as open.')
+                    ->default(false),
 
                 \Filament\Schemas\Components\Section::make('Rules')
                     ->columnSpanFull()
@@ -231,6 +235,10 @@ class ValidationRuleSetResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')->searchable(),
                 Tables\Columns\TextColumn::make('productType.name')->searchable()->sortable(),
+                Tables\Columns\IconColumn::make('is_push_decision')
+                    ->label('Push to Decision')
+                    ->boolean()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([

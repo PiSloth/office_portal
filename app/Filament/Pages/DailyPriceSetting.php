@@ -24,6 +24,38 @@ class DailyPriceSetting extends Page implements HasTable
     
     protected string $view = 'filament.pages.daily-price-setting';
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('record_announcement')
+                ->label('Record Official Announcement')
+                ->icon('heroicon-o-bell')
+                ->color('info')
+                ->form([
+                    TextInput::make('gold_price')
+                        ->label('Official Gold Price')
+                        ->numeric()
+                        ->required(),
+                    \Filament\Forms\Components\DateTimePicker::make('announcement_datetime')
+                        ->label('Announcement Date & Time')
+                        ->default(now())
+                        ->required(),
+                ])
+                ->action(function (array $data) {
+                    \App\Models\AnnouncementGoldPrice::create([
+                        'gold_price' => $data['gold_price'],
+                        'announcement_datetime' => $data['announcement_datetime'],
+                        'user_id' => auth()->id(),
+                    ]);
+
+                    Notification::make()
+                        ->title('Official Announcement Recorded Successfully')
+                        ->success()
+                        ->send();
+                }),
+        ];
+    }
+
     public ?array $data = [];
 
     public function mount(): void

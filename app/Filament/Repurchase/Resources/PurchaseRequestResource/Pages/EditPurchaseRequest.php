@@ -320,15 +320,21 @@ class EditPurchaseRequest extends EditRecord
                             }
                         }
 
-                        if ($allPassed) {
+                        if ($allPassed || !$transition->block_on_fail) {
                             $record->workflow_state_id = $transition->to_state_id;
                             $record->status_updated_by_id = auth()->id();
                             $record->save();
 
-                            \Filament\Notifications\Notification::make()
-                                ->title("Request transitioned to {$record->workflowState->name}")
-                                ->success()
-                                ->send();
+                            $notification = \Filament\Notifications\Notification::make()
+                                ->title("Request transitioned to {$record->workflowState->name}");
+
+                            if ($allPassed) {
+                                $notification->success();
+                            } else {
+                                $notification->warning()->body("Request transitioned despite failed validation rules.");
+                            }
+
+                            $notification->send();
 
                             $this->redirect(static::getResource()::getUrl('edit', ['record' => $record]));
                         } else {

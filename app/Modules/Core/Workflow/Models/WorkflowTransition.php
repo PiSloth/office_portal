@@ -6,7 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class WorkflowTransition extends Model
 {
-    protected $fillable = ['workflow_id', 'from_state_id', 'to_state_id', 'action_name', 'required_permission', 'validation_rule_set_id', 'checklist_id'];
+    protected $fillable = ['workflow_id', 'from_state_id', 'to_state_id', 'action_name', 'required_permission', 'validation_rule_set_id', 'checklist_id', 'block_on_fail'];
+
+    protected $casts = [
+        'block_on_fail' => 'boolean',
+    ];
 
     public function checklist()
     {
