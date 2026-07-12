@@ -22,12 +22,15 @@ class PurchaseRequest extends Model
         'customer_name', 
         'customer_phone', 
         'customer_address', 
+        'customer_nrc',
+        'customer_nrc_photo',
         'total_amount', 
         'submitted_at'
     ];
 
     protected $casts = [
         'submitted_at' => 'datetime',
+        'customer_nrc_photo' => 'array',
     ];
 
     public function branch()

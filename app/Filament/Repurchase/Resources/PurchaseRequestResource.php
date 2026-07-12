@@ -50,18 +50,34 @@ class PurchaseRequestResource extends Resource
                                     ->label('Address')
                                     ->maxLength(500)
                                     ->rows(3),
+                                Forms\Components\TextInput::make('customer_nrc')
+                                    ->label('NRC (Optional)')
+                                    ->maxLength(255)
+                                    ->live(),
+                                Forms\Components\FileUpload::make('customer_nrc_photo')
+                                    ->label('NRC Photo (Optional)')
+                                    ->image()
+                                    ->multiple()
+                                    ->disk('public')
+                                    ->visibility('public')
+                                    ->directory('attachments/nrc_photos')
+                                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => filled($get('customer_nrc'))),
                             ])
                             ->mountUsing(function (\Filament\Schemas\Schema $form, \Filament\Schemas\Components\Utilities\Get $get) {
                                 $form->fill([
                                     'customer_name' => $get('customer_name'),
                                     'customer_phone' => $get('customer_phone'),
                                     'customer_address' => $get('customer_address'),
+                                    'customer_nrc' => $get('customer_nrc'),
+                                    'customer_nrc_photo' => $get('customer_nrc_photo'),
                                 ]);
                             })
                             ->action(function (array $data, \Filament\Schemas\Components\Utilities\Set $set) {
                                 $set('customer_name', $data['customer_name']);
                                 $set('customer_phone', $data['customer_phone']);
                                 $set('customer_address', $data['customer_address']);
+                                $set('customer_nrc', $data['customer_nrc'] ?? null);
+                                $set('customer_nrc_photo', $data['customer_nrc_photo'] ?? null);
                             })
                     ])
                     ->schema([
@@ -72,6 +88,10 @@ class PurchaseRequestResource extends Resource
                         Forms\Components\Hidden::make('customer_phone')
                             ->live(),
                         Forms\Components\Hidden::make('customer_address')
+                            ->live(),
+                        Forms\Components\Hidden::make('customer_nrc')
+                            ->live(),
+                        Forms\Components\Hidden::make('customer_nrc_photo')
                             ->live(),
                         Forms\Components\Hidden::make('branch_id')
                             ->default(fn() => auth()->user()?->branch_id),
@@ -162,6 +182,8 @@ class PurchaseRequestResource extends Resource
                                 $name = $get('customer_name') ?: $record?->customer_name ?: 'Not Provided';
                                 $phone = $get('customer_phone') ?: $record?->customer_phone ?: 'Not Provided';
                                 $address = $get('customer_address') ?: $record?->customer_address ?: 'Not Provided';
+                                $nrc = $get('customer_nrc') ?: $record?->customer_nrc;
+                                $nrcPhoto = $get('customer_nrc_photo') ?: $record?->customer_nrc_photo;
 
                                 $html = '<div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800 space-y-2 text-sm max-w-md shadow-sm">';
                                 $html .= '<h3 class="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">Customer Contact Info</h3>';
@@ -169,6 +191,18 @@ class PurchaseRequestResource extends Resource
                                 $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">Customer Name:</span> <strong class="text-gray-800 dark:text-gray-100 block text-base mt-0.5">' . e($name) . '</strong></div>';
                                 $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">Phone Number:</span> <span class="text-gray-800 dark:text-gray-200 block font-semibold mt-0.5">' . e($phone) . '</span></div>';
                                 $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">Address:</span> <span class="text-gray-700 dark:text-gray-300 block text-xs mt-0.5 whitespace-pre-line">' . e($address) . '</span></div>';
+                                if ($nrc) {
+                                    $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">NRC:</span> <span class="text-gray-800 dark:text-gray-200 block font-semibold mt-0.5">' . e($nrc) . '</span></div>';
+                                    if ($nrcPhoto) {
+                                        $photos = is_array($nrcPhoto) ? $nrcPhoto : (json_decode($nrcPhoto, true) ?: [$nrcPhoto]);
+                                        $html .= '<div><span class="text-gray-500 dark:text-gray-400 font-medium text-xs">NRC Photo:</span> ';
+                                        foreach ($photos as $index => $photo) {
+                                            $url = asset('storage/' . $photo);
+                                            $html .= '<a href="' . e($url) . '" target="_blank" class="text-teal-600 dark:text-teal-400 underline font-semibold mt-0.5 mr-2">Photo ' . ($index + 1) . '</a>';
+                                        }
+                                        $html .= '</div>';
+                                    }
+                                }
                                 $html .= '</div>';
                                 return new \Illuminate\Support\HtmlString($html);
                             }),
@@ -180,7 +214,7 @@ class PurchaseRequestResource extends Resource
                     ->extraAttributes(['class' => 'min-w-0 max-w-full'])
                     ->headerActions([
                         \Filament\Actions\Action::make('add_gb_product')
-                            ->hidden(fn($record) => self::isAllVerified($record))
+                            ->hidden(fn($record) => !self::isDraft($record) && self::isAllVerified($record))
                             ->label('GB Calculator')
                             ->icon('heroicon-m-calculator')
                             ->extraAttributes(['style' => 'background-color: #fffff0; color: #3d3d29; border: 1px solid #d1d1c4; font-weight: bold;'])
@@ -217,10 +251,28 @@ class PurchaseRequestResource extends Resource
                                                 ->options([
                                                     '0' => 'ဆိုင်ထည် (No)',
                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
+                                                    '2' => 'Percent ထည်ပြန်ဝယ်',
                                                 ])
                                                 ->default('0')
                                                 ->live(),
                                         ]),
+
+                                    Forms\Components\TextInput::make('original_voucher_price')
+                                        ->numeric()
+                                        ->label('Original Voucher Price')
+                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                        ->live(onBlur: true)
+                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+
+                                    Forms\Components\FileUpload::make('attachment_image')
+                                        ->label('Attachment Image')
+                                        ->image()
+                                        ->disk('public')
+                                        ->visibility('public')
+                                        ->directory('attachments/purchase_items')
+                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2'),
 
                                     \Filament\Schemas\Components\Grid::make(3)
                                         ->schema([
@@ -273,6 +325,7 @@ class PurchaseRequestResource extends Resource
                                                 ->label('Percent Deduction')
                                                 ->suffix('%')
                                                 ->default(0)
+                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
                                                 ->live(onBlur: true)
                                                 ->helperText(new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>'))
                                                 ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်းလျော့ထည့်ရန်')
@@ -329,6 +382,8 @@ class PurchaseRequestResource extends Resource
                                         'is_good' => (bool) ($data['is_good'] ?? false),
                                         'quantity' => $data['quantity'] ?? 1,
                                         'remark' => $data['remark'] ?? '',
+                                        'original_voucher_price' => $data['original_voucher_price'] ?? 0,
+                                        'attachment_image' => $data['attachment_image'] ?? null,
                                     ]
                                 ];
 
@@ -392,7 +447,7 @@ class PurchaseRequestResource extends Resource
                             }),
 
                         \Filament\Actions\Action::make('add_other_product')
-                            ->hidden(fn($record) => self::isAllVerified($record))
+                            ->hidden(fn($record) => !self::isDraft($record) && self::isAllVerified($record))
                             ->label('Other Calculator')
                             ->icon('heroicon-m-calculator')
                             ->extraAttributes(['style' => 'background-color: #ffe4e1; color: #800000; border: 1px solid #e1b4b4; font-weight: bold;'])
@@ -699,7 +754,7 @@ class PurchaseRequestResource extends Resource
                         Forms\Components\Repeater::make('items')
                             ->relationship()
                             ->addable(false) // Disable inline create button
-                            ->deletable(fn($record) => !self::isAllVerified($record))
+                            ->deletable(false)
                             ->extraAttributes([
                                 'class' => 'overflow-x-auto block w-full max-w-full min-w-0 calculator-table-repeater',
                                 'style' => 'overflow-x: auto; display: block; max-width: 100%; min-width: 0;',
@@ -724,6 +779,11 @@ class PurchaseRequestResource extends Resource
                                         $html = "<strong>" . e($name) . "</strong>";
                                         if ($qty > 1) {
                                             $html .= " <span class='text-gray-500 text-xs'>(Qty: {$qty})</span>";
+                                        }
+                                        $reChange = $get('dynamic_fields_json.reChange');
+                                        if ((string)$reChange === '2') {
+                                            $origPrice = $get('dynamic_fields_json.original_voucher_price') ?? 0;
+                                            $html .= "<br/><span class='text-teal-600 dark:text-teal-400 text-xs font-semibold'>Percent Buyback: " . number_format($origPrice) . " MMK</span>";
                                         }
                                         if ($remark) {
                                             $html .= "<br/><span class='text-gray-400 text-xs italic'>" . e($remark) . "</span>";
@@ -789,7 +849,7 @@ class PurchaseRequestResource extends Resource
                                         ->label('Edit')
                                         ->icon('heroicon-m-pencil-square')
                                         ->color('primary')
-                                        ->hidden(fn($record) => self::isAllVerified($record?->purchaseRequest))
+                                        ->hidden(fn($record) => !self::isDraft($record?->purchaseRequest) && self::isAllVerified($record?->purchaseRequest))
                                         ->modalHeading('Edit Product')
                                         ->modalWidth('4xl')
                                         ->form(function (\Filament\Schemas\Components\Utilities\Get $get) {
@@ -825,13 +885,34 @@ class PurchaseRequestResource extends Resource
 
                                                             Forms\Components\Select::make('reChange')
                                                                 ->label('အလဲအထပ်လုပ်မှာလား?')
-                                                                ->options([
+                                                                ->options(fn () => $purchaseType === 'gb_product' ? [
+                                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                                    '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
+                                                                    '2' => 'Percent ထည်ပြန်ဝယ်',
+                                                                ] : [
                                                                     '0' => 'ဆိုင်ထည် (No)',
                                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                                 ])
                                                                 ->default('0')
                                                                 ->live(),
                                                         ]),
+
+                                                    Forms\Components\TextInput::make('original_voucher_price')
+                                                        ->numeric()
+                                                        ->label('Original Voucher Price')
+                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                                        ->live(onBlur: true)
+                                                        ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+
+                                                    Forms\Components\FileUpload::make('attachment_image')
+                                                        ->label('Attachment Image')
+                                                        ->image()
+                                                        ->disk('public')
+                                                        ->visibility('public')
+                                                        ->directory('attachments/purchase_items')
+                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2'),
 
                                                     \Filament\Schemas\Components\Grid::make(3)
                                                         ->schema([
@@ -884,6 +965,7 @@ class PurchaseRequestResource extends Resource
                                                                 ->label('Percent Deduction')
                                                                 ->suffix('%')
                                                                 ->default(0)
+                                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
                                                                 ->live(onBlur: true)
                                                                 ->helperText(new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>'))
                                                                 ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်းလျော့ထည့်ရန်')
@@ -945,8 +1027,45 @@ class PurchaseRequestResource extends Resource
                                                 'is_good' => (bool) ($data['is_good'] ?? false),
                                                 'quantity' => $data['quantity'] ?? 1,
                                                 'remark' => $data['remark'] ?? '',
+                                                'original_voucher_price' => $data['original_voucher_price'] ?? 0,
+                                                'attachment_image' => $data['attachment_image'] ?? null,
                                             ]);
 
+                                            if ($livewire instanceof \App\Filament\Repurchase\Resources\PurchaseRequestResource\Pages\EditPurchaseRequest) {
+                                                $livewire->save();
+                                                $livewire->redirect(static::getUrl('edit', ['record' => $livewire->record]));
+                                            }
+                                        }),
+
+                                    \Filament\Actions\Action::make('view_attachment')
+                                        ->label('')
+                                        ->tooltip('View Attachment')
+                                        ->icon('heroicon-m-photo')
+                                        ->color('danger')
+                                        ->modalHeading('Attachment Image')
+                                        ->modalContent(fn ($record) => new \Illuminate\Support\HtmlString(
+                                            $record && isset($record->dynamic_fields_json['attachment_image'])
+                                                ? '<div class="flex justify-center"><img src="' . asset('storage/' . $record->dynamic_fields_json['attachment_image']) . '" class="max-w-full h-auto rounded-lg shadow-md border border-gray-200 dark:border-gray-800" /></div>'
+                                                : '<p class="text-gray-500 text-center">No attachment image uploaded.</p>'
+                                        ))
+                                        ->modalSubmitAction(false)
+                                        ->modalCancelActionLabel('Close')
+                                        ->visible(fn ($record) => $record && !empty($record->dynamic_fields_json['attachment_image'])),
+
+                                    \Filament\Actions\Action::make('delete_item')
+                                        ->label('')
+                                        ->tooltip('Delete')
+                                        ->icon('heroicon-m-trash')
+                                        ->color('danger')
+                                        ->requiresConfirmation()
+                                        ->modalHeading('Delete Item')
+                                        ->modalDescription('Are you sure you want to delete this item? This action cannot be undone.')
+                                        ->modalSubmitActionLabel('Yes, delete it')
+                                        ->hidden(fn($record) => !self::isDraft($record?->purchaseRequest) && self::isAllVerified($record?->purchaseRequest))
+                                        ->action(function ($record, $livewire) {
+                                            if ($record) {
+                                                $record->delete();
+                                            }
                                             if ($livewire instanceof \App\Filament\Repurchase\Resources\PurchaseRequestResource\Pages\EditPurchaseRequest) {
                                                 $livewire->save();
                                                 $livewire->redirect(static::getUrl('edit', ['record' => $livewire->record]));
@@ -1205,6 +1324,15 @@ class PurchaseRequestResource extends Resource
         }
     }
 
+    public static function isDraft($record): bool
+    {
+        if (!$record || !$record->exists) {
+            return true;
+        }
+        $stateName = $record->workflowState?->name;
+        return !$stateName || strtolower($stateName) === 'draft';
+    }
+
     public static function isAllVerified($record): bool
     {
         if (!$record || !$record->exists) {
@@ -1416,7 +1544,7 @@ class PurchaseRequestResource extends Resource
                                         $operator = $history->user?->name ?? 'System';
                                         $price = number_format($history->total_amount) . ' MMK';
                                         $qty = $inputs['quantity'] ?? 1;
-                                        $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : 'ဆိုင်ထည် (No)';
+                                        $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : 'ဆိုင်ထည် (No)');
                                         $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
                                         $deduction = ($inputs['percent'] ?? 0) . '%';
                                         $remark = $inputs['remark'] ?? '-';

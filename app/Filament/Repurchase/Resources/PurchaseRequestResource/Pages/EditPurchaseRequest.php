@@ -571,7 +571,7 @@ class EditPurchaseRequest extends EditRecord
                                 $operator = $history->user?->name ?? 'System';
                                 $price = number_format($history->total_amount) . ' MMK';
                                 $qty = $inputs['quantity'] ?? 1;
-                                $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : 'ဆိုင်ထည် (No)';
+                                $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : 'ဆိုင်ထည် (No)');
                                 $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
                                 $deduction = ($inputs['percent'] ?? 0) . '%';
                                 $remark = $inputs['remark'] ?? '-';

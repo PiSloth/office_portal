@@ -10,6 +10,23 @@ class JewelryCalculator implements CalculatorContract
     {
         // 1. Extract inputs
         $reChange = $inputs['reChange'] ?? false; // Is Trade-in?
+        $percentDeduction = ((float) ($inputs['percent'] ?? 0)) / 100;
+
+        if ((string)$reChange === '2') {
+            $originalVoucherPrice = (float) ($inputs['original_voucher_price'] ?? 0);
+            $finalPrice = $originalVoucherPrice - ($originalVoucherPrice * $percentDeduction);
+
+            return [
+                'status' => 'success',
+                'result' => floor($finalPrice / 1000) * 1000,
+                'message' => 'Percent ထည်ပြန်ဝယ်',
+                'details' => [
+                    'total_weight' => 0,
+                    'price_before_deduction' => $originalVoucherPrice,
+                ]
+            ];
+        }
+
         $goldList = (float) ($inputs['goldList'] ?? 16);
         $purchaseType = $inputs['purchase_type'] ?? 'gb_product';
 
@@ -19,7 +36,6 @@ class JewelryCalculator implements CalculatorContract
 
         $kyaukWeightYawe = (float) ($inputs['kyaukWeight'] ?? 0);
         $goldWeightGram = (float) ($inputs['goldWeightGram'] ?? 0);
-        $percentDeduction = ((float) ($inputs['percent'] ?? 0)) / 100;
 
         // 2. Extract parameters (multipliers from DB)
         $goldPrice = (float) ($parameters['base_gold_price'] ?? 0);
