@@ -11,6 +11,7 @@ use App\Filament\Stock\Widgets\SessionResultStackedColumnChartWidget;
 use App\Filament\Stock\Widgets\RecentProductChecksWidget;
 use App\Filament\Stock\Widgets\RecentProductImportsWidget;
 use App\Filament\Stock\Widgets\UserCheckedProductsLineChartWidget;
+use App\Filament\Stock\Widgets\CategoryCheckReportWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
@@ -27,6 +28,7 @@ class Dashboard extends BaseDashboard
             RecentProductChecksWidget::class,
             OpenDecisionsWidget::class,
             RecentProductImportsWidget::class,
+            CategoryCheckReportWidget::class,
         ];
     }
 }

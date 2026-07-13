@@ -637,11 +637,15 @@ class MobileScanner extends Component
                 if (!data_get($fieldConfig, 'compare', false)) {
                     $actualValues[$fName] = match ($fName) {
                         'location_id', 'category_id', 'sub_category_id' => $check->product->{$fName},
-                        'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $check->product->{$fName},
+                        'code', 'barcode', 'qr_code', 'name', 'description', 'status', 'quantity' => $check->product->{$fName},
                         default => $check->product->attributeValues->firstWhere('field_name', $fName)?->value,
                     };
                 } else {
-                    $actualValues[$fName] = null;
+                    if ($fName === 'quantity') {
+                        $actualValues[$fName] = $check->quantity;
+                    } else {
+                        $actualValues[$fName] = null;
+                    }
                 }
             }
             
@@ -657,6 +661,21 @@ class MobileScanner extends Component
             $validation = app(ValidationEngine::class)->validate($scanConfig, $check->product, $actualValues);
             $baseStatus = $validation['result_status'];
             $errors = $validation['errors'] ?? [];
+
+            // If any compare field has not been filled/scanned, force the overall check status to remain PENDING
+            $hasEmptyCompareFields = false;
+            foreach (data_get($scanConfig->config_json, 'fields', []) as $fieldConfig) {
+                if (data_get($fieldConfig, 'compare', false)) {
+                    $fName = $fieldConfig['field'] ?? null;
+                    if ($fName && ($actualValues[$fName] === null || $actualValues[$fName] === '')) {
+                        $hasEmptyCompareFields = true;
+                        break;
+                    }
+                }
+            }
+            if ($hasEmptyCompareFields) {
+                $baseStatus = 'PENDING';
+            }
             
             ProductCheckValue::where('product_check_id', $check->id)->delete();
             foreach ($validation['values'] as $val) {

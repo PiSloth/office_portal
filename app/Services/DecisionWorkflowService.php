@@ -33,7 +33,7 @@ class DecisionWorkflowService
 
         // Auto-resolve decisions if the check passed or specific field is no longer failing
         foreach ($openDecisions as $openDecision) {
-            $matchingRule = $rules->firstWhere('decision_type_id', $openDecision->decision_type_id);
+            $matchingRule = $rules->firstWhere('id', $openDecision->decision_rule_id);
             if ($matchingRule) {
                 $fieldName = $matchingRule->criteria_field;
                 $stillFailing = $failedValues->contains(function ($val) use ($fieldName) {
@@ -93,6 +93,10 @@ class DecisionWorkflowService
             });
 
             if ($matchedFailure) {
+                // If actual value is empty, it means user has not checked/scanned it yet. Skip triggering a decision.
+                if ($matchedFailure->actual_value === null || $matchedFailure->actual_value === '') {
+                    continue;
+                }
                 // If condition is greater_than, verify if actual > expected
                 if ($rule->criteria_condition === 'greater_than') {
                     if (is_numeric($matchedFailure->actual_value) && is_numeric($matchedFailure->expected_value)) {
@@ -115,9 +119,9 @@ class DecisionWorkflowService
                     }
                 }
 
-                // Check if a decision of this type is already open for this product check to prevent duplicate decisions
+                // Check if a decision of this rule is already open for this product check to prevent duplicate decisions
                 $existingOpenDecision = Decision::where('product_check_id', $productCheck->id)
-                    ->where('decision_type_id', $rule->decision_type_id)
+                    ->where('decision_rule_id', $rule->id)
                     ->where('action_status', 'OPEN')
                     ->first();
 

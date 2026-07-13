@@ -148,10 +148,14 @@ class DecisionResource extends Resource
                                 $file = fopen('php://output', 'w');
                                 fputcsv($file, [
                                     'ID',
-                                    'Check ID',
                                     'Check Session',
+                                    'Product Name',
+                                    'Barcode',
+                                    'Category',
+                                    'Sub Category',
                                     'Check Field',
-                                    'Product Code',
+                                    'Database Value',
+                                    'Checked Value',
                                     'Decision Type',
                                     'Status',
                                     'Assigned To',
@@ -161,12 +165,40 @@ class DecisionResource extends Resource
                                 ]);
 
                                 foreach ($records as $record) {
+                                    $field = $record->decisionRule?->criteria_field;
+                                    $dbValue = null;
+                                    $checkedValue = null;
+
+                                    if ($field === 'quantity') {
+                                        $dbValue = $record->productCheck?->product?->quantity;
+                                        $checkedValue = $record->productCheck?->quantity;
+                                    } else {
+                                        $checkVal = $record->productCheck?->checkValues?->firstWhere('field_name', $field);
+                                        if ($checkVal) {
+                                            $dbValue = $checkVal->expected_value;
+                                            $checkedValue = $checkVal->actual_value;
+                                        }
+
+                                        // Format boolean fields to Yes/No in export
+                                        $fieldModel = \App\Models\ProductTypeField::where('product_type_id', $record->productCheck?->product?->product_type_id)
+                                            ->where('field_name', $field)
+                                            ->first();
+                                        if ($fieldModel && $fieldModel->field_type === 'boolean') {
+                                            $dbValue = ($dbValue === '1' || $dbValue === 1) ? 'Yes' : (($dbValue === '0' || $dbValue === 0) ? 'No' : $dbValue);
+                                            $checkedValue = ($checkedValue === '1' || $checkedValue === 1) ? 'Yes' : (($checkedValue === '0' || $checkedValue === 0) ? 'No' : $checkedValue);
+                                        }
+                                    }
+
                                     fputcsv($file, [
                                         $record->id,
-                                        $record->product_check_id,
                                         $record->productCheck?->checkSession?->name,
-                                        $record->decisionRule?->criteria_field,
-                                        $record->productCheck?->product?->code,
+                                        $record->productCheck?->product?->name,
+                                        $record->productCheck?->barcode,
+                                        $record->productCheck?->product?->category?->name,
+                                        $record->productCheck?->product?->subCategory?->name,
+                                        $field,
+                                        $dbValue,
+                                        $checkedValue,
                                         $record->decisionType?->name,
                                         $record->action_status,
                                         $record->assignedTo?->name,

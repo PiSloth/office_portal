@@ -36,7 +36,7 @@ class ValidationEngine
 
             // 1. Determine Expected Value if source is product
             if ($source === 'product') {
-                if (in_array($fieldName, ['code', 'barcode', 'qr_code', 'name', 'status'])) {
+                if (in_array($fieldName, ['code', 'barcode', 'qr_code', 'name', 'status', 'quantity'])) {
                     $expectedValue = $product->{$fieldName};
                 } elseif ($fieldName === 'location_id') {
                     // For location comparison, we might compare location IDs or location codes

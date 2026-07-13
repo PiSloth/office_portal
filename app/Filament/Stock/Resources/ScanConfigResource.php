@@ -210,6 +210,7 @@ class ScanConfigResource extends Resource
             'qr_code' => 'QR Code (Standard)',
             'name' => 'Product Name (Standard)',
             'location_id' => 'Location (Standard)',
+            'quantity' => 'Quantity (Standard)',
         ];
 
         if (! $productTypeId) {
