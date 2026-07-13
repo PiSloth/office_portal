@@ -164,8 +164,11 @@ class ListUsers extends ListRecords
                     $successCount = 0;
                     $updateCount = 0;
                     $failCount = 0;
+                    $errors = [];
+                    $rowNum = 1;
 
                     while (($row = fgetcsv($stream)) !== false) {
+                        $rowNum++;
                         if (empty($row) || !isset($row[$emailIndex])) continue;
                         $email = trim($row[$emailIndex]);
                         if ($email === '') continue;
@@ -181,12 +184,14 @@ class ListUsers extends ListRecords
                                 $branch = Branch::where('name', $branchVal)->first();
                                 if (!$branch) {
                                     $failCount++;
-                                    continue; // Skip import if branch is not found
+                                    $errors[] = "Row {$rowNum} ({$email}): Branch '{$branchVal}' not found in database.";
+                                    continue;
                                 }
                                 $branchId = $branch->id;
                             } else {
                                 $failCount++;
-                                continue; // Skip if branch name is empty
+                                $errors[] = "Row {$rowNum} ({$email}): Branch value is blank.";
+                                continue;
                             }
 
                             // Resolve Role
@@ -198,11 +203,13 @@ class ListUsers extends ListRecords
                                     ->first();
                                 if (!$role) {
                                     $failCount++;
-                                    continue; // Skip import if role is not found
+                                    $errors[] = "Row {$rowNum} ({$email}): Role '{$roleVal}' not found in database.";
+                                    continue;
                                 }
                             } else {
                                 $failCount++;
-                                continue; // Skip if role is empty
+                                $errors[] = "Row {$rowNum} ({$email}): Role value is blank.";
+                                continue;
                             }
 
                             // Create/Update User
@@ -231,15 +238,33 @@ class ListUsers extends ListRecords
                             }
                         } catch (\Exception $e) {
                             $failCount++;
+                            $errors[] = "Row {$rowNum} ({$email}): Error - " . $e->getMessage();
                         }
                     }
 
                     fclose($stream);
 
+                    $logHtml = "<ul class='list-disc pl-4 space-y-1'>";
+                    $logHtml .= "<li><strong>Successfully Created:</strong> {$successCount}</li>";
+                    $logHtml .= "<li><strong>Successfully Updated:</strong> {$updateCount}</li>";
+                    $logHtml .= "<li><strong>Failed:</strong> {$failCount}</li>";
+                    $logHtml .= "</ul>";
+
+                    if (!empty($errors)) {
+                        $logHtml .= "<div class='mt-2 border-t border-gray-200 pt-2 text-xs text-rose-600 max-h-48 overflow-y-auto'>";
+                        $logHtml .= "<strong>Failure Log:</strong><ul class='list-disc pl-4 mt-1 space-y-1'>";
+                        foreach ($errors as $err) {
+                            $logHtml .= "<li>" . e($err) . "</li>";
+                        }
+                        $logHtml .= "</ul></div>";
+                    }
+
                     Notification::make()
                         ->title('Import Complete')
-                        ->body("Successfully imported {$successCount} new users, updated {$updateCount} users, and failed on {$failCount} users.")
-                        ->success()
+                        ->body(new \Illuminate\Support\HtmlString($logHtml))
+                        ->success(empty($errors))
+                        ->warning(!empty($errors))
+                        ->persistent()
                         ->send();
                 }),
 
