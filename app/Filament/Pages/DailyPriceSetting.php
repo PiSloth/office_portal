@@ -55,6 +55,7 @@ class DailyPriceSetting extends Page implements HasTable
                 }),
             Action::make('convert_price')
                 ->label('Convert & Update Price')
+                ->modalDescription('Viber Group တွင်ကြေငြာသော 16.3293 ၏ ဈေးကို ကူးယူ၍ ဤနေရာတွင် ရေးပါ။')
                 ->icon('heroicon-o-calculator')
                 ->color('warning')
                 ->form([
