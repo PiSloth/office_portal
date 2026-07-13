@@ -42,6 +42,7 @@ class ListUsers extends ListRecords
                 ->form([
                     \Filament\Forms\Components\FileUpload::make('file')
                         ->label('CSV File')
+                        ->disk('public')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.ms-excel', 'text/plain']),
                 ])
