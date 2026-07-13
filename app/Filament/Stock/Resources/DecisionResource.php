@@ -76,6 +76,10 @@ class DecisionResource extends Resource
                 Tables\Columns\TextColumn::make('productCheck.id')
                     ->label('Check ID')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('decisionRule.criteria_field')
+                    ->label('Check Field')
+                    ->sortable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('productCheck.product.code')
                     ->label('Product Code')
                     ->searchable(),
@@ -107,6 +111,9 @@ class DecisionResource extends Resource
                 Tables\Filters\SelectFilter::make('check_session')
                     ->label('Check Session')
                     ->relationship('productCheck.checkSession', 'name'),
+                Tables\Filters\SelectFilter::make('criteria_field')
+                    ->label('Check Field')
+                    ->relationship('decisionRule', 'criteria_field'),
                 Tables\Filters\SelectFilter::make('action_status')
                     ->options([
                         'OPEN' => 'Open',
@@ -143,6 +150,7 @@ class DecisionResource extends Resource
                                     'ID',
                                     'Check ID',
                                     'Check Session',
+                                    'Check Field',
                                     'Product Code',
                                     'Decision Type',
                                     'Status',
@@ -157,6 +165,7 @@ class DecisionResource extends Resource
                                         $record->id,
                                         $record->product_check_id,
                                         $record->productCheck?->checkSession?->name,
+                                        $record->decisionRule?->criteria_field,
                                         $record->productCheck?->product?->code,
                                         $record->decisionType?->name,
                                         $record->action_status,

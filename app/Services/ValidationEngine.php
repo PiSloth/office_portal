@@ -53,6 +53,21 @@ class ValidationEngine
             $actualStr = ($actualValue !== null && $actualValue !== '') ? trim((string)$actualValue) : null;
             $expectedStr = ($expectedValue !== null && $expectedValue !== '') ? trim((string)$expectedValue) : null;
 
+            // Normalize boolean fields before comparison
+            $fieldModel = \App\Models\ProductTypeField::where('product_type_id', $product->product_type_id)
+                ->where('field_name', $fieldName)
+                ->first();
+            if ($fieldModel && $fieldModel->field_type === 'boolean') {
+                if ($actualStr !== null) {
+                    $lowerActual = strtolower($actualStr);
+                    $actualStr = ($lowerActual === 'yes' || $lowerActual === 'y' || $lowerActual === 'true' || $lowerActual === '1') ? '1' : '0';
+                }
+                if ($expectedStr !== null) {
+                    $lowerExpected = strtolower($expectedStr);
+                    $expectedStr = ($lowerExpected === 'yes' || $lowerExpected === 'y' || $lowerExpected === 'true' || $lowerExpected === '1') ? '1' : '0';
+                }
+            }
+
             // 2. Check Required
             if ($required && ($actualStr === null || $actualStr === '')) {
                 $fieldStatus = 'FAIL';

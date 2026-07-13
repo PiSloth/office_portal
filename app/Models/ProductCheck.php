@@ -13,6 +13,13 @@ use App\Models\Comment;
 class ProductCheck extends Model
 {
     use SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::deleted(function (ProductCheck $check): void {
+            $check->decisions()->delete();
+        });
+    }
     protected function casts(): array
     {
         return [

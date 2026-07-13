@@ -487,8 +487,10 @@ class MobileScanner extends Component
         if (! $this->scanConfigId) return;
 
         $scanConfig = ScanConfig::find($this->scanConfigId);
+        $dynamicFields = \App\Models\ProductTypeField::where('product_type_id', $this->productTypeId)->get();
         $this->scanConfigFields = collect(data_get($scanConfig?->config_json, 'fields', []))
-            ->map(function (array $fieldConfig): array {
+            ->map(function (array $fieldConfig) use ($dynamicFields): array {
+                $fModel = $dynamicFields->firstWhere('field_name', $fieldConfig['field']);
                 return array_merge([
                     'field' => null,
                     'field_name' => null,
@@ -499,6 +501,7 @@ class MobileScanner extends Component
                     'is_editable_in_table' => false,
                     'is_apply_validate' => false,
                     'is_quickcheck' => false,
+                    'field_type' => $fModel?->field_type ?? 'text',
                 ], $fieldConfig);
             })->values()->all();
     }
@@ -631,11 +634,15 @@ class MobileScanner extends Component
                 $fName = $fieldConfig['field'] ?? null;
                 if (! $fName || ($fieldConfig['source'] ?? 'product') !== 'product') continue;
                 
-                $actualValues[$fName] = match ($fName) {
-                    'location_id', 'category_id', 'sub_category_id' => $check->product->{$fName},
-                    'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $check->product->{$fName},
-                    default => $check->product->attributeValues->firstWhere('field_name', $fName)?->value,
-                };
+                if (!data_get($fieldConfig, 'compare', false)) {
+                    $actualValues[$fName] = match ($fName) {
+                        'location_id', 'category_id', 'sub_category_id' => $check->product->{$fName},
+                        'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $check->product->{$fName},
+                        default => $check->product->attributeValues->firstWhere('field_name', $fName)?->value,
+                    };
+                } else {
+                    $actualValues[$fName] = null;
+                }
             }
             
             $existingValues = ProductCheckValue::where('product_check_id', $check->id)->get();

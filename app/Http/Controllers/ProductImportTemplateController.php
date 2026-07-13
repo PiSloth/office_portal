@@ -77,7 +77,7 @@ class ProductImportTemplateController extends Controller
             'number' => '100',
             'decimal' => '12.5',
             'date' => now()->toDateString(),
-            'boolean' => '1',
+            'boolean' => 'yes',
             'textarea', 'select', 'text' => 'Sample ' . Str::headline($field->field_label),
             default => 'Sample Value',
         };

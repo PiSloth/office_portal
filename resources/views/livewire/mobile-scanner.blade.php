@@ -537,8 +537,11 @@
                                                                 <div class="flex items-center gap-1.5" x-data="{ editing: false, val: '{{ addslashes($actualVal ?? '') }}' }">
                                                                     <div x-show="!editing" @click="editing = true"
                                                                         class="cursor-pointer border-b border-dashed border-gray-400 font-semibold hover:text-amber-600 transition">
-                                                                        <span
-                                                                            x-text="val !== '' ? val : ('{{ addslashes($productVal) }}' || '---')"></span>
+                                                                        @if (($field['field_type'] ?? '') === 'boolean')
+                                                                            <span x-text="val === '1' || val === 1 ? 'Yes' : (val === '0' || val === 0 ? 'No' : ('{{ $productVal === '1' || $productVal === 1 ? 'Yes' : ($productVal === '0' || $productVal === 0 ? 'No' : '---') }}'))"></span>
+                                                                        @else
+                                                                            <span x-text="val !== '' ? val : ('{{ addslashes($productVal) }}' || '---')"></span>
+                                                                        @endif
                                                                     </div>
                                                                     @php
                                                                         $inputType = match (
@@ -556,13 +559,23 @@
                                                                                     ? '1'
                                                                                     : null);
                                                                     @endphp
-                                                                    <input x-cloak x-show="editing" x-model="val"
-                                                                        type="{{ $inputType }}"
-                                                                        @if ($stepAttr) step="{{ $stepAttr }}" @endif
-                                                                        placeholder="{{ addslashes($productVal) }}"
-                                                                        @click.outside="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
-                                                                        @keydown.enter="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
-                                                                        class="w-24 rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
+                                                                    @if (($field['field_type'] ?? '') === 'boolean')
+                                                                        <select x-cloak x-show="editing" x-model="val"
+                                                                            @change="editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val);"
+                                                                            @click.outside="editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val);"
+                                                                            class="w-24 rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
+                                                                            <option value="1">Yes</option>
+                                                                            <option value="0">No</option>
+                                                                        </select>
+                                                                    @else
+                                                                        <input x-cloak x-show="editing" x-model="val"
+                                                                            type="{{ $inputType }}"
+                                                                            @if ($stepAttr) step="{{ $stepAttr }}" @endif
+                                                                            placeholder="{{ addslashes($productVal) }}"
+                                                                            @click.outside="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
+                                                                            @keydown.enter="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
+                                                                            class="w-24 rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
+                                                                    @endif
                                                                 </div>
                                                             @else
                                                                 <span>{{ $displayVal }}</span>
@@ -976,7 +989,13 @@
                                                     <span
                                                         class="block text-xs uppercase tracking-[0.25em] text-gray-400">Expected</span>
                                                     <span
-                                                        class="mt-1 block break-words">{{ $expectedValue ?? 'N/A' }}</span>
+                                                        class="mt-1 block break-words">
+                                                        @if (($fieldConfig['field_type'] ?? '') === 'boolean')
+                                                            {{ $expectedValue === '1' || $expectedValue === 1 ? 'Yes' : ($expectedValue === '0' || $expectedValue === 0 ? 'No' : 'N/A') }}
+                                                        @else
+                                                            {{ $expectedValue ?? 'N/A' }}
+                                                        @endif
+                                                    </span>
                                                 </div>
                                                 <div>
                                                      <div class="flex items-center justify-between mb-2">
@@ -992,9 +1011,18 @@
                                                              </button>
                                                          @endif
                                                      </div>
-                                                    <input wire:model.live="actualValues.{{ $fieldName }}"
-                                                        type="text"
-                                                        class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                                    @if (($fieldConfig['field_type'] ?? '') === 'boolean')
+                                                        <select wire:model.live="actualValues.{{ $fieldName }}"
+                                                            class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                                            <option value="">Select...</option>
+                                                            <option value="1">Yes</option>
+                                                            <option value="0">No</option>
+                                                        </select>
+                                                    @else
+                                                        <input wire:model.live="actualValues.{{ $fieldName }}"
+                                                            type="text"
+                                                            class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                                    @endif
                                                     @error("actualValues.{$fieldName}")
                                                         <p class="mt-2 text-xs text-rose-600">{{ $message }}</p>
                                                     @enderror

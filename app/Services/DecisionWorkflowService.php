@@ -121,13 +121,28 @@ class DecisionWorkflowService
                     ->where('action_status', 'OPEN')
                     ->first();
 
-                $remark = "System automatically created decision based on rule: '{$rule->name}' due to failure on field '{$rule->criteria_field}'. Expected: '{$matchedFailure->expected_value}', Actual: '{$matchedFailure->actual_value}'.";
+                // Format boolean values as Yes/No for user-friendly remarks
+                $fieldModel = \App\Models\ProductTypeField::where('product_type_id', $productCheck->product->product_type_id)
+                    ->where('field_name', $rule->criteria_field)
+                    ->first();
+                $isBoolean = $fieldModel && $fieldModel->field_type === 'boolean';
+
+                $expectedValStr = $isBoolean
+                    ? ($matchedFailure->expected_value === '1' || $matchedFailure->expected_value === 1 ? 'Yes' : 'No')
+                    : $matchedFailure->expected_value;
+
+                $actualValStr = $isBoolean
+                    ? ($matchedFailure->actual_value === '1' || $matchedFailure->actual_value === 1 ? 'Yes' : 'No')
+                    : $matchedFailure->actual_value;
+
+                $remark = "System automatically created decision based on rule: '{$rule->name}' due to failure on field '{$rule->criteria_field}'. Expected: '{$expectedValStr}', Actual: '{$actualValStr}'.";
 
                 if ($existingOpenDecision) {
                     // Update the existing open decision remark if it has changed
                     if ($existingOpenDecision->remark !== $remark) {
                         $existingOpenDecision->update([
                             'remark' => $remark,
+                            'decision_rule_id' => $rule->id,
                         ]);
 
                         // Log comment update
@@ -135,7 +150,7 @@ class DecisionWorkflowService
                             'decision_id' => $existingOpenDecision->id,
                             'user_id' => $productCheck->checked_by,
                             'comment_type' => 'LOG',
-                            'comment' => "Value updated. Expected: '{$matchedFailure->expected_value}', Actual: '{$matchedFailure->actual_value}'.",
+                            'comment' => "Value updated. Expected: '{$expectedValStr}', Actual: '{$actualValStr}'.",
                         ]);
                     }
                 } else {
@@ -143,6 +158,7 @@ class DecisionWorkflowService
                     $decision = Decision::create([
                         'product_check_id' => $productCheck->id,
                         'decision_type_id' => $rule->decision_type_id,
+                        'decision_rule_id' => $rule->id,
                         'action_status' => 'OPEN',
                         'assigned_to' => null,
                         'decision_by' => $productCheck->checked_by,

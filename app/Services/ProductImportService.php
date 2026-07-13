@@ -137,6 +137,16 @@ class ProductImportService
                         if ($field->field_type === 'date' && !strtotime($val)) {
                             $errors[] = "Field '{$field->field_label}' must be a valid date.";
                         }
+                        if ($field->field_type === 'boolean') {
+                            $lowerVal = strtolower($val);
+                            if ($lowerVal === 'yes' || $lowerVal === 'y' || $lowerVal === 'true' || $lowerVal === '1') {
+                                $val = '1';
+                            } elseif ($lowerVal === 'no' || $lowerVal === 'n' || $lowerVal === 'false' || $lowerVal === '0') {
+                                $val = '0';
+                            } else {
+                                $errors[] = "Field '{$field->field_label}' must be 'yes' or 'no'.";
+                            }
+                        }
 
                         if ($fName === 'weight_g' && is_numeric($val)) {
                             $val = (string) round((float) $val, 2);

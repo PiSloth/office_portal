@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 
-#[Fillable(['product_check_id', 'decision_type_id', 'action_status', 'assigned_to', 'decision_by', 'remark'])]
+#[Fillable(['product_check_id', 'decision_type_id', 'decision_rule_id', 'action_status', 'assigned_to', 'decision_by', 'remark'])]
 class Decision extends Model
 {
     protected static function booted(): void
@@ -58,5 +58,10 @@ class Decision extends Model
     public function attachments()
     {
         return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    public function decisionRule()
+    {
+        return $this->belongsTo(DecisionRule::class, 'decision_rule_id');
     }
 }
