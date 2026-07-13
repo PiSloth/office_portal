@@ -43,6 +43,8 @@ class DecisionRuleResource extends Resource
                     ->options([
                         'mismatch' => 'Mismatch',
                         'exceeds_tolerance' => 'Exceeds Tolerance',
+                        'greater_than' => 'Greater Than (Actual > Expected)',
+                        'less_than' => 'Less Than (Actual < Expected)',
                     ]),
                 Forms\Components\Select::make('decision_type_id')
                     ->relationship('decisionType', 'name')

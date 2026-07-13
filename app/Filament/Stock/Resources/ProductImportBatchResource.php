@@ -38,6 +38,7 @@ class ProductImportBatchResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('id')->sortable(),
                 Tables\Columns\TextColumn::make('productType.name')->label('Product Type')->sortable(),
+                Tables\Columns\TextColumn::make('checkSession.name')->label('Check Session')->sortable(),
                 Tables\Columns\TextColumn::make('file_name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()

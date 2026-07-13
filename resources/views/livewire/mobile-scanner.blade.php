@@ -291,6 +291,27 @@
                 </div>
             </div>
 
+            <!-- Color Legend -->
+            <div class="flex flex-wrap items-center gap-4 bg-white px-4 py-3 rounded-2xl shadow-sm border border-gray-100 text-xs dark:bg-gray-900 dark:border-gray-800">
+                <span class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Legend:</span>
+                <div class="flex items-center gap-2">
+                    <span class="w-4 h-4 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-800 shrink-0"></span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Pass (Matches system expectations)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-4 h-4 rounded-md bg-rose-50 border border-rose-200 text-rose-800 shrink-0"></span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Fail (Mismatch / tolerance exceeded)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-4 h-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800 shrink-0"></span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Pending (Awaiting scan / verification)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-4 h-4 rounded-md bg-violet-50 border border-violet-200 text-violet-800 dark:bg-violet-950/20 dark:border-violet-900/40 shrink-0"></span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Unmatched (Barcode not found in master data)</span>
+                </div>
+            </div>
+
             <!-- Checks Table Grouped by Location -->
             <div class="min-w-0 space-y-8">
                 @forelse($recentChecksGrouped as $locationName => $checks)
@@ -331,21 +352,16 @@
                                         @php
                                             $status = strtoupper($check->result_status ?? '');
                                             $rowBgClass = match ($status) {
-                                                'PENDING' => 'bg-amber-100',
-                                                'PASS' => 'bg-green-200',
-                                                'FAIL' => 'bg-green-50',
-                                                'UNMATCHED' => 'bg-rose-50 dark:bg-rose-950/20',
-                                                default => '',
-                                            };
-                                            $barCodeTextClass = match ($status) {
-                                                'PASS' => 'text-gray-900 dark:text-white',
-                                                'PENDING' => 'text-amber-900',
-                                                'UNMATCHED' => 'text-rose-600 dark:text-rose-400',
+                                                'PENDING' => 'bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-300 border-amber-100',
+                                                'PASS' => 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300 border-emerald-100',
+                                                'FAIL' => 'bg-rose-50 text-rose-800 dark:bg-rose-950/20 dark:text-rose-300 border-rose-100',
+                                                'UNMATCHED' => 'bg-violet-50 text-violet-800 dark:bg-violet-950/20 dark:text-violet-300 border-violet-100',
                                                 default => 'text-gray-900 dark:text-white',
                                             };
+                                            $barCodeTextClass = 'font-semibold';
                                         @endphp
                                         <tr wire:key="check-row-{{ $check->id }}"
-                                            class="border-b border-gray-100 dark:border-gray-800 last:border-0 {{ $rowBgClass }}">
+                                            class="border-b last:border-0 {{ $rowBgClass }}">
                                             <td wire:key="barcode-td-{{ $check->id }}"
                                                 x-show="visibleColumns.barcode"
                                                 class="px-4 sm:px-6 py-4 font-medium whitespace-nowrap {{ $barCodeTextClass }}">
@@ -485,93 +501,106 @@
                                                                     : '---');
 
                                                         // Calculate match status on the fly if not evaluated yet, but only if it's supposed to be compared
-$showIcon = false;
-$isMatch = true;
-if ($isCompare) {
-    $showIcon = true;
-    if ($fieldStatus !== null) {
-        $isMatch = $fieldStatus === 'PASS';
-    } else {
-        $expectedStr = trim((string) $productVal);
-        $actualStr = trim((string) $displayVal);
-        $tolerance = $scf['tolerance'] ?? null;
-        if (
-            is_numeric($expectedStr) &&
-            is_numeric($actualStr)
-        ) {
-            $diff = (float) $actualStr - (float) $expectedStr;
-            if ($tolerance !== null) {
-                $isMatch = abs($diff) <= (float) $tolerance;
-            } else {
-                $isMatch = abs($diff) <= 0.00001;
-            }
-        } else {
-            $isMatch =
-                strcasecmp($actualStr, $expectedStr) === 0;
-        }
-    }
-} elseif ($fieldStatus === 'FAIL') {
+                                                        $showIcon = false;
+                                                        $isMatch = true;
+                                                        if ($isCompare) {
+                                                            $showIcon = true;
+                                                            if ($fieldStatus !== null) {
+                                                                $isMatch = $fieldStatus === 'PASS';
+                                                            } else {
+                                                                $expectedStr = trim((string) $productVal);
+                                                                $actualStr = trim((string) $displayVal);
+                                                                $tolerance = $scf['tolerance'] ?? null;
+                                                                if (
+                                                                    is_numeric($expectedStr) &&
+                                                                    is_numeric($actualStr)
+                                                                ) {
+                                                                    $diff = (float) $actualStr - (float) $expectedStr;
+                                                                    if ($tolerance !== null) {
+                                                                        $isMatch = abs($diff) <= (float) $tolerance;
+                                                                    } else {
+                                                                        $isMatch = abs($diff) <= 0.00001;
+                                                                    }
+                                                                } else {
+                                                                    $isMatch =
+                                                                        strcasecmp($actualStr, $expectedStr) === 0;
+                                                                }
+                                                            }
+                                                        } elseif ($fieldStatus === 'FAIL') {
                                                             $showIcon = true;
                                                             $isMatch = false;
                                                         }
                                                     @endphp
-
-                                                    <div class="flex items-center gap-2">
-                                                        @if ($isEditable)
-                                                            <div x-data="{ editing: false, val: '{{ addslashes($actualVal ?? '') }}' }">
-                                                                <div x-show="!editing" @click="editing = true"
-                                                                    class="cursor-pointer border-b border-dashed border-gray-400 font-semibold hover:text-amber-600 transition">
-                                                                    <span
-                                                                        x-text="val !== '' ? val : ('{{ addslashes($productVal) }}' || '---')"></span>
+                                                    <div class="flex flex-col items-start gap-1">
+                                                        <div class="flex items-center gap-2">
+                                                            @if ($isEditable)
+                                                                <div class="flex items-center gap-1.5" x-data="{ editing: false, val: '{{ addslashes($actualVal ?? '') }}' }">
+                                                                    <div x-show="!editing" @click="editing = true"
+                                                                        class="cursor-pointer border-b border-dashed border-gray-400 font-semibold hover:text-amber-600 transition">
+                                                                        <span
+                                                                            x-text="val !== '' ? val : ('{{ addslashes($productVal) }}' || '---')"></span>
+                                                                    </div>
+                                                                    @php
+                                                                        $inputType = match (
+                                                                            $field['field_type'] ?? 'text'
+                                                                        ) {
+                                                                            'number' => 'number',
+                                                                            'decimal' => 'number',
+                                                                            'date' => 'date',
+                                                                            default => 'text',
+                                                                        };
+                                                                        $stepAttr =
+                                                                            $field['field_type'] === 'decimal'
+                                                                                ? 'any'
+                                                                                : ($field['field_type'] === 'number'
+                                                                                    ? '1'
+                                                                                    : null);
+                                                                    @endphp
+                                                                    <input x-cloak x-show="editing" x-model="val"
+                                                                        type="{{ $inputType }}"
+                                                                        @if ($stepAttr) step="{{ $stepAttr }}" @endif
+                                                                        placeholder="{{ addslashes($productVal) }}"
+                                                                        @click.outside="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
+                                                                        @keydown.enter="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
+                                                                        class="w-24 rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
                                                                 </div>
-                                                                @php
-                                                                    $inputType = match (
-                                                                        $field['field_type'] ?? 'text'
-                                                                    ) {
-                                                                        'number' => 'number',
-                                                                        'decimal' => 'number',
-                                                                        'date' => 'date',
-                                                                        default => 'text',
-                                                                    };
-                                                                    $stepAttr =
-                                                                        $field['field_type'] === 'decimal'
-                                                                            ? 'any'
-                                                                            : ($field['field_type'] === 'number'
-                                                                                ? '1'
-                                                                                : null);
-                                                                @endphp
-                                                                <input x-cloak x-show="editing" x-model="val"
-                                                                    type="{{ $inputType }}"
-                                                                    @if ($stepAttr) step="{{ $stepAttr }}" @endif
-                                                                    placeholder="{{ addslashes($productVal) }}"
-                                                                    @click.outside="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
-                                                                    @keydown.enter="if(editing) { editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val !== '' ? val : '{{ addslashes($productVal) }}'); }"
-                                                                    class="w-24 rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
-                                                            </div>
-                                                        @else
-                                                            <span>{{ $displayVal }}</span>
-                                                        @endif
-
-                                                        @if ($showIcon)
-                                                            @if (!$isMatch)
-                                                                <svg class="h-5 w-5 text-amber-500 shrink-0"
-                                                                    fill="none" viewBox="0 0 24 24"
-                                                                    stroke="currentColor" stroke-width="2"
-                                                                    title="Mismatch with master product data">
-                                                                    <path stroke-linecap="round"
-                                                                        stroke-linejoin="round"
-                                                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                                </svg>
                                                             @else
-                                                                <svg class="h-5 w-5 text-emerald-500 shrink-0"
-                                                                    fill="none" viewBox="0 0 24 24"
-                                                                    stroke="currentColor" stroke-width="2"
-                                                                    title="Matches master product data">
-                                                                    <path stroke-linecap="round"
-                                                                        stroke-linejoin="round"
-                                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                </svg>
+                                                                <span>{{ $displayVal }}</span>
                                                             @endif
+
+                                                            @if ($showIcon)
+                                                                @if (!$isMatch)
+                                                                    <svg class="h-5 w-5 text-amber-500 shrink-0"
+                                                                        fill="none" viewBox="0 0 24 24"
+                                                                        stroke="currentColor" stroke-width="2"
+                                                                        title="Mismatch with master product data">
+                                                                        <path stroke-linecap="round"
+                                                                            stroke-linejoin="round"
+                                                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                                    </svg>
+                                                                @else
+                                                                    <svg class="h-5 w-5 text-emerald-500 shrink-0"
+                                                                        fill="none" viewBox="0 0 24 24"
+                                                                        stroke="currentColor" stroke-width="2"
+                                                                        title="Matches master product data">
+                                                                        <path stroke-linecap="round"
+                                                                            stroke-linejoin="round"
+                                                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                    </svg>
+                                                                @endif
+                                                            @endif
+                                                        </div>
+
+                                                        @if (filter_var($scf['is_quickcheck'] ?? false, FILTER_VALIDATE_BOOLEAN) && blank($actualVal))
+                                                            <button type="button"
+                                                                wire:click="updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', '{{ addslashes($productVal) }}')"
+                                                                class="mt-1 inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-200 transition shrink-0"
+                                                                title="Quick copy expected value">
+                                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                Quick Check
+                                                            </button>
                                                         @endif
                                                     </div>
                                                 </td>
@@ -950,8 +979,19 @@ if ($isCompare) {
                                                         class="mt-1 block break-words">{{ $expectedValue ?? 'N/A' }}</span>
                                                 </div>
                                                 <div>
-                                                    <label
-                                                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Actual</label>
+                                                     <div class="flex items-center justify-between mb-2">
+                                                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Actual</label>
+                                                         @if (filter_var($fieldConfig['is_quickcheck'] ?? false, FILTER_VALIDATE_BOOLEAN) && blank(data_get($actualValues, $fieldName)))
+                                                             <button type="button" wire:click="quickCheck('{{ $fieldName }}')"
+                                                                 class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition"
+                                                                 title="Quick copy expected value">
+                                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                 </svg>
+                                                                 Quick Check
+                                                             </button>
+                                                         @endif
+                                                     </div>
                                                     <input wire:model.live="actualValues.{{ $fieldName }}"
                                                         type="text"
                                                         class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">

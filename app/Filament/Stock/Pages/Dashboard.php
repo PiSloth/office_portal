@@ -5,6 +5,7 @@ namespace App\Filament\Stock\Pages;
 use App\Filament\Stock\Widgets\AdminStatsWidget;
 use App\Filament\Stock\Widgets\DelayedDecisionStatusChartWidget;
 use App\Filament\Stock\Widgets\ProductTypeCheckedPieChartWidget;
+use App\Filament\Stock\Widgets\ProductImportVsCheckedPieChartWidget;
 use App\Filament\Stock\Widgets\OpenDecisionsWidget;
 use App\Filament\Stock\Widgets\SessionResultStackedColumnChartWidget;
 use App\Filament\Stock\Widgets\RecentProductChecksWidget;
@@ -18,6 +19,7 @@ class Dashboard extends BaseDashboard
     {
         return [
             AdminStatsWidget::class,
+            ProductImportVsCheckedPieChartWidget::class,
             ProductTypeCheckedPieChartWidget::class,
             UserCheckedProductsLineChartWidget::class,
             SessionResultStackedColumnChartWidget::class,

@@ -181,6 +181,10 @@ class ProductCheckResource extends Resource
                     ->label('Product Name')
                     ->searchable()
                     ->limit(32),
+                Tables\Columns\TextColumn::make('location.code')
+                    ->label('Location')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('Quantity')
                     ->sortable()
@@ -241,6 +245,8 @@ class ProductCheckResource extends Resource
                 Tables\Filters\SelectFilter::make('scan_config_id')
                     ->label('Scan Config')
                     ->relationship('scanConfig', 'name'),
+                Tables\Filters\SelectFilter::make('location')
+                    ->relationship('location', 'code'),
                 Tables\Filters\SelectFilter::make('result_status')
                     ->options([
                         'PASS' => 'Pass',

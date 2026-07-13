@@ -57,60 +57,141 @@ class ScanConfigResource extends Resource
 
                 Section::make('Scan Form Fields Configuration')
                     ->description('Define the fields to scan and how they should be verified.')
+                    ->columnSpanFull()
                     ->schema([
+                        \Filament\Schemas\Components\Grid::make(12)
+                            ->schema([
+                                \Filament\Forms\Components\Placeholder::make('header_field_name')
+                                    ->hiddenLabel()
+                                    ->content('Field Name')
+                                    ->columnSpan(2),
+                                \Filament\Forms\Components\Placeholder::make('header_field')
+                                    ->hiddenLabel()
+                                    ->content('Product Field')
+                                    ->columnSpan(2),
+                                \Filament\Forms\Components\Placeholder::make('header_source')
+                                    ->hiddenLabel()
+                                    ->content('Source')
+                                    ->columnSpan(1),
+                                \Filament\Forms\Components\Placeholder::make('header_required')
+                                    ->hiddenLabel()
+                                    ->content('Required')
+                                    ->columnSpan(1),
+                                \Filament\Forms\Components\Placeholder::make('header_compare')
+                                    ->hiddenLabel()
+                                    ->content('Compare')
+                                    ->columnSpan(1),
+                                \Filament\Forms\Components\Placeholder::make('header_tolerance')
+                                    ->hiddenLabel()
+                                    ->content('Tolerance')
+                                    ->columnSpan(1),
+                                \Filament\Forms\Components\Placeholder::make('header_is_editable')
+                                    ->hiddenLabel()
+                                    ->content('Editable')
+                                    ->columnSpan(1),
+                                \Filament\Forms\Components\Placeholder::make('header_is_quickcheck')
+                                    ->hiddenLabel()
+                                    ->content('Quick Check')
+                                    ->columnSpan(1),
+                                \Filament\Forms\Components\Placeholder::make('header_is_apply_validate')
+                                    ->hiddenLabel()
+                                    ->content('Apply Rule')
+                                    ->columnSpan(2),
+                            ])
+                            ->extraAttributes(['class' => 'font-semibold border-b pb-2 mb-2 hidden md:grid', 'style' => 'min-width: 1200px;']),
+
                         Forms\Components\Repeater::make('config_json.fields')
                             ->label('Fields Checklist')
+                            ->extraAttributes(['style' => 'overflow-x-auto;'])
                             ->schema([
-                                Grid::make(1)->schema([
-                                    Forms\Components\TextInput::make('field_name')
-                                        ->label('Field Name')
-                                        ->required()
-                                        ->maxLength(255)
-                                        ->helperText('A readable label for this scan field.'),
+                                Grid::make(12)
+                                    ->extraAttributes(['style' => 'min-width: 1200px;'])
+                                    ->schema([
+                                        Forms\Components\TextInput::make('field_name')
+                                            ->placeholder('e.g. Weight')
+                                            ->required()
+                                            ->maxLength(255)
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'A user-friendly label describing what this field is.')
+                                            ->columnSpan(2),
 
-                                    Forms\Components\Select::make('field')
-                                        ->label('Product Field')
-                                        ->required()
-                                        ->searchable()
-                                        ->live()
-                                        ->options(function (callable $get) {
-                                            $productTypeId = self::getProductTypeIdFromState($get);
-                                            return self::getFieldOptions($productTypeId);
-                                        })
-                                        ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                            if (blank($get('field_name')) && filled($state)) {
-                                                $set('field_name', self::resolveFieldLabel((string) $state, self::getProductTypeIdFromState($get)));
-                                            }
-                                        })
-                                        ->helperText('Select the actual field key from the chosen product type.'),
+                                        Forms\Components\Select::make('field')
+                                            ->required()
+                                            ->searchable()
+                                            ->live()
+                                            ->options(function (callable $get) {
+                                                $productTypeId = self::getProductTypeIdFromState($get);
+                                                return self::getFieldOptions($productTypeId);
+                                            })
+                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                                if (blank($get('field_name')) && filled($state)) {
+                                                    $set('field_name', self::resolveFieldLabel((string) $state, self::getProductTypeIdFromState($get)));
+                                                }
+                                            })
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'The database key of the field from the product data.')
+                                            ->columnSpan(2),
 
-                                    Forms\Components\Select::make('source')
-                                        ->required()
-                                        ->options([
-                                            'product' => 'Expected (from Product Master Data)',
-                                            'check' => 'Actual Input Only (e.g. checker notes)',
-                                        ])
-                                        ->default('product'),
+                                        Forms\Components\Select::make('source')
+                                            ->required()
+                                            ->options([
+                                                'product' => 'Expected (from Product Master Data)',
+                                                'check' => 'Actual Input Only (e.g. checker notes)',
+                                            ])
+                                            ->default('product')
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Source of the expected target value.')
+                                            ->columnSpan(1),
 
-                                    Forms\Components\Toggle::make('required')
-                                        ->label('Is Required?')
-                                        ->default(true),
+                                        Forms\Components\Toggle::make('required')
+                                            ->label('Required')
+                                            ->default(true)
+                                            ->inline(false)
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Toggle if field input is required during scan.')
+                                            ->columnSpan(1),
 
-                                    Forms\Components\Toggle::make('compare')
-                                        ->label('Compare Expected?')
-                                        ->default(true)
-                                        ->reactive(),
+                                        Forms\Components\Toggle::make('compare')
+                                            ->label('Compare')
+                                            ->default(true)
+                                            ->reactive()
+                                            ->inline(false)
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Compare scanned/actual value against expected value.')
+                                            ->columnSpan(1),
 
-                                    Forms\Components\TextInput::make('tolerance')
-                                        ->numeric()
-                                        ->label('Tolerance (if numeric)')
-                                        ->helperText('e.g. 0.02 for weight deviations')
-                                        ->visible(fn(Get $get) => $get('compare') === true),
+                                        Forms\Components\TextInput::make('tolerance')
+                                            ->numeric()
+                                            ->placeholder('Tolerance')
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Allowed deviation margin (e.g. 0.02).')
+                                            ->visible(fn($get) => $get('compare') === true)
+                                            ->columnSpan(1),
 
-                                    Forms\Components\Toggle::make('is_editable_in_table')
-                                        ->label('Editable in Scanner Table?')
-                                        ->default(false),
-                                ]),
+                                        Forms\Components\Toggle::make('is_editable_in_table')
+                                            ->label('Editable')
+                                            ->default(false)
+                                            ->inline(false)
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Allows editing this value inside scanner table view.')
+                                            ->columnSpan(1),
+
+                                        Forms\Components\Toggle::make('is_quickcheck')
+                                            ->label('Quick Check')
+                                            ->default(false)
+                                            ->inline(false)
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Enable quick check icon to auto-copy expected value.')
+                                            ->columnSpan(1),
+
+                                        Forms\Components\Toggle::make('is_apply_validate')
+                                            ->label('Apply Rule')
+                                            ->default(false)
+                                            ->inline(false)
+                                            ->hiddenLabel()
+                                            ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'Apply automatic decision rules if this field fails check.')
+                                            ->columnSpan(2),
+                                    ]),
                             ])
                             ->itemLabel(fn(array $state): ?string => $state['field_name'] ?? $state['field'] ?? 'New Field')
                             ->default([]),

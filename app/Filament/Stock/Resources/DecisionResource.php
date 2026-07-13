@@ -69,6 +69,10 @@ class DecisionResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('id')->sortable(),
+                Tables\Columns\TextColumn::make('productCheck.checkSession.name')
+                    ->label('Check Session')
+                    ->sortable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('productCheck.id')
                     ->label('Check ID')
                     ->sortable(),
@@ -100,6 +104,9 @@ class DecisionResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('check_session')
+                    ->label('Check Session')
+                    ->relationship('productCheck.checkSession', 'name'),
                 Tables\Filters\SelectFilter::make('action_status')
                     ->options([
                         'OPEN' => 'Open',
@@ -121,6 +128,49 @@ class DecisionResource extends Resource
             ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
+                    Actions\BulkAction::make('export')
+                        ->label('Export to Excel')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->action(function (\Illuminate\Support\Collection $records) {
+                            $headers = [
+                                'Content-Type' => 'text/csv',
+                                'Content-Disposition' => 'attachment; filename="decisions_export_' . now()->format('Ymd_His') . '.csv"',
+                            ];
+
+                            $callback = function () use ($records) {
+                                $file = fopen('php://output', 'w');
+                                fputcsv($file, [
+                                    'ID',
+                                    'Check ID',
+                                    'Check Session',
+                                    'Product Code',
+                                    'Decision Type',
+                                    'Status',
+                                    'Assigned To',
+                                    'Decision By',
+                                    'Remark',
+                                    'Created At'
+                                ]);
+
+                                foreach ($records as $record) {
+                                    fputcsv($file, [
+                                        $record->id,
+                                        $record->product_check_id,
+                                        $record->productCheck?->checkSession?->name,
+                                        $record->productCheck?->product?->code,
+                                        $record->decisionType?->name,
+                                        $record->action_status,
+                                        $record->assignedTo?->name,
+                                        $record->decisionBy?->name,
+                                        $record->remark,
+                                        $record->created_at?->toDateTimeString(),
+                                    ]);
+                                }
+                                fclose($file);
+                            };
+
+                            return response()->stream($callback, 200, $headers);
+                        }),
                     Actions\DeleteBulkAction::make(),
                 ]),
             ]);

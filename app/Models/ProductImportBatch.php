@@ -13,10 +13,16 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'total_rows',
     'imported_rows',
     'failed_rows',
-    'created_by'
+    'created_by',
+    'check_session_id'
 ])]
 class ProductImportBatch extends Model
 {
+    public function checkSession()
+    {
+        return $this->belongsTo(CheckSession::class);
+    }
+
     public function productType()
     {
         return $this->belongsTo(ProductType::class);

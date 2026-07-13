@@ -18,38 +18,127 @@ class DecisionWorkflowService
      */
     public function evaluateRulesAndCreateDecisions(ProductCheck $productCheck): void
     {
-        // Only run if check status is FAIL or WARNING
-        if ($productCheck->result_status === 'PASS') {
-            return;
-        }
+        // Fetch all active decision rules
+        $rules = DecisionRule::where('is_active', true)->get();
 
         // Fetch failed values in this check
         $failedValues = $productCheck->checkValues()
             ->where('status', 'FAIL')
             ->get();
 
+        // Fetch existing open decisions for this check
+        $openDecisions = Decision::where('product_check_id', $productCheck->id)
+            ->where('action_status', 'OPEN')
+            ->get();
+
+        // Auto-resolve decisions if the check passed or specific field is no longer failing
+        foreach ($openDecisions as $openDecision) {
+            $matchingRule = $rules->firstWhere('decision_type_id', $openDecision->decision_type_id);
+            if ($matchingRule) {
+                $fieldName = $matchingRule->criteria_field;
+                $stillFailing = $failedValues->contains(function ($val) use ($fieldName) {
+                    return strtolower($val->field_name) === strtolower($fieldName);
+                });
+
+                if ($productCheck->result_status === 'PASS' || !$stillFailing) {
+                    $openDecision->update(['action_status' => 'DONE']);
+
+                    // Log history
+                    DecisionHistory::create([
+                        'decision_id' => $openDecision->id,
+                        'old_status' => 'OPEN',
+                        'new_status' => 'DONE',
+                        'changed_by' => $productCheck->checked_by,
+                        'remark' => 'Resolved automatically: check value corrected to match expected value.',
+                    ]);
+
+                    // Log comment
+                    Comment::create([
+                        'decision_id' => $openDecision->id,
+                        'user_id' => $productCheck->checked_by,
+                        'comment_type' => 'LOG',
+                        'comment' => 'Resolved automatically: check value corrected to match expected value.',
+                    ]);
+                }
+            }
+        }
+
+        // If the check has resolved to PASS entirely, return early
+        if ($productCheck->result_status === 'PASS') {
+            return;
+        }
+
         if ($failedValues->isEmpty()) {
             return;
         }
 
-        // Fetch all active decision rules
-        $rules = DecisionRule::where('is_active', true)->get();
+        // Get ScanConfig fields config to check is_apply_validate
+        $scanConfig = $productCheck->scanConfig;
+        $fieldsConfig = collect(data_get($scanConfig?->config_json, 'fields', []));
 
         foreach ($rules as $rule) {
+            // Find field config to check if is_apply_validate is disabled
+            $fieldConfig = $fieldsConfig->first(function ($field) use ($rule) {
+                return strtolower($field['field'] ?? '') === strtolower($rule->criteria_field);
+            });
+
+            // If the field is configured in scan config and is_apply_validate is false, do not trigger decision rule
+            if ($fieldConfig && !($fieldConfig['is_apply_validate'] ?? false)) {
+                continue;
+            }
+
             // Check if any failed value matches the rule's criteria_field
             $matchedFailure = $failedValues->first(function ($val) use ($rule) {
                 return strtolower($val->field_name) === strtolower($rule->criteria_field);
             });
 
             if ($matchedFailure) {
+                // If condition is greater_than, verify if actual > expected
+                if ($rule->criteria_condition === 'greater_than') {
+                    if (is_numeric($matchedFailure->actual_value) && is_numeric($matchedFailure->expected_value)) {
+                        if ((float)$matchedFailure->actual_value <= (float)$matchedFailure->expected_value) {
+                            continue; // Skip, not greater than
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+
+                // If condition is less_than, verify if actual < expected
+                if ($rule->criteria_condition === 'less_than') {
+                    if (is_numeric($matchedFailure->actual_value) && is_numeric($matchedFailure->expected_value)) {
+                        if ((float)$matchedFailure->actual_value >= (float)$matchedFailure->expected_value) {
+                            continue; // Skip, not less than
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+
                 // Check if a decision of this type is already open for this product check to prevent duplicate decisions
-                $exists = Decision::where('product_check_id', $productCheck->id)
+                $existingOpenDecision = Decision::where('product_check_id', $productCheck->id)
                     ->where('decision_type_id', $rule->decision_type_id)
-                    ->exists();
+                    ->where('action_status', 'OPEN')
+                    ->first();
 
-                if (!$exists) {
-                    $remark = "System automatically created decision based on rule: '{$rule->name}' due to failure on field '{$rule->criteria_field}'. Expected: '{$matchedFailure->expected_value}', Actual: '{$matchedFailure->actual_value}'.";
+                $remark = "System automatically created decision based on rule: '{$rule->name}' due to failure on field '{$rule->criteria_field}'. Expected: '{$matchedFailure->expected_value}', Actual: '{$matchedFailure->actual_value}'.";
 
+                if ($existingOpenDecision) {
+                    // Update the existing open decision remark if it has changed
+                    if ($existingOpenDecision->remark !== $remark) {
+                        $existingOpenDecision->update([
+                            'remark' => $remark,
+                        ]);
+
+                        // Log comment update
+                        Comment::create([
+                            'decision_id' => $existingOpenDecision->id,
+                            'user_id' => $productCheck->checked_by,
+                            'comment_type' => 'LOG',
+                            'comment' => "Value updated. Expected: '{$matchedFailure->expected_value}', Actual: '{$matchedFailure->actual_value}'.",
+                        ]);
+                    }
+                } else {
                     // Create Decision
                     $decision = Decision::create([
                         'product_check_id' => $productCheck->id,

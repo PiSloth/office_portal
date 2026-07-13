@@ -106,12 +106,6 @@ class ProductImportService
 
                 if (empty($code)) {
                     $errors[] = "Product code is required.";
-                } else {
-                    // Check duplicate code
-                    $exists = Product::where('code', $code)->exists();
-                    if ($exists) {
-                        $errors[] = "Product code '{$code}' already exists in database.";
-                    }
                 }
 
                 if (empty($name)) {
@@ -143,6 +137,11 @@ class ProductImportService
                         if ($field->field_type === 'date' && !strtotime($val)) {
                             $errors[] = "Field '{$field->field_label}' must be a valid date.";
                         }
+
+                        if ($fName === 'weight_g' && is_numeric($val)) {
+                            $val = (string) round((float) $val, 2);
+                        }
+
                         $dynamicValuesToSave[$field->field_name] = $val;
                     }
                 }
@@ -177,29 +176,35 @@ class ProductImportService
                     $locationId = $location->id;
                 }
 
-                // 4. Create Product
-                $product = Product::create([
-                    'product_type_id' => $batch->product_type_id,
-                    'location_id' => $locationId,
-                    'category_id' => $category->id,
-                    'sub_category_id' => $subCategoryId,
-                    'code' => $code,
-                    'barcode' => $barcode,
-                    'qr_code' => $qrCode,
-                    'name' => $name,
-                    'description' => $description,
-                    'quantity' => (int) $quantity,
-                    'status' => 'ACTIVE',
-                    'import_batch_id' => $batch->id,
-                ]);
+                // 4. Create or Update Product (Upsert)
+                $product = Product::updateOrCreate(
+                    ['code' => $code],
+                    [
+                        'product_type_id' => $batch->product_type_id,
+                        'location_id' => $locationId,
+                        'category_id' => $category->id,
+                        'sub_category_id' => $subCategoryId,
+                        'barcode' => $barcode,
+                        'qr_code' => $qrCode,
+                        'name' => $name,
+                        'description' => $description,
+                        'quantity' => (int) $quantity,
+                        'status' => 'ACTIVE',
+                        'import_batch_id' => $batch->id,
+                    ]
+                );
 
-                // 5. Save Attributes
+                // 5. Save/Update Attributes
                 foreach ($dynamicValuesToSave as $fName => $val) {
-                    ProductAttributeValue::create([
-                        'product_id' => $product->id,
-                        'field_name' => $fName,
-                        'value' => $val,
-                    ]);
+                    ProductAttributeValue::updateOrCreate(
+                        [
+                            'product_id' => $product->id,
+                            'field_name' => $fName,
+                        ],
+                        [
+                            'value' => $val,
+                        ]
+                    );
                 }
 
                 // Log Success

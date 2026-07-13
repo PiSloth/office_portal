@@ -48,6 +48,15 @@ class ListProducts extends ListRecords
                     Forms\Components\Select::make('product_type_id')
                         ->options(ProductType::query()->orderBy('name')->pluck('name', 'id')->all())
                         ->required(),
+                    Forms\Components\Select::make('check_session_id')
+                        ->label('Check Session')
+                        ->options(\App\Models\CheckSession::query()
+                            ->whereIn('status', ['DRAFT', 'OPEN'])
+                            ->orderBy('created_at', 'desc')
+                            ->pluck('name', 'id')
+                            ->all())
+                        ->nullable()
+                        ->helperText('Select a check session to map this import batch directly to it.'),
                     Forms\Components\FileUpload::make('file')
                         ->required()
                         ->disk('local')
@@ -63,6 +72,7 @@ class ListProducts extends ListRecords
                         'file_path' => $filePath,
                         'file_name' => $originalName,
                         'product_type_id' => $data['product_type_id'],
+                        'check_session_id' => $data['check_session_id'] ?? null,
                         'status' => 'PENDING',
                         'total_rows' => 0,
                         'imported_rows' => 0,

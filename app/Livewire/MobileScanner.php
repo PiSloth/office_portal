@@ -118,6 +118,18 @@ class MobileScanner extends Component
         $this->refreshConfigFields();
     }
 
+    protected function hasPendingChecks(): bool
+    {
+        if (!$this->checkSessionId) {
+            return false;
+        }
+
+        return \App\Models\ProductCheck::where('check_session_id', $this->checkSessionId)
+            ->where('checked_by', auth()->id())
+            ->where('result_status', 'PENDING')
+            ->exists();
+    }
+
     public function handleScan(string $decodedText): void
     {
         $this->scanCode = trim($decodedText);
@@ -125,6 +137,13 @@ class MobileScanner extends Component
         if (! $this->checkSessionId) {
             $this->flashMessage = 'No active session selected. Please open a session first.';
             $this->flashTone = 'warning';
+            return;
+        }
+
+        if ($this->hasPendingChecks()) {
+            $this->flashMessage = 'Please complete the pending check validation before scanning another product.';
+            $this->flashTone = 'warning';
+            $this->scanCode = '';
             return;
         }
 
@@ -478,8 +497,24 @@ class MobileScanner extends Component
                     'compare' => false,
                     'tolerance' => null,
                     'is_editable_in_table' => false,
+                    'is_apply_validate' => false,
+                    'is_quickcheck' => false,
                 ], $fieldConfig);
             })->values()->all();
+    }
+
+    public function quickCheck(string $fieldName): void
+    {
+        $product = $this->matchedProductId ? Product::with('attributeValues')->find($this->matchedProductId) : null;
+        if (!$product) return;
+
+        $expectedValue = match ($fieldName) {
+            'location_id', 'category_id', 'sub_category_id' => $product->{$fieldName},
+            'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $product->{$fieldName},
+            default => $product->attributeValues->firstWhere('field_name', $fieldName)?->value,
+        };
+
+        $this->actualValues[$fieldName] = ($expectedValue !== null) ? (string) $expectedValue : '';
     }
 
     protected function loadProductTypeDynamicFields(): void

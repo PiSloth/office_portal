@@ -49,4 +49,9 @@ class CheckSession extends Model
     {
         return $this->belongsToMany(User::class, 'check_session_user');
     }
+
+    public function importBatches()
+    {
+        return $this->hasMany(ProductImportBatch::class, 'check_session_id');
+    }
 }
