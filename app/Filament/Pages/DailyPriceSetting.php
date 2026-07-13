@@ -53,6 +53,55 @@ class DailyPriceSetting extends Page implements HasTable
                         ->success()
                         ->send();
                 }),
+            Action::make('convert_price')
+                ->label('Convert & Update Price')
+                ->icon('heroicon-o-calculator')
+                ->color('warning')
+                ->form([
+                    TextInput::make('new_gold_price')
+                        ->label('New Gold Price')
+                        ->numeric()
+                        ->required(),
+                    TextInput::make('tax')
+                        ->label('Oth Charges (Tax / ခွာဈေး)')
+                        ->numeric()
+                        ->required(),
+                ])
+                ->mountUsing(function ($form) {
+                    $taxParam = CalculationParameter::where('key', 'tax_rate')->first();
+                    $form->fill([
+                        'tax' => $taxParam ? $taxParam->value : 0,
+                    ]);
+                })
+                ->action(function (array $data, DailyPriceSetting $livewire) {
+                    $newGoldPrice = (float) $data['new_gold_price'];
+                    $convertedGoldPrice = (16.606 / 16.3293) * $newGoldPrice;
+                    $tax = (float) $data['tax'];
+
+                    // Update generic engine parameters
+                    CalculationParameter::updateOrCreate(
+                        ['key' => 'base_gold_price'],
+                        ['value' => $convertedGoldPrice, 'type' => 'numeric', 'method_id' => 1]
+                    );
+
+                    CalculationParameter::updateOrCreate(
+                        ['key' => 'tax_rate'],
+                        ['value' => $tax, 'type' => 'numeric', 'method_id' => 1]
+                    );
+
+                    // Keep historical record
+                    \App\Models\DailyPriceHistory::create([
+                        'gold_price' => $convertedGoldPrice,
+                        'tax_rate' => $tax,
+                    ]);
+
+                    Notification::make()
+                        ->title('Prices Converted and Updated Successfully')
+                        ->success()
+                        ->send();
+
+                    $livewire->redirect(static::getUrl());
+                }),
         ];
     }
 

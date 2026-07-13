@@ -61,7 +61,7 @@ class PurchaseRequestResource extends Resource
                                     ->disk('public')
                                     ->visibility('public')
                                     ->directory('attachments/nrc_photos')
-                                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => filled($get('customer_nrc'))),
+                                    ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => filled($get('customer_nrc'))),
                             ])
                             ->mountUsing(function (\Filament\Schemas\Schema $form, \Filament\Schemas\Components\Utilities\Get $get) {
                                 $form->fill([
@@ -146,7 +146,7 @@ class PurchaseRequestResource extends Resource
                                             ->modalSubmitAction(false)
                                             ->modalCancelActionLabel('Close')
                                             ->modalHeading('Related Purchase Decision')
-                                            ->form(fn ($record) => [
+                                            ->form(fn($record) => [
                                                 Forms\Components\TextInput::make('status')
                                                     ->default($record->purchaseDecision?->status)
                                                     ->disabled()
@@ -231,11 +231,12 @@ class PurchaseRequestResource extends Resource
                                         ->default('gb_product'),
 
                                     Forms\Components\Toggle::make('is_good')->offColor('danger')->onColor('success')
-                                         ->label(fn ($state) => $state 
-                                             ? new \Illuminate\Support\HtmlString('<span style="color: green; font-weight: bold;">ရ</span>') 
-                                             : new \Illuminate\Support\HtmlString('<span style="color: red; font-weight: bold;">မရ</span>')
-                                         )
-                                         ->live()
+                                        ->label(
+                                            fn($state) => $state
+                                                ? new \Illuminate\Support\HtmlString('<span style="color: green; font-weight: bold;">ရ</span>')
+                                                : new \Illuminate\Support\HtmlString('<span style="color: red; font-weight: bold;">မရ</span>')
+                                        )
+                                        ->live()
                                         ->default(false),
 
                                     \Filament\Schemas\Components\Grid::make(2)
@@ -247,7 +248,7 @@ class PurchaseRequestResource extends Resource
                                                 ->live(),
 
                                             Forms\Components\Select::make('reChange')
-                                                ->label('အလဲအထပ်လုပ်မှာလား?')
+                                                ->label('ပြန်ဝယ်အမျိုးအစား?')
                                                 ->options([
                                                     '0' => 'ဆိုင်ထည် (No)',
                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
@@ -274,6 +275,31 @@ class PurchaseRequestResource extends Resource
                                         ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
                                         ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2'),
 
+                                    \Filament\Schemas\Components\Grid::make(2)
+                                        ->schema([
+                                            Forms\Components\TextInput::make('goldWeightGram')
+                                                ->numeric()
+                                                ->label('Gram (g)')
+                                                ->default(0)
+                                                ->live(onBlur: true)
+                                                ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
+                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                            Forms\Components\TextInput::make('kyaukWeight')
+                                                ->numeric()
+                                                ->label('ကျောက်ချိန် (ရွေး)')
+                                                ->default(0)
+                                                ->live(onBlur: true)
+                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                        ]),
+
+                                    Forms\Components\Toggle::make('show_KPY')
+                                        ->label('Show KPY (ကျပ်၊ ပဲ၊ ရွေး)')
+                                        ->live()
+                                        ->afterStateHydrated(function ($component, $state, $get) {
+                                            $hasKpy = (float)($get('kyat') ?? 0) > 0 || (float)($get('pae') ?? 0) > 0 || (float)($get('yawe') ?? 0) > 0;
+                                            $component->state((bool)($state || $hasKpy));
+                                        }),
+
                                     \Filament\Schemas\Components\Grid::make(3)
                                         ->schema([
                                             Forms\Components\TextInput::make('kyat')
@@ -297,26 +323,8 @@ class PurchaseRequestResource extends Resource
                                                 ->live(onBlur: true)
                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertKyatToGram($get, $set))
                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                            Forms\Components\TextInput::make('kyaukWeight')
-                                                ->numeric()
-                                                ->label('ကျောက်ချိန် (ရွေး)')
-                                                ->default(0)
-                                                ->live(onBlur: true)
-                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
                                         ])
-                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
-
-                                    \Filament\Schemas\Components\Grid::make(1)
-                                        ->schema([
-                                            Forms\Components\TextInput::make('goldWeightGram')
-                                                ->numeric()
-                                                ->label('Gram (g)')
-                                                ->default(0)
-                                                ->live(onBlur: true)
-                                                ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
-                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                        ])
-                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => !in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (bool)$get('show_KPY')),
 
                                     \Filament\Schemas\Components\Grid::make(3)
                                         ->schema([
@@ -464,11 +472,12 @@ class PurchaseRequestResource extends Resource
                                         ->default('other_product'),
 
                                     Forms\Components\Toggle::make('is_good')->offColor('danger')->onColor('success')
-                                         ->label(fn ($state) => $state 
-                                             ? new \Illuminate\Support\HtmlString('<span style="color: green; font-weight: bold;">ရ</span>') 
-                                             : new \Illuminate\Support\HtmlString('<span style="color: red; font-weight: bold;">မရ</span>')
-                                         )
-                                         ->live()
+                                        ->label(
+                                            fn($state) => $state
+                                                ? new \Illuminate\Support\HtmlString('<span style="color: green; font-weight: bold;">ရ</span>')
+                                                : new \Illuminate\Support\HtmlString('<span style="color: red; font-weight: bold;">မရ</span>')
+                                        )
+                                        ->live()
                                         ->default(false),
 
                                     \Filament\Schemas\Components\Grid::make(2)
@@ -480,7 +489,7 @@ class PurchaseRequestResource extends Resource
                                                 ->live(),
 
                                             Forms\Components\Select::make('reChange')
-                                                ->label('အလဲအထပ်လုပ်မှာလား?')
+                                                ->label('ပြန်ဝယ်အမျိုးအစား')
                                                 ->options([
                                                     '0' => 'ဆိုင်ထည် (No)',
                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
@@ -512,16 +521,10 @@ class PurchaseRequestResource extends Resource
                                                 ->live(onBlur: true)
                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertKyatToGram($get, $set))
                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                            Forms\Components\TextInput::make('kyaukWeight')
-                                                ->numeric()
-                                                ->label('ကျောက်ချိန် (ရွေး)')
-                                                ->default(0)
-                                                ->live(onBlur: true)
-                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
                                         ])
-                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (bool)$get('show_KPY')),
 
-                                    \Filament\Schemas\Components\Grid::make(1)
+                                    \Filament\Schemas\Components\Grid::make(2)
                                         ->schema([
                                             Forms\Components\TextInput::make('goldWeightGram')
                                                 ->numeric()
@@ -530,8 +533,21 @@ class PurchaseRequestResource extends Resource
                                                 ->live(onBlur: true)
                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                        ])
-                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => !in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
+                                            Forms\Components\TextInput::make('kyaukWeight')
+                                                ->numeric()
+                                                ->label('ကျောက်ချိန် (ရွေး)')
+                                                ->default(0)
+                                                ->live(onBlur: true)
+                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                        ]),
+
+                                    Forms\Components\Toggle::make('show_KPY')
+                                        ->label('Show KPY (ကျပ်၊ ပဲ၊ ရွေး)')
+                                        ->live()
+                                        ->afterStateHydrated(function ($component, $state, $get) {
+                                            $hasKpy = (float)($get('kyat') ?? 0) > 0 || (float)($get('pae') ?? 0) > 0 || (float)($get('yawe') ?? 0) > 0;
+                                            $component->state((bool)($state || $hasKpy));
+                                        }),
 
                                     \Filament\Schemas\Components\Grid::make(3)
                                         ->schema([
@@ -591,6 +607,7 @@ class PurchaseRequestResource extends Resource
                                         'yawe' => $data['yawe'] ?? 0,
                                         'kyaukWeight' => $data['kyaukWeight'] ?? 0,
                                         'goldWeightGram' => $data['goldWeightGram'] ?? 0,
+                                        'show_KPY' => (bool) ($data['show_KPY'] ?? false),
                                         'percent' => blank($data['percent'] ?? null) ? 0 : $data['percent'],
                                         'reChange' => $data['reChange'] ?? '0',
                                         'is_good' => (bool) ($data['is_good'] ?? false),
@@ -868,10 +885,11 @@ class PurchaseRequestResource extends Resource
                                                         ->default($purchaseType),
 
                                                     Forms\Components\Toggle::make('is_good')->offColor('danger')->onColor('success')
-                                                        ->label(fn ($state) => $state 
-                                                             ? new \Illuminate\Support\HtmlString('<span style="color: green; font-weight: bold;">ရ</span>') 
-                                                             : new \Illuminate\Support\HtmlString('<span style="color: red; font-weight: bold;">မရ</span>')
-                                                         )
+                                                        ->label(
+                                                            fn($state) => $state
+                                                                ? new \Illuminate\Support\HtmlString('<span style="color: green; font-weight: bold;">ရ</span>')
+                                                                : new \Illuminate\Support\HtmlString('<span style="color: red; font-weight: bold;">မရ</span>')
+                                                        )
                                                         ->live()
                                                         ->default(false),
 
@@ -884,8 +902,8 @@ class PurchaseRequestResource extends Resource
                                                                 ->live(),
 
                                                             Forms\Components\Select::make('reChange')
-                                                                ->label('အလဲအထပ်လုပ်မှာလား?')
-                                                                ->options(fn () => $purchaseType === 'gb_product' ? [
+                                                                ->label('ပြန်ဝယ်အမျိုးအစား')
+                                                                ->options(fn() => $purchaseType === 'gb_product' ? [
                                                                     '0' => 'ဆိုင်ထည် (No)',
                                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                                     '2' => 'Percent ထည်ပြန်ဝယ်',
@@ -914,6 +932,31 @@ class PurchaseRequestResource extends Resource
                                                         ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
                                                         ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2'),
 
+                                                    \Filament\Schemas\Components\Grid::make(1)
+                                                        ->schema([
+                                                            Forms\Components\TextInput::make('goldWeightGram')
+                                                                ->numeric()
+                                                                ->label('Gram (g)')
+                                                                ->default(0)
+                                                                ->live(onBlur: true)
+                                                                ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
+                                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                                            Forms\Components\TextInput::make('kyaukWeight')
+                                                                ->numeric()
+                                                                ->label('ကျောက်ချိန် (ရွေး)')
+                                                                ->default(0)
+                                                                ->live(onBlur: true)
+                                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
+                                                        ]),
+
+                                                    Forms\Components\Toggle::make('show_KPY')
+                                                        ->label('Show KPY (ကျပ်၊ ပဲ၊ ရွေး)')
+                                                        ->live()
+                                                        ->afterStateHydrated(function ($component, $state, $get) {
+                                                            $hasKpy = (float)($get('kyat') ?? 0) > 0 || (float)($get('pae') ?? 0) > 0 || (float)($get('yawe') ?? 0) > 0;
+                                                            $component->state((bool)($state || $hasKpy));
+                                                        }),
+
                                                     \Filament\Schemas\Components\Grid::make(3)
                                                         ->schema([
                                                             Forms\Components\TextInput::make('kyat')
@@ -937,26 +980,8 @@ class PurchaseRequestResource extends Resource
                                                                 ->live(onBlur: true)
                                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertKyatToGram($get, $set))
                                                                 ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                                            Forms\Components\TextInput::make('kyaukWeight')
-                                                                ->numeric()
-                                                                ->label('ကျောက်ချိန် (ရွေး)')
-                                                                ->default(0)
-                                                                ->live(onBlur: true)
-                                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
                                                         ])
-                                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
-
-                                                    \Filament\Schemas\Components\Grid::make(1)
-                                                        ->schema([
-                                                            Forms\Components\TextInput::make('goldWeightGram')
-                                                                ->numeric()
-                                                                ->label('Gram (g)')
-                                                                ->default(0)
-                                                                ->live(onBlur: true)
-                                                                ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
-                                                                ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
-                                                        ])
-                                                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => !in_array((string)$get('goldList'), ['16', '15', '14.2', '142', '14'], true)),
+                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (bool)$get('show_KPY')),
 
                                                     \Filament\Schemas\Components\Grid::make(3)
                                                         ->schema([
@@ -1022,6 +1047,7 @@ class PurchaseRequestResource extends Resource
                                                 'yawe' => $data['yawe'] ?? 0,
                                                 'kyaukWeight' => $data['kyaukWeight'] ?? 0,
                                                 'goldWeightGram' => $data['goldWeightGram'] ?? 0,
+                                                'show_KPY' => (bool) ($data['show_KPY'] ?? false),
                                                 'percent' => blank($data['percent'] ?? null) ? 0 : $data['percent'],
                                                 'reChange' => $data['reChange'] ?? '0',
                                                 'is_good' => (bool) ($data['is_good'] ?? false),
@@ -1043,14 +1069,14 @@ class PurchaseRequestResource extends Resource
                                         ->icon('heroicon-m-photo')
                                         ->color('danger')
                                         ->modalHeading('Attachment Image')
-                                        ->modalContent(fn ($record) => new \Illuminate\Support\HtmlString(
+                                        ->modalContent(fn($record) => new \Illuminate\Support\HtmlString(
                                             $record && isset($record->dynamic_fields_json['attachment_image'])
                                                 ? '<div class="flex justify-center"><img src="' . asset('storage/' . $record->dynamic_fields_json['attachment_image']) . '" class="max-w-full h-auto rounded-lg shadow-md border border-gray-200 dark:border-gray-800" /></div>'
                                                 : '<p class="text-gray-500 text-center">No attachment image uploaded.</p>'
                                         ))
                                         ->modalSubmitAction(false)
                                         ->modalCancelActionLabel('Close')
-                                        ->visible(fn ($record) => $record && !empty($record->dynamic_fields_json['attachment_image'])),
+                                        ->visible(fn($record) => $record && !empty($record->dynamic_fields_json['attachment_image'])),
 
                                     \Filament\Actions\Action::make('delete_item')
                                         ->label('')
@@ -1411,7 +1437,7 @@ class PurchaseRequestResource extends Resource
                 Tables\Columns\TextColumn::make('purchaseDecision.status')
                     ->label('Decision Status')
                     ->badge()
-                    ->color(fn ($state): string => match ($state) {
+                    ->color(fn($state): string => match ($state) {
                         'open' => 'warning',
                         'closed' => 'success',
                         default => 'gray',
@@ -1430,7 +1456,7 @@ class PurchaseRequestResource extends Resource
                 Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Branch')
                     ->options(\App\Models\Branch::pluck('name', 'id'))
-                    ->default(fn () => auth()->user()?->branch_id),
+                    ->default(fn() => auth()->user()?->branch_id),
                 Tables\Filters\SelectFilter::make('workflow_state_id')
                     ->label('Status')
                     ->relationship('workflowState', 'name'),
@@ -1485,11 +1511,11 @@ class PurchaseRequestResource extends Resource
                         return $query
                             ->when(
                                 $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
                             )
                             ->when(
                                 $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
             ])
