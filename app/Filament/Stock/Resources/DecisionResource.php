@@ -83,6 +83,14 @@ class DecisionResource extends Resource
                 Tables\Columns\TextColumn::make('productCheck.product.code')
                     ->label('Product Code')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('productCheck.product.name')
+                    ->label('Product Name')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('productCheck.product.category.name')
+                    ->label('Category'),
+                Tables\Columns\TextColumn::make('productCheck.product.subCategory.name')
+                    ->label('Sub-Category')
+                    ->default('---'),
                 Tables\Columns\TextColumn::make('decisionType.name')
                     ->label('Decision Type')
                     ->searchable()
@@ -103,6 +111,10 @@ class DecisionResource extends Resource
                 Tables\Columns\TextColumn::make('decisionBy.name')
                     ->label('Decision By')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('remark')
+                    ->label('Remark')
+                    ->limit(30)
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
