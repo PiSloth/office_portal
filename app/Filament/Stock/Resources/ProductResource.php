@@ -166,50 +166,6 @@ class ProductResource extends Resource
                 ->formatStateUsing(fn($state) => $state ?? 0),
             Tables\Columns\TextColumn::make('barcode')->searchable()->sortable(),
             Tables\Columns\TextColumn::make('qr_code')->searchable()->sortable(),
-            Tables\Columns\TextColumn::make('created_at')
-                ->dateTime()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('updated_at')
-                ->dateTime()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('created_by')
-                ->label('Created By')
-                ->sortable()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('updated_by')
-                ->label('Updated By')
-                ->sortable()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('status')
-                ->badge()
-                ->color(fn(string $state): string => match ($state) {
-                    'ACTIVE' => 'success',
-                    'SUSPENDED' => 'danger',
-                    default => 'gray',
-                })
-                ->sortable(),
-            Tables\Columns\TextColumn::make('created_at')
-                ->dateTime()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('updated_at')
-                ->dateTime()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('created_by')
-                ->label('Created By')
-                ->sortable()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('updated_by')
-                ->label('Updated By')
-                ->sortable()
-                ->toggleable(isToggledHiddenByDefault: true),
-            Tables\Columns\TextColumn::make('status')
-                ->badge()
-                ->color(fn(string $state): string => match ($state) {
-                    'ACTIVE' => 'success',
-                    'SUSPENDED' => 'danger',
-                    default => 'gray',
-                })
-                ->sortable(),
             Tables\Columns\TextColumn::make('created_during_pickup')
                 ->label('Created During Pickup')
                 ->badge()
@@ -227,6 +183,17 @@ class ProductResource extends Resource
                 ->sortable(),
             Tables\Columns\TextColumn::make('created_at')
                 ->dateTime()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('updated_at')
+                ->dateTime()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('created_by')
+                ->label('Created By')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('updated_by')
+                ->label('Updated By')
+                ->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
         ];
 
