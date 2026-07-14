@@ -239,6 +239,18 @@ class ProductResource extends Resource
                             $query->whereHas('productChecks', fn ($q) => $q->where('check_session_id', $sessionId));
                         }
                     }),
+                Tables\Filters\TernaryFilter::make('created_during_pickup')
+                    ->label('Created During Pickup')
+                    ->placeholder('All Products')
+                    ->trueLabel('Created During Pickup')
+                    ->falseLabel('Originally Imported')
+                    ->queries(
+                        true: fn ($query) => $query->where('created_during_pickup', true),
+                        false: fn ($query) => $query->where(function ($q) {
+                            $q->where('created_during_pickup', false)
+                              ->orWhereNull('created_during_pickup');
+                        }),
+                    ),
                  Tables\Filters\TernaryFilter::make('is_checked')
                     ->label('Check Status')
                     ->placeholder('All Products')
