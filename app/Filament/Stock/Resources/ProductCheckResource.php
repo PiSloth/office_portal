@@ -352,6 +352,188 @@ class ProductCheckResource extends Resource
             ])
             ->actions([
                 Actions\ViewAction::make(),
+                Actions\Action::make('create_product')
+                    ->label('Create Product')
+                    ->icon('heroicon-o-plus-circle')
+                    ->color('warning')
+                    ->visible(fn (ProductCheck $record) => !$record->product_id)
+                    ->form([
+                        \Filament\Schemas\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\Select::make('product_type_id')
+                                    ->label('Product Type')
+                                    ->options(\App\Models\ProductType::where('is_active', true)->pluck('name', 'id'))
+                                    ->required()
+                                    ->reactive()
+                                    ->afterStateUpdated(fn ($state, Forms\Set $set) => [
+                                        $set('category_id', null),
+                                        $set('sub_category_id', null),
+                                    ]),
+                                Forms\Components\Select::make('location_id')
+                                    ->relationship('location', 'name')
+                                    ->default(fn (ProductCheck $record) => $record->location_id)
+                                    ->required(),
+                                Forms\Components\Select::make('category_id')
+                                    ->label('Category')
+                                    ->options(function (callable $get) {
+                                        $productTypeId = $get('product_type_id');
+                                        if (!$productTypeId) {
+                                            return [];
+                                        }
+                                        return \App\Models\Category::where('product_type_id', $productTypeId)->pluck('name', 'id');
+                                    })
+                                    ->required()
+                                    ->reactive()
+                                    ->afterStateUpdated(fn ($state, Forms\Set $set) => $set('sub_category_id', null)),
+                                Forms\Components\Select::make('sub_category_id')
+                                    ->label('Sub-Category')
+                                    ->options(function (callable $get) {
+                                        $categoryId = $get('category_id');
+                                        if (!$categoryId) {
+                                            return [];
+                                        }
+                                        return \App\Models\SubCategory::where('category_id', $categoryId)->pluck('name', 'id');
+                                    })
+                                    ->nullable(),
+                                Forms\Components\TextInput::make('code')
+                                    ->default(fn (ProductCheck $record) => $record->barcode)
+                                    ->required()
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('name')
+                                    ->required()
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('barcode')
+                                    ->default(fn (ProductCheck $record) => $record->barcode)
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('qr_code')
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('quantity')
+                                    ->numeric()
+                                    ->default(1)
+                                    ->required(),
+                                Forms\Components\Select::make('status')
+                                    ->options([
+                                        'ACTIVE' => 'Active',
+                                        'SUSPENDED' => 'Suspended',
+                                    ])
+                                    ->default('ACTIVE')
+                                    ->required(),
+                            ]),
+                        
+                        \Filament\Schemas\Components\Group::make()
+                            ->schema(function (callable $get) {
+                                $productTypeId = $get('product_type_id');
+                                if (!$productTypeId) {
+                                    return [];
+                                }
+
+                                $fields = \App\Models\ProductTypeField::where('product_type_id', $productTypeId)
+                                    ->where('is_active', true)
+                                    ->get();
+
+                                $schema = [];
+                                foreach ($fields as $field) {
+                                    $input = match ($field->field_type) {
+                                        'number' => Forms\Components\TextInput::make('dynamic_attributes.' . $field->field_name)->numeric()->integer(),
+                                        'decimal' => Forms\Components\TextInput::make('dynamic_attributes.' . $field->field_name)->numeric(),
+                                        'date' => Forms\Components\DatePicker::make('dynamic_attributes.' . $field->field_name),
+                                        'textarea' => Forms\Components\Textarea::make('dynamic_attributes.' . $field->field_name),
+                                        'select' => Forms\Components\TextInput::make('dynamic_attributes.' . $field->field_name),
+                                        'boolean' => Forms\Components\Toggle::make('dynamic_attributes.' . $field->field_name),
+                                        default => Forms\Components\TextInput::make('dynamic_attributes.' . $field->field_name),
+                                    };
+
+                                    $input->label($field->field_label)
+                                        ->required($field->required);
+
+                                    $schema[] = $input;
+                                }
+
+                                return $schema;
+                            })
+                            ->columns(2)
+                            ->key('modal_dynamic_attributes_group'),
+                    ])
+                    ->action(function (ProductCheck $record, array $data): void {
+                        $product = \App\Models\Product::create([
+                            'product_type_id' => $data['product_type_id'],
+                            'location_id' => $data['location_id'],
+                            'category_id' => $data['category_id'],
+                            'sub_category_id' => $data['sub_category_id'],
+                            'code' => $data['code'],
+                            'barcode' => $data['barcode'],
+                            'qr_code' => $data['qr_code'],
+                            'name' => $data['name'],
+                            'quantity' => $data['quantity'],
+                            'status' => $data['status'],
+                            'created_during_pickup' => true,
+                        ]);
+
+                        if (!empty($data['dynamic_attributes'])) {
+                            foreach ($data['dynamic_attributes'] as $fieldName => $value) {
+                                if ($value !== null && $value !== '') {
+                                    \App\Models\ProductAttributeValue::create([
+                                        'product_id' => $product->id,
+                                        'field_name' => $fieldName,
+                                        'value' => $value,
+                                    ]);
+                                }
+                            }
+                        }
+
+                        $record->update([
+                            'product_id' => $product->id,
+                            'result_status' => 'UNMATCHED',
+                        ]);
+
+                        // Run validation to auto-complete
+                        $scanConfig = $record->scanConfig;
+                        if (!$scanConfig) {
+                            $scanConfig = \App\Models\ScanConfig::where('product_type_id', $product->product_type_id)
+                                ->where('is_active', true)
+                                ->first();
+                        }
+
+                        if ($scanConfig) {
+                            $actualValues = [];
+                            foreach (data_get($scanConfig->config_json, 'fields', []) as $fieldConfig) {
+                                $fName = $fieldConfig['field'] ?? null;
+                                if (!$fName || ($fieldConfig['source'] ?? 'product') !== 'product') continue;
+
+                                if ($fName === 'quantity') {
+                                    $actualValues[$fName] = $record->quantity;
+                                } else {
+                                    $expectedVal = match ($fName) {
+                                        'location_id', 'category_id', 'sub_category_id' => $product->{$fName},
+                                        'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $product->{$fName},
+                                        default => $product->attributeValues->firstWhere('field_name', $fName)?->value,
+                                    };
+                                    $actualValues[$fName] = $expectedVal;
+                                }
+                            }
+
+                            $validation = app(\App\Services\ValidationEngine::class)->validate($scanConfig, $product, $actualValues);
+
+                            \App\Models\ProductCheckValue::where('product_check_id', $record->id)->delete();
+                            foreach ($validation['values'] as $val) {
+                                \App\Models\ProductCheckValue::create([
+                                    'product_check_id' => $record->id,
+                                    'field_name' => $val['field_name'],
+                                    'expected_value' => $val['expected_value'],
+                                    'actual_value' => $val['actual_value'],
+                                    'difference_value' => $val['difference_value'],
+                                    'status' => $val['status'],
+                                ]);
+                            }
+
+                            $record->update([
+                                'scan_config_id' => $scanConfig->id,
+                                'remark' => !empty($validation['errors']) ? implode(' | ', $validation['errors']) : null,
+                            ]);
+                        }
+
+                        event(new \App\Events\ProductChecked($record));
+                    }),
             ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
