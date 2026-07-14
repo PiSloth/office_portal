@@ -259,7 +259,7 @@ class ProductCheckResource extends Resource
                     ->relationship('scanConfig', 'name'),
                 Tables\Filters\SelectFilter::make('location_id')
                     ->label('Location')
-                    ->relationship('location', 'code')
+                    ->relationship('location', 'name')
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('category')
                     ->label('Category')
