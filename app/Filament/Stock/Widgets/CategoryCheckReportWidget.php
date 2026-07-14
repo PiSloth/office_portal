@@ -39,13 +39,7 @@ class CategoryCheckReportWidget extends TableWidget
 
                 $subQuery->groupBy('products.category_id', 'products.sub_category_id');
 
-                $modelInstance = new Product();
-                $modelInstance->setTable('grouped_products');
-                $modelInstance->setKeyName('id');
-                $modelInstance->incrementing = false;
-                $modelInstance->keyType = 'string';
-
-                return $modelInstance->newQuery()
+                return GroupedProductReport::query()
                     ->fromSub($subQuery, 'grouped_products')
                     ->select('grouped_products.*')
                     ->with(['category', 'subCategory']);
@@ -80,5 +74,23 @@ class CategoryCheckReportWidget extends TableWidget
     public static function canView(): bool
     {
         return auth()->check();
+    }
+}
+
+class GroupedProductReport extends \Illuminate\Database\Eloquent\Model
+{
+    protected $table = 'grouped_products';
+    protected $primaryKey = 'id';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
+    public function category()
+    {
+        return $this->belongsTo(\App\Models\Category::class, 'category_id');
+    }
+
+    public function subCategory()
+    {
+        return $this->belongsTo(\App\Models\SubCategory::class, 'sub_category_id');
     }
 }
