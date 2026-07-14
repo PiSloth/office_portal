@@ -263,6 +263,15 @@ class ProductResource extends Resource
                     ->label('Sub-Category')
                     ->relationship('subCategory', 'name')
                     ->searchable(),
+                Tables\Filters\SelectFilter::make('check_session_id')
+                    ->label('Check Session')
+                    ->options(\App\Models\CheckSession::pluck('name', 'id'))
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): void {
+                        $sessionId = $data['value'] ?? null;
+                        if ($sessionId) {
+                            $query->whereHas('productChecks', fn ($q) => $q->where('check_session_id', $sessionId));
+                        }
+                    }),
                 Tables\Filters\TernaryFilter::make('is_checked')
                     ->label('Check Status (Latest Session)')
                     ->placeholder('All Products')

@@ -29,7 +29,7 @@ class CategoryCheckReportWidget extends TableWidget
                     ->selectRaw('count(distinct case when products.created_during_pickup = 1 then products.id end) as total_created_during_pickup');
 
                 if ($sessionId) {
-                    $subQuery->selectRaw('count(distinct product_checks.product_id) as total_checked')
+                    $subQuery->selectRaw('count(distinct case when products.created_during_pickup = 0 or products.created_during_pickup is null then product_checks.product_id end) as total_checked')
                         ->leftJoin('product_checks', function ($join) use ($sessionId, $checkedBy) {
                             $join->on('product_checks.product_id', '=', 'products.id')
                                 ->where('product_checks.check_session_id', '=', $sessionId)
