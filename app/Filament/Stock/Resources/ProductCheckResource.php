@@ -365,7 +365,7 @@ class ProductCheckResource extends Resource
                                     ->options(\App\Models\ProductType::where('is_active', true)->pluck('name', 'id'))
                                     ->required()
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($state, Forms\Set $set) => [
+                                    ->afterStateUpdated(fn ($state, $set) => [
                                         $set('category_id', null),
                                         $set('sub_category_id', null),
                                     ]),
@@ -384,7 +384,7 @@ class ProductCheckResource extends Resource
                                     })
                                     ->required()
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($state, Forms\Set $set) => $set('sub_category_id', null)),
+                                    ->afterStateUpdated(fn ($state, $set) => $set('sub_category_id', null)),
                                 Forms\Components\Select::make('sub_category_id')
                                     ->label('Sub-Category')
                                     ->options(function (callable $get) {
