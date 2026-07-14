@@ -257,7 +257,8 @@ class ProductCheckResource extends Resource
                 Tables\Filters\SelectFilter::make('scan_config_id')
                     ->label('Scan Config')
                     ->relationship('scanConfig', 'name'),
-                Tables\Filters\SelectFilter::make('location')
+                Tables\Filters\SelectFilter::make('location_id')
+                    ->label('Location')
                     ->relationship('location', 'code')
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('category')
