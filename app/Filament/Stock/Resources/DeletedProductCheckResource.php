@@ -27,8 +27,15 @@ class DeletedProductCheckResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('id')->sortable(),
-                Tables\Columns\TextColumn::make('product.code')->label('Product')->sortable(),
-                Tables\Columns\TextColumn::make('product.name')->label('Product Name')->limit(32)->sortable(),
+                Tables\Columns\TextColumn::make('product.code')
+                    ->label('Product')
+                    ->state(fn (ProductCheck $record): ?string => $record->product?->code ?? $record->barcode)
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('product.name')
+                    ->label('Product Name')
+                    ->state(fn (ProductCheck $record): ?string => $record->product?->name ?? 'Unmatched Product')
+                    ->limit(32)
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('quantity')->label('Quantity')->sortable(),
                 Tables\Columns\TextColumn::make('checkSession.name')->label('Session')->sortable(),
                 Tables\Columns\TextColumn::make('result_status')->badge()->color(fn (string $state): string => match ($state) {

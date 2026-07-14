@@ -177,10 +177,12 @@ class ProductCheckResource extends Resource
                 Tables\Columns\TextColumn::make('id')->sortable(),
                 Tables\Columns\TextColumn::make('product.code')
                     ->label('Product')
+                    ->state(fn (ProductCheck $record): ?string => $record->product?->code ?? $record->barcode)
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('product.name')
                     ->label('Product Name')
+                    ->state(fn (ProductCheck $record): ?string => $record->product?->name ?? 'Unmatched Product')
                     ->searchable()
                     ->limit(32),
                 Tables\Columns\TextColumn::make('location.code')

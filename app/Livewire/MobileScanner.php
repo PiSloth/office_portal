@@ -651,7 +651,9 @@ class MobileScanner extends Component
             
             $existingValues = ProductCheckValue::where('product_check_id', $check->id)->get();
             foreach ($existingValues as $ev) {
-                $actualValues[$ev->field_name] = $ev->actual_value;
+                if ($ev->field_name !== 'quantity') {
+                    $actualValues[$ev->field_name] = $ev->actual_value;
+                }
             }
             
             foreach ($inlineOverrides as $k => $v) {
