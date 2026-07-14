@@ -84,7 +84,12 @@ class MobileScanner extends Component
                 'description' => 'System default location'
             ]);
         }
-        $this->selectedLocationId = $defaultLocation->id;
+        $this->selectedLocationId = session('scanner_selected_location_id', $defaultLocation->id);
+    }
+
+    public function updatedSelectedLocationId($value): void
+    {
+        session(['scanner_selected_location_id' => $value]);
     }
 
     public function createLocation()
@@ -101,6 +106,7 @@ class MobileScanner extends Component
             'description' => $this->newLocationDescription
         ]);
         $this->selectedLocationId = $loc->id;
+        session(['scanner_selected_location_id' => $loc->id]);
         $this->showCreateLocationModal = false;
         $this->newLocationName = null;
         $this->newLocationDescription = null;
