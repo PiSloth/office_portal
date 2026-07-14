@@ -18,6 +18,10 @@
     },
     countdown: 0,
     delaySeconds: parseInt(localStorage.getItem('scannerDelaySeconds')) || 3,
+    prefixes: JSON.parse(localStorage.getItem('scannerPrefixes') || '[]'),
+    activePrefix: localStorage.getItem('scannerActivePrefix') || '',
+    newPrefix: '',
+    showPrefixMenu: false,
     init() {
         this.$watch('showScannerModal', value => {
             window.dispatchEvent(new CustomEvent(value ? 'mobile-scanner-start' : 'mobile-scanner-stop'));
@@ -81,6 +85,37 @@
                 this.showScannerModal = true;
             }
         }, 1000);
+    },
+    addPrefix() {
+        const val = this.newPrefix.trim();
+        if (val && this.prefixes.length < 10 && !this.prefixes.includes(val)) {
+            this.prefixes.push(val);
+            localStorage.setItem('scannerPrefixes', JSON.stringify(this.prefixes));
+            this.newPrefix = '';
+        }
+    },
+    removePrefix(prefix) {
+        this.prefixes = this.prefixes.filter(p => p !== prefix);
+        localStorage.setItem('scannerPrefixes', JSON.stringify(this.prefixes));
+        if (this.activePrefix === prefix) {
+            this.activePrefix = '';
+            localStorage.setItem('scannerActivePrefix', '');
+        }
+    },
+    setActivePrefix(prefix) {
+        this.activePrefix = this.activePrefix === prefix ? '' : prefix;
+        localStorage.setItem('scannerActivePrefix', this.activePrefix);
+    },
+    submitScan() {
+        let code = this.$refs.scanCodeInput.value.trim();
+        if (code !== '') {
+            if (this.activePrefix) {
+                code = this.activePrefix + code;
+            }
+            @this.set('scanCode', code);
+            @this.processScannedCode();
+            this.$refs.scanCodeInput.value = '';
+        }
     }
 }" x-init="init()"
     x-effect="document.body.style.overflow = (showMatchedModal || showScannerModal || showCreateLocationModal || showCreateProductModal || showRemarkModal) ? 'hidden' : ''"
@@ -279,8 +314,70 @@
             <div class="space-y-6 rounded-2xl bg-white p-4 shadow-sm dark:bg-gray-900 sm:rounded-3xl sm:p-6">
                 <div class="grid gap-4 md:grid-cols-[1fr_auto]">
                     <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Scanned
-                            code</label>
+                        <div class="mb-2">
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Scanned code</label>
+                                
+                                <!-- Prefix Selector Droplet and Dropdown -->
+                                <div class="relative flex items-center gap-2" @click.outside="showPrefixMenu = false">
+                                    <!-- Waterdrop Button -->
+                                    <button type="button" @click="showPrefixMenu = !showPrefixMenu"
+                                        class="w-7 h-7 flex items-center justify-center bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition-all hover:scale-105 rounded-[50%_50%_0%_50%] rotate-45 focus:outline-none"
+                                        title="Manage scan prefixes">
+                                        <span class="-rotate-45 font-bold text-sm select-none">+</span>
+                                    </button>
+
+                                    <!-- Dropdown Panel (for adding/removing prefixes) -->
+                                    <div x-cloak x-show="showPrefixMenu" x-transition
+                                        class="absolute right-0 top-8 z-50 w-64 origin-top-right rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-gray-700">
+                                        <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Manage Prefixes (Max 10)</p>
+                                        
+                                        <!-- Input with Inline Send Icon -->
+                                        <div class="relative mb-3">
+                                            <input type="text" x-model="newPrefix" @keydown.enter.prevent="addPrefix()"
+                                                class="w-full rounded-xl border-gray-300 pr-10 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                                placeholder="Add new prefix...">
+                                            <button type="button" @click="addPrefix()"
+                                                class="absolute right-2 top-1.5 bottom-1.5 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400">
+                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                </svg>
+                                            </button>
+                                        </div>
+
+                                        <!-- Saved Prefix List (Delete action) -->
+                                        <div class="space-y-1 max-h-40 overflow-y-auto">
+                                            <template x-for="p in prefixes" :key="p">
+                                                <div class="flex items-center justify-between rounded-xl px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300" x-text="p"></span>
+                                                    <button type="button" @click="removePrefix(p)" class="text-gray-400 hover:text-red-500 p-1">
+                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </template>
+                                            <template x-if="prefixes.length === 0">
+                                                <p class="text-xs text-gray-400 text-center py-2">No prefixes saved yet.</p>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Clickable horizontal prefix list under the label -->
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                <template x-for="p in prefixes" :key="p">
+                                    <button type="button" @click="setActivePrefix(p)"
+                                        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border transition shadow-sm"
+                                        :class="activePrefix === p 
+                                            ? 'bg-amber-500 text-white border-amber-600 dark:bg-amber-600 dark:border-amber-700 font-bold' 
+                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-gray-800 dark:text-slate-300 dark:border-gray-700 dark:hover:bg-gray-700/50'">
+                                        <span x-text="p"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
                         <div class="relative">
                             <!-- Scanner Button on Left -->
                             <button type="button" @click="showScannerModal = true"
@@ -295,12 +392,12 @@
                             </button>
 
                             <!-- Barcode Input field -->
-                            <input x-ref="scanCodeInput" wire:model.defer="scanCode" wire:keydown.enter="processScannedCode" type="text"
+                            <input x-ref="scanCodeInput" @keydown.enter.prevent="submitScan()" type="text"
                                 class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white pl-14 pr-14 py-3 text-base"
                                 placeholder="Scan or type a code, then press enter">
 
                             <!-- Rocket Button on Right -->
-                            <button type="button" wire:click="processScannedCode"
+                            <button type="button" @click="submitScan()"
                                 class="absolute right-1 top-1 bottom-1 px-3.5 flex items-center justify-center rounded-xl bg-slate-950 text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 transition shadow-sm"
                                 title="Launch scan/submit">
                                 <span class="text-base leading-none">🚀</span>
