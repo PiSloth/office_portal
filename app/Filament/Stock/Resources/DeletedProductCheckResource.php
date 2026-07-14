@@ -35,6 +35,7 @@ class DeletedProductCheckResource extends Resource
                     'PASS' => 'success',
                     'FAIL' => 'danger',
                     'WARNING' => 'warning',
+                    'UNMATCHED' => 'danger',
                     default => 'gray',
                 })->sortable(),
                 Tables\Columns\TextColumn::make('deleted_at')->dateTime()->label('Deleted At')->sortable(),
@@ -48,6 +49,7 @@ class DeletedProductCheckResource extends Resource
                         'PASS' => 'Pass',
                         'FAIL' => 'Fail',
                         'WARNING' => 'Warning',
+                        'UNMATCHED' => 'Unmatched',
                     ]),
             ])
             ->actions([

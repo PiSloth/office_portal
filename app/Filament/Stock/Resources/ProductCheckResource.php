@@ -59,6 +59,7 @@ class ProductCheckResource extends Resource
                         'PASS' => 'Pass',
                         'FAIL' => 'Fail',
                         'WARNING' => 'Warning',
+                        'UNMATCHED' => 'Unmatched',
                     ])
                     ->required(),
                 Forms\Components\Textarea::make('remark')
@@ -78,6 +79,7 @@ class ProductCheckResource extends Resource
                             'PASS' => 'success',
                             'FAIL' => 'danger',
                             'WARNING' => 'warning',
+                            'UNMATCHED' => 'danger',
                             default => 'gray',
                         }),
                     TextEntry::make('solution_status')
@@ -204,12 +206,20 @@ class ProductCheckResource extends Resource
                         'PASS' => 'success',
                         'FAIL' => 'danger',
                         'WARNING' => 'warning',
+                        'UNMATCHED' => 'danger',
                         default => 'gray',
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('checked_at')
                     ->dateTime()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('product.created_during_pickup')
+                    ->label('Created During Pickup')
+                    ->badge()
+                    ->formatStateUsing(fn(?bool $state): string => $state ? 'Yes' : '-')
+                    ->color(fn(?bool $state): string => $state ? 'success' : 'gray')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('remark')
                     ->limit(40)
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -246,22 +256,26 @@ class ProductCheckResource extends Resource
                     ->label('Scan Config')
                     ->relationship('scanConfig', 'name'),
                 Tables\Filters\SelectFilter::make('location')
-                    ->relationship('location', 'code'),
+                    ->relationship('location', 'code')
+                    ->searchable(),
                 Tables\Filters\SelectFilter::make('category')
                     ->label('Category')
                     ->relationship('product.category', 'name'),
                 Tables\Filters\SelectFilter::make('subCategory')
                     ->label('Sub-Category')
-                    ->relationship('product.subCategory', 'name'),
+                    ->relationship('product.subCategory', 'name')
+                    ->searchable(),
                 Tables\Filters\SelectFilter::make('result_status')
                     ->options([
                         'PASS' => 'Pass',
                         'FAIL' => 'Fail',
                         'WARNING' => 'Warning',
+                        'UNMATCHED' => 'Unmatched',
                     ]),
                 Tables\Filters\SelectFilter::make('checked_by')
                     ->label('Checked By')
-                    ->relationship('checkedBy', 'name'),
+                    ->relationship('checkedBy', 'name')
+                    ->searchable(),
                 Tables\Filters\SelectFilter::make('failure_state')
                     ->label('Review State')
                     ->options([
@@ -312,7 +326,7 @@ class ProductCheckResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with('checkValues')
-            ->orderByRaw("CASE result_status WHEN 'FAIL' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'PASS' THEN 2 ELSE 3 END")
+            ->orderByRaw("CASE result_status WHEN 'FAIL' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'UNMATCHED' THEN 2 WHEN 'PASS' THEN 3 ELSE 4 END")
             ->orderByDesc('checked_at');
     }
 
