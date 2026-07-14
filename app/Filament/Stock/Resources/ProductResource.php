@@ -252,6 +252,27 @@ class ProductResource extends Resource
                     ->relationship('productType', 'name'),
                 Tables\Filters\SelectFilter::make('location')
                     ->relationship('location', 'code'),
+                Tables\Filters\TernaryFilter::make('is_checked')
+                    ->label('Check Status (Latest Session)')
+                    ->placeholder('All Products')
+                    ->trueLabel('Checked')
+                    ->falseLabel('Not Checked')
+                    ->queries(
+                        true: function ($query) {
+                            $latestSessionId = \App\Models\CheckSession::latest('started_at')->first()?->id;
+                            if ($latestSessionId) {
+                                return $query->whereHas('productChecks', fn ($q) => $q->where('check_session_id', $latestSessionId));
+                            }
+                            return $query->whereHas('productChecks');
+                        },
+                        false: function ($query) {
+                            $latestSessionId = \App\Models\CheckSession::latest('started_at')->first()?->id;
+                            if ($latestSessionId) {
+                                return $query->whereDoesntHave('productChecks', fn ($q) => $q->where('check_session_id', $latestSessionId));
+                            }
+                            return $query->whereDoesntHave('productChecks');
+                        },
+                    ),
             ])
             ->recordActions([
                 Actions\EditAction::make(),

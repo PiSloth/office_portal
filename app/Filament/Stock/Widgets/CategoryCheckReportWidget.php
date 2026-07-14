@@ -25,7 +25,8 @@ class CategoryCheckReportWidget extends TableWidget
                 $subQuery = Product::query()
                     ->select('products.category_id', 'products.sub_category_id')
                     ->selectRaw("CONCAT(coalesce(products.category_id, 0), '-', coalesce(products.sub_category_id, 0)) as id")
-                    ->selectRaw('count(distinct products.id) as total_imported');
+                    ->selectRaw('count(distinct case when products.created_during_pickup = 0 or products.created_during_pickup is null then products.id end) as total_imported')
+                    ->selectRaw('count(distinct case when products.created_during_pickup = 1 then products.id end) as total_created_during_pickup');
 
                 if ($sessionId) {
                     $subQuery->selectRaw('count(distinct product_checks.product_id) as total_checked')
@@ -60,6 +61,9 @@ class CategoryCheckReportWidget extends TableWidget
                     ->searchable(),
                 TextColumn::make('total_imported')
                     ->label('Imported Products')
+                    ->alignEnd(),
+                TextColumn::make('total_created_during_pickup')
+                    ->label('Created During Pickup')
                     ->alignEnd(),
                 TextColumn::make('total_checked')
                     ->label('Checked Products')
