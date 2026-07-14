@@ -65,7 +65,8 @@
     }
 }" x-init="init()"
     x-effect="document.body.style.overflow = (showMatchedModal || showScannerModal || showCreateLocationModal || showCreateProductModal || showRemarkModal) ? 'hidden' : ''"
-    @check-saved.window="startCountdown()">
+    @check-saved.window="startCountdown()"
+    @keydown.window.space="if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && !showMatchedModal && !showScannerModal && !showCreateLocationModal && !showCreateProductModal && !showRemarkModal) { $event.preventDefault(); $refs.scanCodeInput.focus(); }">
     <style>
         [x-cloak] {
             display: none !important;
@@ -276,7 +277,7 @@
                             </button>
 
                             <!-- Barcode Input field -->
-                            <input wire:model.defer="scanCode" wire:keydown.enter="processScannedCode" type="text"
+                            <input x-ref="scanCodeInput" wire:model.defer="scanCode" wire:keydown.enter="processScannedCode" type="text"
                                 class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white pl-14 pr-14 py-3 text-base"
                                 placeholder="Scan or type a code, then press enter">
 
