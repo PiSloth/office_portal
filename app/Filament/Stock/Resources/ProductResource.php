@@ -252,6 +252,13 @@ class ProductResource extends Resource
                     ->relationship('productType', 'name'),
                 Tables\Filters\SelectFilter::make('location')
                     ->relationship('location', 'code'),
+                Tables\Filters\SelectFilter::make('category')
+                    ->label('Category')
+                    ->relationship('category', 'name'),
+                Tables\Filters\SelectFilter::make('subCategory')
+                    ->label('Sub-Category')
+                    ->relationship('subCategory', 'name')
+                    ->searchable(),
                 Tables\Filters\TernaryFilter::make('is_checked')
                     ->label('Check Status (Latest Session)')
                     ->placeholder('All Products')
