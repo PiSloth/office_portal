@@ -74,6 +74,7 @@ class CategoryCheckReportWidget extends TableWidget
                 Tables\Filters\SelectFilter::make('checked_by')
                     ->label('Checked By')
                     ->options(\App\Models\User::pluck('name', 'id'))
+                    ->searchable()
                     ->query(fn (\Illuminate\Database\Eloquent\Builder $query) => $query),
                 Tables\Filters\SelectFilter::make('progress_status')
                     ->label('Progress Status')
