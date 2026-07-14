@@ -129,7 +129,11 @@ class ProductResource extends Resource
                                 'date' => Forms\Components\DatePicker::make($field->field_name),
                                 'textarea' => Forms\Components\Textarea::make($field->field_name),
                                 'select' => Forms\Components\TextInput::make($field->field_name), // simple input or select
-                                'boolean' => Forms\Components\Toggle::make($field->field_name),
+                                'boolean' => Forms\Components\Select::make($field->field_name)
+                                    ->options([
+                                        '1' => 'Yes',
+                                        '0' => 'No',
+                                    ]),
                                 default => Forms\Components\TextInput::make($field->field_name),
                             };
 

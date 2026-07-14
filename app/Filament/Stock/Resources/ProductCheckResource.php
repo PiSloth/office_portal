@@ -439,7 +439,11 @@ class ProductCheckResource extends Resource
                                         'date' => Forms\Components\DatePicker::make('dynamic_attributes.' . $field->field_name),
                                         'textarea' => Forms\Components\Textarea::make('dynamic_attributes.' . $field->field_name),
                                         'select' => Forms\Components\TextInput::make('dynamic_attributes.' . $field->field_name),
-                                        'boolean' => Forms\Components\Toggle::make('dynamic_attributes.' . $field->field_name),
+                                        'boolean' => Forms\Components\Select::make('dynamic_attributes.' . $field->field_name)
+                                            ->options([
+                                                '1' => 'Yes',
+                                                '0' => 'No',
+                                            ]),
                                         default => Forms\Components\TextInput::make('dynamic_attributes.' . $field->field_name),
                                     };
 
