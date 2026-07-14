@@ -298,7 +298,8 @@ class ProductCheckResource extends Resource
                 Tables\Filters\SelectFilter::make('checked_by')
                     ->label('Checked By')
                     ->relationship('checkedBy', 'name')
-                    ->searchable(),
+                    ->searchable()
+                    ->default(fn () => auth()->id()),
                 Tables\Filters\SelectFilter::make('failure_state')
                     ->label('Review State')
                     ->options([
