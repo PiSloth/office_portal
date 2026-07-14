@@ -22,6 +22,9 @@
     activePrefix: localStorage.getItem('scannerActivePrefix') || '',
     newPrefix: '',
     showPrefixMenu: false,
+    isInputFocused: false,
+    scannedInputText: '',
+    mirrorWidth: 0,
     init() {
         this.$watch('showScannerModal', value => {
             window.dispatchEvent(new CustomEvent(value ? 'mobile-scanner-start' : 'mobile-scanner-stop'));
@@ -71,6 +74,15 @@
         this.$watch(() => JSON.stringify(this.visibleColumns), (val) => {
             try { localStorage.setItem('scannerVisibleColumns', val); } catch (e) {}
         });
+
+        // watch input text to calculate cursor/mirror width dynamically
+        this.$watch('scannedInputText', () => {
+            this.$nextTick(() => {
+                if (this.$refs.textMirror) {
+                    this.mirrorWidth = this.$refs.textMirror.offsetWidth;
+                }
+            });
+        });
     },
     startCountdown() {
         this.countdown = this.delaySeconds;
@@ -106,6 +118,18 @@
         this.activePrefix = this.activePrefix === prefix ? '' : prefix;
         localStorage.setItem('scannerActivePrefix', this.activePrefix);
     },
+    addPrefixFromInput() {
+        const val = this.$refs.scanCodeInput.value.trim();
+        if (val && this.prefixes.length < 10 && !this.prefixes.includes(val)) {
+            this.prefixes.push(val);
+            localStorage.setItem('scannerPrefixes', JSON.stringify(this.prefixes));
+            this.activePrefix = val;
+            localStorage.setItem('scannerActivePrefix', val);
+            this.$refs.scanCodeInput.value = '';
+            this.scannedInputText = '';
+            this.mirrorWidth = 0;
+        }
+    },
     submitScan() {
         let code = this.$refs.scanCodeInput.value.trim();
         if (code !== '') {
@@ -115,6 +139,8 @@
             @this.set('scanCode', code);
             @this.processScannedCode();
             this.$refs.scanCodeInput.value = '';
+            this.scannedInputText = '';
+            this.mirrorWidth = 0;
         }
     }
 }" x-init="init()"
@@ -316,8 +342,9 @@
                     <div>
                         <div class="mb-2">
                             <div class="flex items-center justify-between">
-                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Scanned code</label>
-                                
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Scanned
+                                    code</label>
+
                                 <!-- Prefix Selector Droplet and Dropdown -->
                                 <div class="relative flex items-center gap-2" @click.outside="showPrefixMenu = false">
                                     <!-- Waterdrop Button -->
@@ -330,17 +357,22 @@
                                     <!-- Dropdown Panel (for adding/removing prefixes) -->
                                     <div x-cloak x-show="showPrefixMenu" x-transition
                                         class="absolute right-0 top-8 z-50 w-64 origin-top-right rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-gray-700">
-                                        <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Manage Prefixes (Max 10)</p>
-                                        
+                                        <p
+                                            class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                            Manage Prefixes (Max 10)</p>
+
                                         <!-- Input with Inline Send Icon -->
                                         <div class="relative mb-3">
-                                            <input type="text" x-model="newPrefix" @keydown.enter.prevent="addPrefix()"
+                                            <input type="text" x-model="newPrefix"
+                                                @keydown.enter.prevent="addPrefix()"
                                                 class="w-full rounded-xl border-gray-300 pr-10 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                                                 placeholder="Add new prefix...">
                                             <button type="button" @click="addPrefix()"
                                                 class="absolute right-2 top-1.5 bottom-1.5 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400">
-                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                                                 </svg>
                                             </button>
                                         </div>
@@ -348,17 +380,24 @@
                                         <!-- Saved Prefix List (Delete action) -->
                                         <div class="space-y-1 max-h-40 overflow-y-auto">
                                             <template x-for="p in prefixes" :key="p">
-                                                <div class="flex items-center justify-between rounded-xl px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300" x-text="p"></span>
-                                                    <button type="button" @click="removePrefix(p)" class="text-gray-400 hover:text-red-500 p-1">
-                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                <div
+                                                    class="flex items-center justify-between rounded-xl px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                        x-text="p"></span>
+                                                    <button type="button" @click="removePrefix(p)"
+                                                        class="text-gray-400 hover:text-red-500 p-1">
+                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                                            stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                         </svg>
                                                     </button>
                                                 </div>
                                             </template>
                                             <template x-if="prefixes.length === 0">
-                                                <p class="text-xs text-gray-400 text-center py-2">No prefixes saved yet.</p>
+                                                <p class="text-xs text-gray-400 text-center py-2">No prefixes saved
+                                                    yet.</p>
                                             </template>
                                         </div>
                                     </div>
@@ -370,9 +409,9 @@
                                 <template x-for="p in prefixes" :key="p">
                                     <button type="button" @click="setActivePrefix(p)"
                                         class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border transition shadow-sm"
-                                        :class="activePrefix === p 
-                                            ? 'bg-amber-500 text-white border-amber-600 dark:bg-amber-600 dark:border-amber-700 font-bold' 
-                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-gray-800 dark:text-slate-300 dark:border-gray-700 dark:hover:bg-gray-700/50'">
+                                        :class="activePrefix === p ?
+                                            'bg-amber-500 text-white border-amber-600 dark:bg-amber-600 dark:border-amber-700 font-bold' :
+                                            'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-gray-800 dark:text-slate-300 dark:border-gray-700 dark:hover:bg-gray-700/50'">
                                         <span x-text="p"></span>
                                     </button>
                                 </template>
@@ -392,8 +431,10 @@
                             </button>
 
                             <!-- Barcode Input field -->
-                            <input x-ref="scanCodeInput" @keydown.enter.prevent="submitScan()" type="text"
-                                class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white pl-14 pr-14 py-3 text-base"
+                            <input x-ref="scanCodeInput" @keydown.enter.prevent="submitScan()"
+                                @focus="isInputFocused = true" @blur="setTimeout(() => isInputFocused = false, 200)"
+                                @input="scannedInputText = $event.target.value" type="text"
+                                class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white pl-14 pr-14 py-3 text-base font-mono"
                                 placeholder="Scan or type a code, then press enter">
 
                             <!-- Rocket Button on Right -->
@@ -403,48 +444,76 @@
                                 <span class="text-base leading-none">🚀</span>
                             </button>
                         </div>
+
+                        <!-- Mirror Span and Floating Droplet Button (Moved outside to prevent height stretching) -->
+                        <div class="relative w-full h-8 overflow-visible"
+                            x-show="isInputFocused && scannedInputText.trim() !== ''">
+                            <!-- Font matching the input field to measure width accurately -->
+                            <span x-ref="textMirror"
+                                class="invisible absolute text-base font-mono pl-14 whitespace-pre"
+                                x-text="scannedInputText"></span>
+
+                            <!-- Floating Droplet Button (pointed corner top-left, rotated to point straight UP) -->
+                             <button type="button" @mousedown.prevent.stop="addPrefixFromInput()"
+                                 class="absolute -top-1.5 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-md transition-all duration-150 rounded-[0%_50%_50%_50%] rotate-45 w-7 h-7 z-10 hover:scale-110"
+                                 :style="`left: ${mirrorWidth + 2}px;`" title="new prefix">
+                                 <span class="-rotate-45 font-bold text-sm select-none">+</span>
+                             </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Color Legend -->
-            <div class="flex flex-wrap items-center gap-4 bg-white px-4 py-3 rounded-2xl shadow-sm border border-gray-100 text-xs dark:bg-gray-900 dark:border-gray-800">
+            <div
+                class="flex flex-wrap items-center gap-4 bg-white px-4 py-3 rounded-2xl shadow-sm border border-gray-100 text-xs dark:bg-gray-900 dark:border-gray-800">
                 <span class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Legend:</span>
                 <div class="flex items-center gap-2">
-                    <span class="w-4 h-4 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-800 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Pass (Matches system expectations)</span>
+                    <span
+                        class="w-4 h-4 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-800 shrink-0"></span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Pass (Matches system
+                        expectations)</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="w-4 h-4 rounded-md bg-rose-50 border border-rose-200 text-rose-800 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Fail (Mismatch / tolerance exceeded)</span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Fail (Mismatch / tolerance
+                        exceeded)</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="w-4 h-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Pending (Awaiting scan / verification)</span>
+                    <span
+                        class="w-4 h-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800 shrink-0"></span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Pending (Awaiting scan /
+                        verification)</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="w-4 h-4 rounded-md bg-violet-50 border border-violet-200 text-violet-800 dark:bg-violet-950/20 dark:border-violet-900/40 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Unmatched (Barcode not found in master data)</span>
+                    <span
+                        class="w-4 h-4 rounded-md bg-violet-50 border border-violet-200 text-violet-800 dark:bg-violet-950/20 dark:border-violet-900/40 shrink-0"></span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Unmatched (Barcode not found in master
+                        data)</span>
                 </div>
             </div>
 
             <!-- Location Scan Stats -->
-            <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+            <div
+                class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Current Location:</span>
-                    <span class="px-2.5 py-1 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
+                    <span
+                        class="px-2.5 py-1 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
                         {{ $selectedLocationName }}
                     </span>
                 </div>
                 <div class="flex items-center gap-6">
                     <div class="flex items-center gap-1.5 text-sm">
                         <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Products:</span>
-                        <strong class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedCount }}</strong>
+                        <strong
+                            class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedCount }}</strong>
                     </div>
                     <div class="w-px h-4 bg-slate-200 dark:bg-slate-800"></div>
                     <div class="flex items-center gap-1.5 text-sm">
                         <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Quantity:</span>
-                        <strong class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedQty }}</strong>
+                        <strong
+                            class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedQty }}</strong>
                     </div>
                 </div>
             </div>
@@ -489,10 +558,14 @@
                                         @php
                                             $status = strtoupper($check->result_status ?? '');
                                             $rowBgClass = match ($status) {
-                                                'PENDING' => 'bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-300 border-amber-100',
-                                                'PASS' => 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300 border-emerald-100',
-                                                'FAIL' => 'bg-rose-50 text-rose-800 dark:bg-rose-950/20 dark:text-rose-300 border-rose-100',
-                                                'UNMATCHED' => 'bg-violet-50 text-violet-800 dark:bg-violet-950/20 dark:text-violet-300 border-violet-100',
+                                                'PENDING'
+                                                    => 'bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-300 border-amber-100',
+                                                'PASS'
+                                                    => 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300 border-emerald-100',
+                                                'FAIL'
+                                                    => 'bg-rose-50 text-rose-800 dark:bg-rose-950/20 dark:text-rose-300 border-rose-100',
+                                                'UNMATCHED'
+                                                    => 'bg-violet-50 text-violet-800 dark:bg-violet-950/20 dark:text-violet-300 border-violet-100',
                                                 default => 'text-gray-900 dark:text-white',
                                             };
                                             $barCodeTextClass = 'font-semibold';
@@ -642,40 +715,43 @@
                                                                     : '---');
 
                                                         // Calculate match status on the fly if not evaluated yet, but only if it's supposed to be compared
-                                                        $showIcon = false;
-                                                        $isMatch = true;
-                                                        if ($isCompare) {
-                                                            $showIcon = true;
-                                                            if ($fieldStatus !== null) {
-                                                                $isMatch = $fieldStatus === 'PASS';
-                                                            } else {
-                                                                $expectedStr = trim((string) $productVal);
-                                                                $actualStr = trim((string) $displayVal);
-                                                                $tolerance = $scf['tolerance'] ?? null;
-                                                                if (
-                                                                    is_numeric($expectedStr) &&
-                                                                    is_numeric($actualStr)
-                                                                ) {
-                                                                    $diff = (float) $actualStr - (float) $expectedStr;
-                                                                    if ($tolerance !== null) {
-                                                                        $isMatch = abs($diff) <= (float) $tolerance;
-                                                                    } else {
-                                                                        $isMatch = abs($diff) <= 0.00001;
-                                                                    }
-                                                                } else {
-                                                                    $isMatch =
-                                                                        strcasecmp($actualStr, $expectedStr) === 0;
-                                                                }
-                                                            }
-                                                        } elseif ($fieldStatus === 'FAIL') {
+$showIcon = false;
+$isMatch = true;
+if ($isCompare) {
+    $showIcon = true;
+    if ($fieldStatus !== null) {
+        $isMatch = $fieldStatus === 'PASS';
+    } else {
+        $expectedStr = trim((string) $productVal);
+        $actualStr = trim((string) $displayVal);
+        $tolerance = $scf['tolerance'] ?? null;
+        if (
+            is_numeric($expectedStr) &&
+            is_numeric($actualStr)
+        ) {
+            $diff = (float) $actualStr - (float) $expectedStr;
+            if ($tolerance !== null) {
+                $isMatch = abs($diff) <= (float) $tolerance;
+            } else {
+                $isMatch = abs($diff) <= 0.00001;
+            }
+        } else {
+            $isMatch =
+                strcasecmp($actualStr, $expectedStr) === 0;
+        }
+    }
+} elseif ($fieldStatus === 'FAIL') {
                                                             $showIcon = true;
                                                             $isMatch = false;
                                                         }
                                                     @endphp
-                                            <div class="flex flex-col items-start gap-1">
+                                                    <div class="flex flex-col items-start gap-1">
                                                         <div class="flex items-center gap-2">
                                                             @if ($isEditable)
-                                                                <div class="flex items-center gap-1.5" wire:key="inline-edit-{{ $check->id }}-{{ $field['field_name'] }}" x-data="{ editing: false, val: '{{ addslashes($actualVal ?? '') }}' }" x-effect="val = '{{ addslashes($actualVal ?? '') }}'">
+                                                                <div class="flex items-center gap-1.5"
+                                                                    wire:key="inline-edit-{{ $check->id }}-{{ $field['field_name'] }}"
+                                                                    x-data="{ editing: false, val: '{{ addslashes($actualVal ?? '') }}' }"
+                                                                    x-effect="val = '{{ addslashes($actualVal ?? '') }}'">
                                                                     <div x-show="!editing" @click="editing = true"
                                                                         class="cursor-pointer border-b border-dashed border-gray-400 font-semibold hover:text-amber-600 transition">
                                                                         @if (($field['field_type'] ?? '') === 'boolean')
@@ -689,7 +765,7 @@
                                                                                 {{ $productVal === '1' || $productVal === 1 ? 'Yes' : ($productVal === '0' || $productVal === 0 ? 'No' : '---') }}
                                                                             @endif
                                                                         @else
-                                                                            {{ ($actualVal !== '' && $actualVal !== null) ? $actualVal : ($productVal ?: '---') }}
+                                                                            {{ $actualVal !== '' && $actualVal !== null ? $actualVal : ($productVal ?: '---') }}
                                                                         @endif
                                                                     </div>
                                                                     @php
@@ -709,7 +785,8 @@
                                                                                     : null);
                                                                     @endphp
                                                                     @if (($field['field_type'] ?? '') === 'boolean')
-                                                                        <select x-cloak x-show="editing" x-model="val"
+                                                                        <select x-cloak x-show="editing"
+                                                                            x-model="val"
                                                                             @change="editing = false; $wire.updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', val);"
                                                                             @click.outside="editing = false;"
                                                                             class="w-24 rounded border-gray-300 py-1 text-sm focus:border-amber-500 focus:ring-amber-500 dark:bg-gray-800 dark:border-gray-700">
@@ -759,8 +836,12 @@
                                                                 wire:click="updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', '{{ addslashes($productVal) }}')"
                                                                 class="mt-1 inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-200 transition shrink-0"
                                                                 title="Quick copy expected value">
-                                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                <svg class="w-3.5 h-3.5" fill="none"
+                                                                    viewBox="0 0 24 24" stroke="currentColor"
+                                                                    stroke-width="2.5">
+                                                                    <path stroke-linecap="round"
+                                                                        stroke-linejoin="round"
+                                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                                 </svg>
                                                                 Quick Check
                                                             </button>
@@ -1138,8 +1219,7 @@
                                                     class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                                                     <span
                                                         class="block text-xs uppercase tracking-[0.25em] text-gray-400">Expected</span>
-                                                    <span
-                                                        class="mt-1 block break-words">
+                                                    <span class="mt-1 block break-words">
                                                         @if (($fieldConfig['field_type'] ?? '') === 'boolean')
                                                             {{ $expectedValue === '1' || $expectedValue === 1 ? 'Yes' : ($expectedValue === '0' || $expectedValue === 0 ? 'No' : 'N/A') }}
                                                         @else
@@ -1148,19 +1228,26 @@
                                                     </span>
                                                 </div>
                                                 <div>
-                                                     <div class="flex items-center justify-between mb-2">
-                                                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Actual</label>
-                                                         @if (filter_var($fieldConfig['is_quickcheck'] ?? false, FILTER_VALIDATE_BOOLEAN) && blank(data_get($actualValues, $fieldName)))
-                                                             <button type="button" wire:click="quickCheck('{{ $fieldName }}')"
-                                                                 class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition"
-                                                                 title="Quick copy expected value">
-                                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                 </svg>
-                                                                 Quick Check
-                                                             </button>
-                                                         @endif
-                                                     </div>
+                                                    <div class="flex items-center justify-between mb-2">
+                                                        <label
+                                                            class="text-sm font-medium text-gray-700 dark:text-gray-300">Actual</label>
+                                                        @if (filter_var($fieldConfig['is_quickcheck'] ?? false, FILTER_VALIDATE_BOOLEAN) &&
+                                                                blank(data_get($actualValues, $fieldName)))
+                                                            <button type="button"
+                                                                wire:click="quickCheck('{{ $fieldName }}')"
+                                                                class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition"
+                                                                title="Quick copy expected value">
+                                                                <svg class="w-4 h-4" fill="none"
+                                                                    viewBox="0 0 24 24" stroke="currentColor"
+                                                                    stroke-width="2.5">
+                                                                    <path stroke-linecap="round"
+                                                                        stroke-linejoin="round"
+                                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                Quick Check
+                                                            </button>
+                                                        @endif
+                                                    </div>
                                                     @if (($fieldConfig['field_type'] ?? '') === 'boolean')
                                                         <select wire:model.live="actualValues.{{ $fieldName }}"
                                                             class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
