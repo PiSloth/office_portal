@@ -67,6 +67,26 @@ class CategoryCheckReportWidget extends TableWidget
                     ->options(CheckSession::pluck('name', 'id'))
                     ->default(fn() => CheckSession::latest()->first()?->id)
                     ->query(fn (\Illuminate\Database\Eloquent\Builder $query) => $query),
+                Tables\Filters\SelectFilter::make('progress_status')
+                    ->label('Progress Status')
+                    ->options([
+                        'COMPLETED' => 'Complete Check',
+                        'PROCESSING' => 'Processing Check',
+                        'NOT_STARTED' => 'No Start Check',
+                    ])
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): void {
+                        $value = $data['value'] ?? null;
+                        if (!$value) {
+                            return;
+                        }
+
+                        match ($value) {
+                            'COMPLETED' => $query->whereRaw('total_checked >= total_imported'),
+                            'PROCESSING' => $query->whereRaw('total_checked > 0 AND total_checked < total_imported'),
+                            'NOT_STARTED' => $query->whereRaw('total_checked = 0'),
+                            default => null,
+                        };
+                    }),
             ])
             ->defaultSort('category_id', 'asc');
     }
