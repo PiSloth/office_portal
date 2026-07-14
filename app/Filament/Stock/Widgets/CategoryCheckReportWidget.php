@@ -20,6 +20,7 @@ class CategoryCheckReportWidget extends TableWidget
         return $table
             ->query(function () {
                 $sessionId = $this->tableFilters['check_session']['value'] ?? null;
+                $checkedBy = $this->tableFilters['checked_by']['value'] ?? null;
 
                 $subQuery = Product::query()
                     ->select('products.category_id', 'products.sub_category_id')
@@ -28,10 +29,13 @@ class CategoryCheckReportWidget extends TableWidget
 
                 if ($sessionId) {
                     $subQuery->selectRaw('count(distinct product_checks.product_id) as total_checked')
-                        ->leftJoin('product_checks', function ($join) use ($sessionId) {
+                        ->leftJoin('product_checks', function ($join) use ($sessionId, $checkedBy) {
                             $join->on('product_checks.product_id', '=', 'products.id')
                                 ->where('product_checks.check_session_id', '=', $sessionId)
                                 ->whereNull('product_checks.deleted_at');
+                            if ($checkedBy) {
+                                $join->where('product_checks.checked_by', '=', $checkedBy);
+                            }
                         });
                 } else {
                     $subQuery->selectRaw('0 as total_checked');
@@ -66,6 +70,10 @@ class CategoryCheckReportWidget extends TableWidget
                     ->label('Check Session')
                     ->options(CheckSession::pluck('name', 'id'))
                     ->default(fn() => CheckSession::latest()->first()?->id)
+                    ->query(fn (\Illuminate\Database\Eloquent\Builder $query) => $query),
+                Tables\Filters\SelectFilter::make('checked_by')
+                    ->label('Checked By')
+                    ->options(\App\Models\User::pluck('name', 'id'))
                     ->query(fn (\Illuminate\Database\Eloquent\Builder $query) => $query),
                 Tables\Filters\SelectFilter::make('progress_status')
                     ->label('Progress Status')
