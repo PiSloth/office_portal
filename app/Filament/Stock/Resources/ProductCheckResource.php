@@ -247,6 +247,12 @@ class ProductCheckResource extends Resource
                     ->relationship('scanConfig', 'name'),
                 Tables\Filters\SelectFilter::make('location')
                     ->relationship('location', 'code'),
+                Tables\Filters\SelectFilter::make('category')
+                    ->label('Category')
+                    ->relationship('product.category', 'name'),
+                Tables\Filters\SelectFilter::make('subCategory')
+                    ->label('Sub-Category')
+                    ->relationship('product.subCategory', 'name'),
                 Tables\Filters\SelectFilter::make('result_status')
                     ->options([
                         'PASS' => 'Pass',
