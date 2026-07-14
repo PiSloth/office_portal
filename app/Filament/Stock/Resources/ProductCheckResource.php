@@ -300,6 +300,18 @@ class ProductCheckResource extends Resource
                     ->relationship('checkedBy', 'name')
                     ->searchable()
                     ->default(fn () => auth()->id()),
+                Tables\Filters\TernaryFilter::make('created_during_pickup')
+                    ->label('Created During Pickup')
+                    ->placeholder('All Checks')
+                    ->trueLabel('Created During Pickup')
+                    ->falseLabel('Originally Imported')
+                    ->queries(
+                        true: fn ($query) => $query->whereHas('product', fn ($q) => $q->where('created_during_pickup', true)),
+                        false: fn ($query) => $query->where(function ($q) {
+                            $q->whereDoesntHave('product')
+                              ->orWhereHas('product', fn ($sq) => $sq->where('created_during_pickup', false));
+                        }),
+                    ),
                 Tables\Filters\SelectFilter::make('failure_state')
                     ->label('Review State')
                     ->options([
