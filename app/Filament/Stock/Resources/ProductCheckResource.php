@@ -300,7 +300,7 @@ class ProductCheckResource extends Resource
                     ->relationship('checkedBy', 'name')
                     ->searchable()
                     ->default(fn () => auth()->id()),
-                Tables\Filters\TernaryFilter::make('created_during_pickup')
+                 Tables\Filters\TernaryFilter::make('created_during_pickup')
                     ->label('Created During Pickup')
                     ->placeholder('All Checks')
                     ->trueLabel('Created During Pickup')
@@ -310,6 +310,18 @@ class ProductCheckResource extends Resource
                         false: fn ($query) => $query->where(function ($q) {
                             $q->whereDoesntHave('product')
                               ->orWhereHas('product', fn ($sq) => $sq->where('created_during_pickup', false));
+                        }),
+                    ),
+                Tables\Filters\TernaryFilter::make('unmatched_pending_creation')
+                    ->label('Unmatched (Pending Creation)')
+                    ->placeholder('All Checks')
+                    ->trueLabel('Pending Creation')
+                    ->falseLabel('Linked / Matched')
+                    ->queries(
+                        true: fn ($query) => $query->where('result_status', 'UNMATCHED')->whereNull('product_id'),
+                        false: fn ($query) => $query->where(function ($q) {
+                            $q->where('result_status', '!=', 'UNMATCHED')
+                              ->orWhereNotNull('product_id');
                         }),
                     ),
                 Tables\Filters\SelectFilter::make('failure_state')
