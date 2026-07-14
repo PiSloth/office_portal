@@ -45,6 +45,7 @@ class DecisionRuleResource extends Resource
                         'exceeds_tolerance' => 'Exceeds Tolerance',
                         'greater_than' => 'Greater Than (Actual > Expected)',
                         'less_than' => 'Less Than (Actual < Expected)',
+                        'unmatched' => 'Unmatched',
                     ]),
                 Forms\Components\Select::make('decision_type_id')
                     ->relationship('decisionType', 'name')

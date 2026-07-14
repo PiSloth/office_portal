@@ -94,6 +94,10 @@ class ProductCheck extends Model
             ->map(fn ($value) => strtolower((string) $value))
             ->values();
 
+        if ($this->result_status === 'UNMATCHED') {
+            $failedFieldNames->push('result_status');
+        }
+
         if ($failedFieldNames->isEmpty()) {
             return collect();
         }

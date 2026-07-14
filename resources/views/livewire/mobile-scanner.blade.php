@@ -23,6 +23,25 @@
             window.dispatchEvent(new CustomEvent(value ? 'mobile-scanner-start' : 'mobile-scanner-stop'));
         });
 
+        // Redirect global keystrokes/scans to the scan input
+        window.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+                return;
+            }
+            if (this.showMatchedModal || this.showScannerModal || this.showCreateLocationModal || this.showCreateProductModal || this.showRemarkModal) {
+                return;
+            }
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const input = this.$refs.scanCodeInput;
+                if (input) {
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                    }
+                    input.focus();
+                }
+            }
+        });
+
         // hydrate visible columns from localStorage
         try {
             const stored = localStorage.getItem('scannerVisibleColumns');
@@ -65,8 +84,7 @@
     }
 }" x-init="init()"
     x-effect="document.body.style.overflow = (showMatchedModal || showScannerModal || showCreateLocationModal || showCreateProductModal || showRemarkModal) ? 'hidden' : ''"
-    @check-saved.window="startCountdown()"
-    @keydown.window.space="if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && !showMatchedModal && !showScannerModal && !showCreateLocationModal && !showCreateProductModal && !showRemarkModal) { $event.preventDefault(); $refs.scanCodeInput.focus(); }">
+    @check-saved.window="startCountdown()">
     <style>
         [x-cloak] {
             display: none !important;

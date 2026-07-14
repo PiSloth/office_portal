@@ -42,6 +42,8 @@ class CategoryCheckReportWidget extends TableWidget
                 $modelInstance = new Product();
                 $modelInstance->setTable('grouped_products');
                 $modelInstance->setKeyName('id');
+                $modelInstance->incrementing = false;
+                $modelInstance->keyType = 'string';
 
                 return $modelInstance->newQuery()
                     ->fromSub($subQuery, 'grouped_products')
