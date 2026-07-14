@@ -207,6 +207,7 @@ class MobileScanner extends Component
                 $newCheck->update(['result_status' => $this->resolveCheckStatus($newCheck, $autoStatus)]);
             } else {
                 $newCheck->update(['result_status' => 'UNMATCHED']);
+                event(new \App\Events\ProductChecked($newCheck));
             }
 
             if ($this->scanConfigId && collect($this->scanConfigFields)->contains('field', 'quantity')) {
@@ -350,12 +351,11 @@ class MobileScanner extends Component
         if ($this->activeCheckId) {
             $check = ProductCheck::find($this->activeCheckId);
             if ($check) {
-                $autoStatus = $this->getAutoStatusForProduct($product);
-
                 $check->update([
                     'product_id' => $product->id,
-                    'result_status' => $autoStatus,
+                    'result_status' => 'UNMATCHED',
                 ]);
+                $this->runFullValidation($check);
             }
         }
 
@@ -607,6 +607,10 @@ class MobileScanner extends Component
             return 'UNMATCHED';
         }
 
+        if ($check->product->created_during_pickup) {
+            return 'UNMATCHED';
+        }
+
         if ($baseStatus === 'FAIL') {
             return 'FAIL';
         }
@@ -640,17 +644,30 @@ class MobileScanner extends Component
                 $fName = $fieldConfig['field'] ?? null;
                 if (! $fName || ($fieldConfig['source'] ?? 'product') !== 'product') continue;
                 
-                if (!data_get($fieldConfig, 'compare', false)) {
-                    $actualValues[$fName] = match ($fName) {
-                        'location_id', 'category_id', 'sub_category_id' => $check->product->{$fName},
-                        'code', 'barcode', 'qr_code', 'name', 'description', 'status', 'quantity' => $check->product->{$fName},
-                        default => $check->product->attributeValues->firstWhere('field_name', $fName)?->value,
-                    };
-                } else {
+                if ($check->product->created_during_pickup) {
                     if ($fName === 'quantity') {
                         $actualValues[$fName] = $check->quantity;
                     } else {
-                        $actualValues[$fName] = null;
+                        $expectedVal = match ($fName) {
+                            'location_id', 'category_id', 'sub_category_id' => $check->product->{$fName},
+                            'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $check->product->{$fName},
+                            default => $check->product->attributeValues->firstWhere('field_name', $fName)?->value,
+                        };
+                        $actualValues[$fName] = $expectedVal;
+                    }
+                } else {
+                    if (!data_get($fieldConfig, 'compare', false)) {
+                        $actualValues[$fName] = match ($fName) {
+                            'location_id', 'category_id', 'sub_category_id' => $check->product->{$fName},
+                            'code', 'barcode', 'qr_code', 'name', 'description', 'status', 'quantity' => $check->product->{$fName},
+                            default => $check->product->attributeValues->firstWhere('field_name', $fName)?->value,
+                        };
+                    } else {
+                        if ($fName === 'quantity') {
+                            $actualValues[$fName] = $check->quantity;
+                        } else {
+                            $actualValues[$fName] = null;
+                        }
                     }
                 }
             }
@@ -664,6 +681,24 @@ class MobileScanner extends Component
             
             foreach ($inlineOverrides as $k => $v) {
                 $actualValues[$k] = $v;
+            }
+
+            // Sync updated values to Product if product was created during pickup
+            if ($check->product->created_during_pickup) {
+                if (isset($actualValues['quantity'])) {
+                    $check->quantity = (int) $actualValues['quantity'];
+                    $check->save();
+                }
+                foreach ($actualValues as $fieldName => $value) {
+                    if (in_array($fieldName, ['code', 'barcode', 'qr_code', 'name', 'status', 'quantity', 'location_id', 'category_id', 'sub_category_id'])) {
+                        $check->product->update([$fieldName => $value]);
+                    } else {
+                        \App\Models\ProductAttributeValue::updateOrCreate(
+                            ['product_id' => $check->product_id, 'field_name' => $fieldName],
+                            ['value' => $value]
+                        );
+                    }
+                }
             }
             
             $validation = app(ValidationEngine::class)->validate($scanConfig, $check->product, $actualValues);
@@ -734,12 +769,25 @@ class MobileScanner extends Component
             return $item->location ? $item->location->name : 'Unknown Location';
         });
 
+        $selectedLocation = Location::find($this->selectedLocationId);
+        $locationScannedCount = ProductCheck::where('check_session_id', $this->checkSessionId)
+            ->where('checked_by', auth()->id())
+            ->where('location_id', $this->selectedLocationId)
+            ->count();
+        $locationScannedQty = (int) ProductCheck::where('check_session_id', $this->checkSessionId)
+            ->where('checked_by', auth()->id())
+            ->where('location_id', $this->selectedLocationId)
+            ->sum('quantity');
+
         return view('livewire.mobile-scanner', [
             'sessions' => CheckSession::latest('started_at')->get(),
             'locations' => Location::orderBy('name')->get(),
             'productTypes' => ProductType::where('is_active', true)->orderBy('name')->get(),
             'decisionTypes' => DecisionType::where('is_active', true)->orderBy('name')->get(),
             'recentChecksGrouped' => $recentChecksGrouped,
+            'selectedLocationName' => $selectedLocation?->name ?? 'None',
+            'locationScannedCount' => $locationScannedCount,
+            'locationScannedQty' => $locationScannedQty,
             'scanConfigs' => $this->productTypeId
                 ? ScanConfig::where('product_type_id', $this->productTypeId)->where('is_active', true)->orderBy('name')->get()
                 : collect(),

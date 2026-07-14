@@ -36,9 +36,13 @@ class DecisionWorkflowService
             $matchingRule = $rules->firstWhere('id', $openDecision->decision_rule_id);
             if ($matchingRule) {
                 $fieldName = $matchingRule->criteria_field;
-                $stillFailing = $failedValues->contains(function ($val) use ($fieldName) {
-                    return strtolower($val->field_name) === strtolower($fieldName);
-                });
+                if (strtolower($fieldName) === 'result_status') {
+                    $stillFailing = ($productCheck->result_status === 'UNMATCHED');
+                } else {
+                    $stillFailing = $failedValues->contains(function ($val) use ($fieldName) {
+                        return strtolower($val->field_name) === strtolower($fieldName);
+                    });
+                }
 
                 if ($productCheck->result_status === 'PASS' || !$stillFailing) {
                     $openDecision->update(['action_status' => 'DONE']);
@@ -59,6 +63,58 @@ class DecisionWorkflowService
                         'comment_type' => 'LOG',
                         'comment' => 'Resolved automatically: check value corrected to match expected value.',
                     ]);
+                }
+            }
+        }
+
+        // Process unmatched product rules
+        if ($productCheck->result_status === 'UNMATCHED') {
+            foreach ($rules as $rule) {
+                $isUnmatchedRule = strtolower($rule->criteria_field) === 'result_status' && strtolower($rule->criteria_condition) === 'unmatched';
+                if ($isUnmatchedRule) {
+                    $existingOpenDecision = Decision::where('product_check_id', $productCheck->id)
+                        ->where('decision_rule_id', $rule->id)
+                        ->where('action_status', 'OPEN')
+                        ->first();
+
+                    if (!$existingOpenDecision) {
+                        $remark = "System automatically created decision based on rule: '{$rule->name}' due to unmatched product during scan. Unmatched code: '{$productCheck->barcode}'.";
+                        
+                        $decision = Decision::create([
+                            'product_check_id' => $productCheck->id,
+                            'decision_type_id' => $rule->decision_type_id,
+                            'decision_rule_id' => $rule->id,
+                            'action_status' => 'OPEN',
+                            'assigned_to' => null,
+                            'decision_by' => $productCheck->checked_by,
+                            'remark' => $remark,
+                        ]);
+
+                        DecisionHistory::create([
+                            'decision_id' => $decision->id,
+                            'old_status' => 'NONE',
+                            'new_status' => 'OPEN',
+                            'changed_by' => $productCheck->checked_by,
+                            'remark' => 'Automatic rule trigger.',
+                        ]);
+
+                        Comment::create([
+                            'decision_id' => $decision->id,
+                            'user_id' => $productCheck->checked_by,
+                            'comment_type' => 'LOG',
+                            'comment' => $remark,
+                        ]);
+
+                        foreach ($productCheck->attachments as $attachment) {
+                            $decision->attachments()->create([
+                                'file_path' => $attachment->file_path,
+                                'file_name' => $attachment->file_name,
+                                'file_type' => $attachment->file_type,
+                                'file_size' => $attachment->file_size,
+                                'uploaded_by' => $attachment->uploaded_by,
+                            ]);
+                        }
+                    }
                 }
             }
         }

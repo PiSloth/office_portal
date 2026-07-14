@@ -203,13 +203,33 @@ class ProductCheckResource extends Resource
                     ->label('Checked By')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('result_status')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'PASS' => 'success',
-                        'FAIL' => 'danger',
-                        'WARNING' => 'warning',
-                        'UNMATCHED' => 'danger',
-                        default => 'gray',
+                    ->html()
+                    ->state(function (ProductCheck $record): string {
+                        $status = $record->result_status;
+                        
+                        $colorClass = match ($status) {
+                            'PASS' => 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 dark:bg-emerald-500/20 ring-emerald-600/10 dark:ring-emerald-500/20',
+                            'FAIL' => 'bg-rose-500/10 text-rose-700 dark:text-rose-400 dark:bg-rose-500/20 ring-rose-600/10 dark:ring-rose-500/20',
+                            'WARNING' => 'bg-amber-500/10 text-amber-700 dark:text-amber-400 dark:bg-amber-500/20 ring-amber-600/10 dark:ring-amber-500/20',
+                            'UNMATCHED' => 'bg-rose-500/10 text-rose-700 dark:text-rose-400 dark:bg-rose-500/20 ring-rose-600/10 dark:ring-rose-500/20',
+                            default => 'bg-gray-500/10 text-gray-700 dark:text-gray-400 dark:bg-gray-500/20 ring-gray-600/10 dark:ring-gray-500/20',
+                        };
+                        
+                        $statusLabel = match ($status) {
+                            'PASS' => 'Pass',
+                            'FAIL' => 'Fail',
+                            'WARNING' => 'Warning',
+                            'UNMATCHED' => 'Unmatched',
+                            default => $status,
+                        };
+                        
+                        $badges = "<span class='inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset {$colorClass}'>{$statusLabel}</span>";
+                        
+                        if ($status === 'UNMATCHED' && $record->product?->created_during_pickup) {
+                            $badges .= " <span class='inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 dark:bg-emerald-500/20 ring-emerald-600/10 dark:ring-emerald-500/20 ml-1'>Created</span>";
+                        }
+                        
+                        return $badges;
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('checked_at')

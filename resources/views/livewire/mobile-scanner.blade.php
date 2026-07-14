@@ -428,6 +428,27 @@
                 </div>
             </div>
 
+            <!-- Location Scan Stats -->
+            <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Current Location:</span>
+                    <span class="px-2.5 py-1 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
+                        {{ $selectedLocationName }}
+                    </span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-1.5 text-sm">
+                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Products:</span>
+                        <strong class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedCount }}</strong>
+                    </div>
+                    <div class="w-px h-4 bg-slate-200 dark:bg-slate-800"></div>
+                    <div class="flex items-center gap-1.5 text-sm">
+                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Quantity:</span>
+                        <strong class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedQty }}</strong>
+                    </div>
+                </div>
+            </div>
+
             <!-- Checks Table Grouped by Location -->
             <div class="min-w-0 space-y-8">
                 @forelse($recentChecksGrouped as $locationName => $checks)
@@ -487,9 +508,13 @@
                                                         @if ($status === 'UNMATCHED')
                                                             <span
                                                                 class="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">Unmatched</span>
+                                                            @if ($check->product?->created_during_pickup)
+                                                                <span
+                                                                    class="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Created</span>
+                                                            @endif
                                                         @endif
                                                         <button type="button"
-                                                            @click="activeRowCheck = { id: {{ $check->id }}, barcode: '{{ $check->barcode }}', status: '{{ $status }}' }; showRowActionsModal = true"
+                                                            @click="activeRowCheck = { id: {{ $check->id }}, barcode: '{{ $check->barcode }}', status: '{{ $status }}', has_product: {{ $check->product_id ? 'true' : 'false' }} }; showRowActionsModal = true"
                                                             class="p-1 rounded-lg text-slate-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition"
                                                             title="Quick Actions">
                                                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -785,8 +810,8 @@
                                                         </svg>
                                                     </button>
 
-                                                    <!-- Create Product (If Unmatched) -->
-                                                    @if ($check->result_status === 'UNMATCHED')
+                                                    <!-- Create Product (If Unmatched and not created yet) -->
+                                                    @if ($check->result_status === 'UNMATCHED' && !$check->product_id)
                                                         <button type="button"
                                                             wire:click="openCreateProduct({{ $check->id }})"
                                                             title="Create Product"
@@ -1253,8 +1278,8 @@
                         </div>
                     </button>
 
-                    <!-- Create Product (Conditional: only shown if Unmatched) -->
-                    <template x-if="activeRowCheck.status === 'UNMATCHED'">
+                    <!-- Create Product (Conditional: only shown if Unmatched and not created yet) -->
+                    <template x-if="activeRowCheck.status === 'UNMATCHED' && !activeRowCheck.has_product">
                         <button type="button"
                             @click="$wire.openCreateProduct(activeRowCheck.id); showRowActionsModal = false"
                             class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
