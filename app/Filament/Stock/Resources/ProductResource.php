@@ -272,23 +272,35 @@ class ProductResource extends Resource
                             $query->whereHas('productChecks', fn ($q) => $q->where('check_session_id', $sessionId));
                         }
                     }),
-                Tables\Filters\TernaryFilter::make('is_checked')
-                    ->label('Check Status (Latest Session)')
+                 Tables\Filters\TernaryFilter::make('is_checked')
+                    ->label('Check Status')
                     ->placeholder('All Products')
                     ->trueLabel('Checked')
                     ->falseLabel('Not Checked')
                     ->queries(
                         true: function ($query) {
-                            $latestSessionId = \App\Models\CheckSession::latest('started_at')->first()?->id;
-                            if ($latestSessionId) {
-                                return $query->whereHas('productChecks', fn ($q) => $q->where('check_session_id', $latestSessionId));
+                            $sessionId = request()->input('tableFilters.check_session_id.value')
+                                ?? \App\Models\CheckSession::latest('started_at')->first()?->id;
+
+                            if ($sessionId) {
+                                $session = \App\Models\CheckSession::find($sessionId);
+                                if ($session && $session->product_type_id) {
+                                    $query->where('product_type_id', $session->product_type_id);
+                                }
+                                return $query->whereHas('productChecks', fn ($q) => $q->where('check_session_id', $sessionId));
                             }
                             return $query->whereHas('productChecks');
                         },
                         false: function ($query) {
-                            $latestSessionId = \App\Models\CheckSession::latest('started_at')->first()?->id;
-                            if ($latestSessionId) {
-                                return $query->whereDoesntHave('productChecks', fn ($q) => $q->where('check_session_id', $latestSessionId));
+                            $sessionId = request()->input('tableFilters.check_session_id.value')
+                                ?? \App\Models\CheckSession::latest('started_at')->first()?->id;
+
+                            if ($sessionId) {
+                                $session = \App\Models\CheckSession::find($sessionId);
+                                if ($session && $session->product_type_id) {
+                                    $query->where('product_type_id', $session->product_type_id);
+                                }
+                                return $query->whereDoesntHave('productChecks', fn ($q) => $q->where('check_session_id', $sessionId));
                             }
                             return $query->whereDoesntHave('productChecks');
                         },
