@@ -31,7 +31,7 @@ class EditRole extends EditRecord
                         ->multiple()
                         ->searchable()
                         ->options(fn(): array => RoleResource::permittedPermissionOptions())
-                        ->default(fn(): array => $this->record->permissions()->pluck('name')->all()),
+                        ->default(fn(): array => $this->record->permissions()->pluck('id')->all()),
                 ])
                 ->action(function (Role $record, array $data): void {
                     $record->syncPermissions($data['permissions'] ?? []);

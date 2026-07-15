@@ -191,7 +191,7 @@ class UserResource extends Resource
             ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('export')
+                    Actions\BulkAction::make('export')
                         ->label('Export to Excel')
                         ->icon('heroicon-o-document-arrow-down')
                         ->action(function (\Illuminate\Support\Collection $records) {

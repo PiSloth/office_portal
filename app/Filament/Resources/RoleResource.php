@@ -135,16 +135,16 @@ class RoleResource extends Resource
         if ($user?->can('roles.assign') || $user?->can('permissions.manage')) {
             return Permission::query()
                 ->orderBy('name')
-                ->pluck('name', 'name')
+                ->pluck('name', 'id')
                 ->all();
         }
 
-        $own = $user?->getAllPermissions()->pluck('name')->all() ?? [];
+        $own = $user?->getAllPermissions()->pluck('id')->all() ?? [];
 
         return Permission::query()
-            ->whereIn('name', $own)
+            ->whereIn('id', $own)
             ->orderBy('name')
-            ->pluck('name', 'name')
+            ->pluck('name', 'id')
             ->all();
     }
 }
