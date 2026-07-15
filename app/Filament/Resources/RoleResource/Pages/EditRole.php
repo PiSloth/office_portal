@@ -12,6 +12,11 @@ class EditRole extends EditRecord
 {
     protected static string $resource = RoleResource::class;
 
+    protected function afterSave(): void
+    {
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
