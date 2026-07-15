@@ -288,7 +288,29 @@
         </div>
 
         @if ($flashMessage)
-            <div x-data="{ open: true }" x-init="setTimeout(() => open = false, 2800)" x-show="open" x-transition
+            @php
+                $isDeleteNotification = $deletedCheckIdToRestore && str_contains(strtolower($flashMessage), 'deleted');
+                $timeout = $isDeleteNotification ? 5000 : 2800;
+            @endphp
+            <div wire:key="flash-message-{{ $flashId }}" x-data="{ 
+                open: true, 
+                countdown: {{ $isDeleteNotification ? 5 : 0 }},
+                timer: null,
+                init() {
+                    if ({{ $isDeleteNotification ? 'true' : 'false' }}) {
+                        this.timer = setInterval(() => {
+                            if (this.countdown > 1) {
+                                this.countdown--;
+                            } else {
+                                this.open = false;
+                                clearInterval(this.timer);
+                            }
+                        }, 1000);
+                    } else {
+                        setTimeout(() => { this.open = false; }, 2800);
+                    }
+                }
+            }" x-show="open" x-transition
                 class="fixed left-1/2 top-6 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
                 <div
                     class="flex items-start gap-3 rounded-2xl border border-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-200 bg-white px-4 py-3 shadow-2xl dark:border-{{ $flashTone === 'success' ? 'emerald' : 'amber' }}-900/40 dark:bg-gray-900">
@@ -312,8 +334,16 @@
                         <p class="text-sm font-semibold text-gray-900 dark:text-white">
                             {{ $flashTone === 'success' ? 'Success' : 'Warning' }}</p>
                         <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{{ $flashMessage }}</p>
+                        @if ($isDeleteNotification)
+                            <div class="mt-2">
+                                <button type="button" wire:click="restoreCheck({{ $deletedCheckIdToRestore }})" @click="open = false; clearInterval(timer);"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-400 focus:outline-none transition">
+                                    Undo (<span x-text="countdown"></span>)
+                                </button>
+                            </div>
+                        @endif
                     </div>
-                    <button type="button" @click="open = false"
+                    <button type="button" @click="open = false; clearInterval(timer);"
                         class="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200">
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M6 18 18 6M6 6l12 12" stroke-linecap="round" />
@@ -323,18 +353,7 @@
             </div>
         @endif
 
-        @if ($deletedCheckIdToRestore)
-            <div
-                class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-900/30 dark:bg-amber-950/10 dark:text-amber-200">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="leading-6">Check deleted. Restore it if this was a mistake.</p>
-                    <button type="button" wire:click="restoreCheck({{ $deletedCheckIdToRestore }})"
-                        class="inline-flex items-center justify-center rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400">
-                        Restore
-                    </button>
-                </div>
-            </div>
-        @endif
+
 
         <div class="grid min-w-0 gap-6">
             <div class="space-y-6 rounded-2xl bg-white p-4 shadow-sm dark:bg-gray-900 sm:rounded-3xl sm:p-6">
@@ -579,11 +598,12 @@
                                                     <span class="font-semibold">{{ $check->barcode }}</span>
                                                     <div class="flex items-center gap-1.5">
                                                         @if ($status === 'UNMATCHED')
-                                                            <span
-                                                                class="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">Unmatched</span>
                                                             @if ($check->product?->created_during_pickup)
                                                                 <span
                                                                     class="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Created</span>
+                                                            @else
+                                                                <span
+                                                                    class="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">Unmatched</span>
                                                             @endif
                                                         @endif
                                                         <button type="button"
@@ -1000,37 +1020,124 @@ if ($isCompare) {
         <!-- Create Product Modal -->
         <div x-cloak x-show="showCreateProductModal" x-transition.opacity
             class="fixed inset-0 z-[150] flex items-end justify-center bg-slate-950/80 p-0 backdrop-blur-md sm:items-center sm:px-4 sm:py-6">
-            <div class="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-md sm:rounded-3xl sm:p-6"
+            <div class="max-h-[92dvh] w-full overflow-y-auto scrollbar-none rounded-t-3xl bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-3xl sm:rounded-3xl sm:p-6"
                 @click.outside="showCreateProductModal = false">
-                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Create Unmatched Product</h3>
-                <div class="space-y-4">
+                <div class="flex items-center justify-between mb-4 border-b border-gray-200 dark:border-gray-800 pb-3">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Create Unmatched Product</h3>
+                    <button type="button" @click="showCreateProductModal = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Code /
-                            Barcode</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Code <span class="text-rose-500">*</span></label>
                         <input wire:model="createProductCode" type="text"
-                            class="w-full rounded-xl border-amber-300 bg-amber-50 text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white font-semibold">
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                        @error('createProductCode')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product
-                            Name</label>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name <span class="text-rose-500">*</span></label>
                         <input wire:model="createProductName" type="text"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                        @error('createProductName')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product
-                            Type</label>
-                        <div
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 font-medium">
-                            {{ $productTypes->firstWhere('id', $createProductTypeId)?->name ?? 'None' }}
-                        </div>
-                        <input type="hidden" wire:model="createProductTypeId">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Type <span class="text-rose-500">*</span></label>
+                        <select wire:model.live="createProductTypeId"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="">Select Product Type</option>
+                            @foreach ($productTypes as $type)
+                                <option value="{{ $type->id }}">{{ $type->name }}</option>
+                            @endforeach
+                        </select>
                         @error('createProductTypeId')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location <span class="text-rose-500">*</span></label>
+                        <select wire:model="createProductLocationId"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="">Select Location</option>
+                            @foreach ($locations as $loc)
+                                <option value="{{ $loc->id }}">{{ $loc->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('createProductLocationId')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category <span class="text-rose-500">*</span></label>
+                        <select wire:model.live="createProductCategoryId"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="">Select Category</option>
+                            @foreach ($categoriesList as $catId => $catName)
+                                <option value="{{ $catId }}">{{ $catName }}</option>
+                            @endforeach
+                        </select>
+                        @error('createProductCategoryId')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sub-Category</label>
+                        <select wire:model="createProductSubCategoryId"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="">Select Sub-Category</option>
+                            @foreach ($subCategoriesList as $subCatId => $subCatName)
+                                <option value="{{ $subCatId }}">{{ $subCatName }}</option>
+                            @endforeach
+                        </select>
+                        @error('createProductSubCategoryId')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Barcode</label>
+                        <input wire:model="createProductBarcode" type="text"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                        @error('createProductBarcode')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">QR Code</label>
+                        <input wire:model="createProductQrCode" type="text"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                        @error('createProductQrCode')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity <span class="text-rose-500">*</span></label>
+                        <input wire:model="createProductQuantity" type="number"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                        @error('createProductQuantity')
+                            <span class="text-xs text-rose-500">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status <span class="text-rose-500">*</span></label>
+                        <select wire:model="createProductStatus"
+                            class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="ACTIVE">Active</option>
+                            <option value="SUSPENDED">Suspended</option>
+                        </select>
+                        @error('createProductStatus')
                             <span class="text-xs text-rose-500">{{ $message }}</span>
                         @enderror
                     </div>
 
                     @foreach ($createProductDynamicFields as $field)
-                        <div>
+                        <div class="{{ ($field['field_type'] ?? '') === 'textarea' ? 'md:col-span-2' : '' }}">
                             <label
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $field['field_label'] }}
                                 @if (isset($field['required']) && $field['required'])

@@ -175,6 +175,20 @@ class DecisionWorkflowService
                     }
                 }
 
+                // If condition is equals_true, verify if actual is true (1 or 'true')
+                if ($rule->criteria_condition === 'equals_true') {
+                    if ($matchedFailure->actual_value !== '1' && $matchedFailure->actual_value !== 1 && strtolower($matchedFailure->actual_value) !== 'true') {
+                        continue; // Skip, not true
+                    }
+                }
+
+                // If condition is equals_false, verify if actual is false (0 or 'false')
+                if ($rule->criteria_condition === 'equals_false') {
+                    if ($matchedFailure->actual_value !== '0' && $matchedFailure->actual_value !== 0 && strtolower($matchedFailure->actual_value) !== 'false') {
+                        continue; // Skip, not false
+                    }
+                }
+
                 // Check if a decision of this rule is already open for this product check to prevent duplicate decisions
                 $existingOpenDecision = Decision::where('product_check_id', $productCheck->id)
                     ->where('decision_rule_id', $rule->id)

@@ -42,6 +42,15 @@ class MobileScanner extends Component
     public string $createProductName = '';
     public string $createProductCode = '';
     public ?int $createProductTypeId = null;
+    public ?int $createProductLocationId = null;
+    public ?int $createProductCategoryId = null;
+    public ?int $createProductSubCategoryId = null;
+    public string $createProductBarcode = '';
+    public string $createProductQrCode = '';
+    public int $createProductQuantity = 1;
+    public string $createProductStatus = 'ACTIVE';
+    public array $categoriesList = [];
+    public array $subCategoriesList = [];
     public array $createProductDynamicFields = [];
     public array $createProductDynamicValues = [];
     
@@ -59,6 +68,7 @@ class MobileScanner extends Component
     public ?array $lastResult = null;
     public ?string $flashMessage = null;
     public ?string $flashTone = null;
+    public string $flashId = '';
     public ?string $comment = null;
     public bool $showDuplicateWarning = false;
     public array $duplicateChecks = [];
@@ -136,19 +146,42 @@ class MobileScanner extends Component
             ->exists();
     }
 
+    protected function hasUnmatchedChecks(): bool
+    {
+        if (!$this->checkSessionId) {
+            return false;
+        }
+
+        return \App\Models\ProductCheck::where('check_session_id', $this->checkSessionId)
+            ->where('checked_by', auth()->id())
+            ->whereNull('product_id')
+            ->exists();
+    }
+
+    protected function flash(string $message, string $tone = 'success'): void
+    {
+        $this->flashMessage = $message;
+        $this->flashTone = $tone;
+        $this->flashId = uniqid();
+    }
+
     public function handleScan(string $decodedText): void
     {
         $this->scanCode = trim($decodedText);
         
         if (! $this->checkSessionId) {
-            $this->flashMessage = 'No active session selected. Please open a session first.';
-            $this->flashTone = 'warning';
+            $this->flash('No active session selected. Please open a session first.', 'warning');
             return;
         }
 
         if ($this->hasPendingChecks()) {
-            $this->flashMessage = 'Please complete the pending check validation before scanning another product.';
-            $this->flashTone = 'warning';
+            $this->flash('Please complete the pending check validation before scanning another product.', 'warning');
+            $this->scanCode = '';
+            return;
+        }
+
+        if ($this->hasUnmatchedChecks()) {
+            $this->flash('Unmatched check found. Please create the product before scanning another item.', 'warning');
             $this->scanCode = '';
             return;
         }
@@ -182,8 +215,7 @@ class MobileScanner extends Component
                 }
             }
 
-            $this->flashMessage = 'Quantity updated for existing check.';
-            $this->flashTone = 'success';
+            $this->flash('Quantity updated for existing check.', 'success');
         } else {
             $autoStatus = $this->getAutoStatusForProduct($product);
             $closingStock = $product ? (int) $product->quantity : 0;
@@ -205,17 +237,17 @@ class MobileScanner extends Component
             
             if ($product) {
                 $newCheck->update(['result_status' => $this->resolveCheckStatus($newCheck, $autoStatus)]);
+                $this->flash('Scanned successfully.', 'success');
             } else {
                 $newCheck->update(['result_status' => 'UNMATCHED']);
                 event(new \App\Events\ProductChecked($newCheck));
+                $this->openCreateProduct($newCheck->id);
+                $this->flash('Unmatched product scanned. Please create the product.', 'warning');
             }
 
             if ($this->scanConfigId && collect($this->scanConfigFields)->contains('field', 'quantity')) {
                 $this->updateInlineCheckValue($newCheck->id, 'quantity', 1);
             }
-
-            $this->flashMessage = 'Scanned successfully.';
-            $this->flashTone = 'success';
         }
         
         $this->scanCode = '';
@@ -244,8 +276,7 @@ class MobileScanner extends Component
     {
         $code = trim($this->scanCode);
         if ($code === '') {
-            $this->flashMessage = 'Please enter or scan a code before launching.';
-            $this->flashTone = 'warning';
+            $this->flash('Please enter or scan a code before launching.', 'warning');
             return;
         }
 
@@ -256,30 +287,26 @@ class MobileScanner extends Component
     {
         $check = ProductCheck::find($checkId);
         if (! $check) {
-            $this->flashMessage = 'Check not found.';
-            $this->flashTone = 'warning';
+            $this->flash('Check not found.', 'warning');
             return;
         }
 
         $check->delete();
         $this->deletedCheckIdToRestore = $check->id;
-        $this->flashMessage = 'Check deleted. You can restore it if this was a mistake.';
-        $this->flashTone = 'warning';
+        $this->flash('Check deleted.', 'warning');
     }
 
     public function restoreCheck(int $checkId): void
     {
         $check = ProductCheck::withTrashed()->find($checkId);
         if (! $check || ! $check->trashed()) {
-            $this->flashMessage = 'Nothing to restore.';
-            $this->flashTone = 'warning';
+            $this->flash('Nothing to restore.', 'warning');
             return;
         }
 
         $check->restore();
         $this->deletedCheckIdToRestore = null;
-        $this->flashMessage = 'Check restored successfully.';
-        $this->flashTone = 'success';
+        $this->flash('Check restored successfully.', 'success');
     }
 
     public function openCreateProduct($checkId)
@@ -287,18 +314,32 @@ class MobileScanner extends Component
         $this->activeCheckId = $checkId;
         $check = ProductCheck::find($checkId);
         $this->createProductCode = $check->barcode ?? '';
+        $this->createProductBarcode = $check->barcode ?? '';
+        $this->createProductQrCode = '';
         $this->createProductName = '';
+        $this->createProductQuantity = 1;
+        $this->createProductStatus = 'ACTIVE';
+        $this->createProductLocationId = $check->location_id ?? $this->selectedLocationId;
         $this->createProductTypeId = $this->productTypeId;
+        
         $this->updatedCreateProductTypeId();
         $this->showCreateProductModal = true;
     }
 
     public function updatedCreateProductTypeId()
     {
+        $this->createProductCategoryId = null;
+        $this->createProductSubCategoryId = null;
+        $this->categoriesList = [];
+        $this->subCategoriesList = [];
         $this->createProductDynamicFields = [];
         $this->createProductDynamicValues = [];
         
         if ($this->createProductTypeId) {
+            $this->categoriesList = \App\Models\Category::where('product_type_id', $this->createProductTypeId)
+                ->pluck('name', 'id')
+                ->toArray();
+
             $fields = \App\Models\ProductTypeField::where('product_type_id', $this->createProductTypeId)
                 ->where('is_active', true)
                 ->where('show_in_creation_form', true)
@@ -311,41 +352,64 @@ class MobileScanner extends Component
         }
     }
 
+    public function updatedCreateProductCategoryId()
+    {
+        $this->createProductSubCategoryId = null;
+        $this->subCategoriesList = [];
+        if ($this->createProductCategoryId) {
+            $this->subCategoriesList = \App\Models\SubCategory::where('category_id', $this->createProductCategoryId)
+                ->pluck('name', 'id')
+                ->toArray();
+        }
+    }
+
     public function saveCreatedProduct()
     {
         $rules = [
             'createProductTypeId' => 'required|exists:product_types,id',
+            'createProductLocationId' => 'required|exists:locations,id',
+            'createProductCategoryId' => 'required|exists:categories,id',
+            'createProductSubCategoryId' => 'nullable|exists:sub_categories,id',
             'createProductCode' => 'required|string|unique:products,code',
+            'createProductBarcode' => 'nullable|string',
+            'createProductQrCode' => 'nullable|string',
             'createProductName' => 'required|string',
+            'createProductQuantity' => 'required|integer|min:0',
+            'createProductStatus' => 'required|in:ACTIVE,SUSPENDED',
         ];
 
         foreach ($this->createProductDynamicFields as $field) {
-            $rules['createProductDynamicValues.' . $field['field_name']] = 'required';
+            if (isset($field['required']) && $field['required']) {
+                $rules['createProductDynamicValues.' . $field['field_name']] = 'required';
+            } else {
+                $rules['createProductDynamicValues.' . $field['field_name']] = 'nullable';
+            }
         }
 
         $this->validate($rules);
-
-        $type = ProductType::with('categories.subCategories')->find($this->createProductTypeId);
-        $cat = $type->categories->first();
         
         $product = Product::create([
             'product_type_id' => $this->createProductTypeId,
-            'location_id' => $this->selectedLocationId,
-            'category_id' => $cat?->id,
-            'sub_category_id' => $cat?->subCategories->first()?->id,
+            'location_id' => $this->createProductLocationId,
+            'category_id' => $this->createProductCategoryId,
+            'sub_category_id' => $this->createProductSubCategoryId,
             'code' => $this->createProductCode,
-            'barcode' => $this->createProductCode,
+            'barcode' => $this->createProductBarcode,
+            'qr_code' => $this->createProductQrCode,
             'name' => $this->createProductName,
-            'status' => 'ACTIVE',
+            'quantity' => $this->createProductQuantity,
+            'status' => $this->createProductStatus,
             'created_during_pickup' => true
         ]);
 
         foreach ($this->createProductDynamicValues as $fieldName => $value) {
-            ProductAttributeValue::create([
-                'product_id' => $product->id,
-                'field_name' => $fieldName,
-                'value' => $value
-            ]);
+            if ($value !== null && $value !== '') {
+                ProductAttributeValue::create([
+                    'product_id' => $product->id,
+                    'field_name' => $fieldName,
+                    'value' => $value
+                ]);
+            }
         }
 
         if ($this->activeCheckId) {
@@ -361,8 +425,7 @@ class MobileScanner extends Component
 
         $this->showCreateProductModal = false;
         $this->activeCheckId = null;
-        $this->flashMessage = 'Product created and linked.';
-        $this->flashTone = 'success';
+        $this->flash('Product created and linked.', 'success');
     }
 
     public function openComparison($checkId)
@@ -371,8 +434,7 @@ class MobileScanner extends Component
         $check = ProductCheck::with('product.attributeValues')->find($checkId);
         
         if (! $check || ! $check->product) {
-            $this->flashMessage = 'Cannot validate unmatched product. Create product first.';
-            $this->flashTone = 'warning';
+            $this->flash('Cannot validate unmatched product. Create product first.', 'warning');
             return;
         }
 
@@ -432,8 +494,7 @@ class MobileScanner extends Component
         $this->actualValues = [];
         $this->comment = null;
 
-        $this->flashMessage = 'Check validation saved.';
-        $this->flashTone = $validation['result_status'] === 'PASS' ? 'success' : 'warning';
+        $this->flash('Check validation saved.', $validation['result_status'] === 'PASS' ? 'success' : 'warning');
     }
 
     public function openRemarkModal($checkId)
@@ -483,8 +544,7 @@ class MobileScanner extends Component
         $this->remarkText = null;
         $this->decisionTypeId = null;
         
-        $this->flashMessage = 'Remark/Decision added.';
-        $this->flashTone = 'success';
+        $this->flash('Remark/Decision added.', 'success');
     }
 
     protected function refreshConfigFields(): void

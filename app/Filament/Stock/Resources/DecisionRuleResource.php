@@ -46,6 +46,8 @@ class DecisionRuleResource extends Resource
                         'greater_than' => 'Greater Than (Actual > Expected)',
                         'less_than' => 'Less Than (Actual < Expected)',
                         'unmatched' => 'Unmatched',
+                        'equals_true' => 'Equals True (Only True)',
+                        'equals_false' => 'Equals False (Only False)',
                     ]),
                 Forms\Components\Select::make('decision_type_id')
                     ->relationship('decisionType', 'name')

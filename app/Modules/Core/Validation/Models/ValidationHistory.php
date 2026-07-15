@@ -52,6 +52,32 @@ class ValidationHistory extends Model
                         ]);
                     }
                 }
+            } elseif ($history->status === 'PASS') {
+                $purchaseRequestId = null;
+                $validatable = $history->validatable;
+                if ($validatable) {
+                    if (get_class($validatable) === \App\Modules\Purchase\Models\PurchaseRequest::class) {
+                        $purchaseRequestId = $validatable->id;
+                    } elseif (get_class($validatable) === \App\Modules\Purchase\Models\PurchaseItem::class) {
+                        $purchaseRequestId = $validatable->purchase_request_id;
+                    }
+                }
+
+                if ($purchaseRequestId) {
+                    $rule = $history->rule;
+                    $fieldName = $rule ? ($rule->label ?: $rule->field_name) : 'unknown_field';
+
+                    \App\Modules\Purchase\Models\FailCheck::where('purchase_request_id', $purchaseRequestId)
+                        ->where('field_name', $fieldName)
+                        ->delete();
+
+                    $remainingFails = \App\Modules\Purchase\Models\FailCheck::where('purchase_request_id', $purchaseRequestId)->count();
+                    if ($remainingFails === 0) {
+                        \App\Modules\Purchase\Models\PurchaseDecision::where('purchase_request_id', $purchaseRequestId)
+                            ->where('status', 'open')
+                            ->update(['status' => 'closed']);
+                    }
+                }
             }
         });
     }
