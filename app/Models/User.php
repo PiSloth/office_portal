@@ -70,6 +70,10 @@ class User extends Authenticatable implements FilamentUser
             return true;
         }
 
+        if ($this->can('admin.access')) {
+            return true;
+        }
+
         return $this->hasAnyRole($this->adminAccessRoles());
     }
 
