@@ -191,6 +191,31 @@ class UserResource extends Resource
             ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('export')
+                        ->label('Export to Excel')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->action(function (\Illuminate\Support\Collection $records) {
+                            $records->load(['branch', 'roles']);
+                            return new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($records) {
+                                $handle = fopen('php://output', 'w');
+                                fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
+                                fputcsv($handle, ['User name', 'Email', 'Branch', 'Role']);
+
+                                foreach ($records as $record) {
+                                    fputcsv($handle, [
+                                        $record->name,
+                                        $record->email,
+                                        $record->branch?->name ?? 'N/A',
+                                        $record->roles->pluck('name')->implode(', '),
+                                    ]);
+                                }
+
+                                fclose($handle);
+                            }, 200, [
+                                'Content-Type' => 'text/csv; charset=UTF-8',
+                                'Content-Disposition' => 'attachment; filename="users_export_' . now()->format('Y-m-d_H-i-s') . '.csv"',
+                            ]);
+                        }),
                     Actions\DeleteBulkAction::make()
                         ->visible(fn (): bool => auth()->user()?->can('users.delete') ?? false),
                 ]),
