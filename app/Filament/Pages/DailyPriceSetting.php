@@ -129,7 +129,9 @@ class DailyPriceSetting extends Page implements HasTable
                         TextInput::make('gold_price')
                             ->label('Gold Price')
                             ->numeric()
-                            ->required(),
+                            ->required()
+                            ->disabled()
+                            ->dehydrated(),
                         TextInput::make('tax')
                             ->label('Oth Charges (Tax / ခွာဈေး)')
                             ->numeric()
