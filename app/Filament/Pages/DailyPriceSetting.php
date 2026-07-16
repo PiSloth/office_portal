@@ -60,11 +60,13 @@ class DailyPriceSetting extends Page implements HasTable
                 ->color('warning')
                 ->form([
                     TextInput::make('new_gold_price')
-                        ->label('New Gold Price')
+                        ->label('လက်ရှိ အရောင်း ပေါက်စျေး')
+                        ->helperText(new \Illuminate\Support\HtmlString('<span style="color: #dc2626; font-size: 0.875rem;">Price Group မှ အရောင်း ပေါက်ဈေးကို ကူးယူ ထည့်သွင်းပါ။</span>'))
                         ->numeric()
                         ->required(),
                     TextInput::make('tax')
                         ->label('Oth Charges (Tax / ခွာဈေး)')
+                        ->helperText(new \Illuminate\Support\HtmlString('<span style="color: #dc2626; font-size: 0.875rem;">Price Group မှ အရောင်းဈေးနှင့် ပြန်ဝယ်ဈေးကို ခြားနား၍ ကွာဟသော ပမာဏကို ထည့်ပေးရန်။</span>'))
                         ->numeric()
                         ->required(),
                 ])

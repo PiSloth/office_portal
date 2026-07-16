@@ -110,12 +110,11 @@ class JewelryCalculator implements CalculatorContract
             $finalPrice = $finalPrice - ($finalPrice * $percentDeduction);
         }
 
-        // 7. Multiply by quantity
+        // 7. Quantity is for reference only (does not affect price)
         $quantity = (int) ($inputs['quantity'] ?? 1);
         if ($quantity < 1) {
             $quantity = 1;
         }
-        $finalPrice = $finalPrice * $quantity;
 
         return [
             'status' => 'success',
