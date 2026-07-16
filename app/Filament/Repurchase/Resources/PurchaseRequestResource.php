@@ -1023,37 +1023,6 @@ class PurchaseRequestResource extends Resource
                                             $state = $get('dynamic_fields_json') ?? [];
                                             $form->fill($state);
                                         })
-                                        ->action(function (array $data, \Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $livewire) {
-                                            // Calculate the price!
-                                            $method = \App\Modules\Core\Calculation\Models\CalculationMethod::where('name', 'Standard Jewelry Calculator')->first();
-                                            $parameters = $method ? $method->parameters->pluck('value', 'key')->toArray() : [];
-
-                                            $multiplier = self::resolveMultiplierValue($data['goldList'], $data['purchase_type'] ?? 'gb_product');
-                                            $data['multiplier'] = $multiplier;
-
-                                            $strategy = new \App\Modules\Core\Calculation\Strategies\JewelryCalculator();
-                                            $result = $strategy->calculate($data, $parameters);
-
-                                            // Update state on the row
-                                            $set('product_type_id', $get('../../product_type_id'));
-                                            $set('calculated_price', $result['result']);
-                                            $set('dynamic_fields_json', [
-                                                'product_name' => $data['product_name'],
-                                                'purchase_type' => $data['purchase_type'] ?? 'gb_product',
-                                                'goldList' => $data['goldList'],
-                                                'multiplier' => $multiplier,
-                                                'kyat' => $data['kyat'] ?? 0,
-                                                'pae' => $data['pae'] ?? 0,
-                                                'yawe' => $data['yawe'] ?? 0,
-                                                'kyaukWeight' => $data['kyaukWeight'] ?? 0,
-                                                'goldWeightGram' => $data['goldWeightGram'] ?? 0,
-                                                'show_KPY' => (bool) ($data['show_KPY'] ?? false),
-                                                'percent' => blank($data['percent'] ?? null) ? 0 : $data['percent'],
-                                                'reChange' => $data['reChange'] ?? '0',
-                                                'is_good' => (bool) ($data['is_good'] ?? false),
-                                                'quantity' => $data['quantity'] ?? 1,
-                                                'remark' => $data['remark'] ?? '',
-                                                'original_voucher_price' => $data['original_voucher_price'] ?? 0,
                                                 'attachment_image' => $data['attachment_image'] ?? null,
                                             ]);
 
