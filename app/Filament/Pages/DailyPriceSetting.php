@@ -94,6 +94,7 @@ class DailyPriceSetting extends Page implements HasTable
                     \App\Models\DailyPriceHistory::create([
                         'gold_price' => $convertedGoldPrice,
                         'tax_rate' => $tax,
+                        'user_id' => auth()->id(),
                     ]);
 
                     Notification::make()
@@ -170,6 +171,7 @@ class DailyPriceSetting extends Page implements HasTable
         \App\Models\DailyPriceHistory::create([
             'gold_price' => $state['gold_price'],
             'tax_rate' => $state['tax'],
+            'user_id' => auth()->id(),
         ]);
 
         Notification::make()
@@ -186,6 +188,14 @@ class DailyPriceSetting extends Page implements HasTable
                 TextColumn::make('created_at')
                     ->label('Date & Time')
                     ->dateTime('d M Y, h:i A')
+                    ->sortable(),
+                TextColumn::make('user.name')
+                    ->label('Changed By')
+                    ->placeholder('-')
+                    ->sortable(),
+                TextColumn::make('user.branch.name')
+                    ->label('Branch')
+                    ->placeholder('-')
                     ->sortable(),
                 TextColumn::make('gold_price')
                     ->label('Gold Price (MMK)')
