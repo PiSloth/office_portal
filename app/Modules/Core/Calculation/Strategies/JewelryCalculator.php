@@ -18,7 +18,7 @@ class JewelryCalculator implements CalculatorContract
 
             return [
                 'status' => 'success',
-                'result' => floor($finalPrice / 1000) * 1000,
+                'result' => floor($finalPrice / 100) * 100,
                 'message' => 'Percent ထည်ပြန်ဝယ်',
                 'details' => [
                     'total_weight' => 0,
@@ -119,7 +119,7 @@ class JewelryCalculator implements CalculatorContract
 
         return [
             'status' => 'success',
-            'result' => floor($finalPrice / 1000) * 1000,
+            'result' => floor($finalPrice / 100) * 100,
             'message' => $reChange ? 'အလဲအထပ်ထည်' : 'ဆိုင်ထည်',
             'details' => [
                 'total_weight' => $totalWeight,
