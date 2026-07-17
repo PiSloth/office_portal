@@ -9,6 +9,7 @@ use Filament\Schemas\Schema;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class PurchaseDecisionResource extends Resource
 {
@@ -89,8 +90,59 @@ class PurchaseDecisionResource extends Resource
                 Tables\Columns\TextColumn::make('id')->sortable(),
                 Tables\Columns\TextColumn::make('purchaseRequest.purchase_number')
                     ->label('Purchase Request No')
-                    ->searchable()
-                    ->sortable(),
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        $search = trim($search);
+                        
+                        // 1. Full pattern: PR-BRANCHCODE/YYMMDDNNN
+                        if (preg_match('/^PR-([A-Z0-9]+)\/(\d{6})(\d{3})$/i', $search, $matches)) {
+                            $branchCode = $matches[1];
+                            $dateStr = $matches[2];
+                            $seq = intval($matches[3]);
+                            
+                            try {
+                                $date = \Carbon\Carbon::createFromFormat('ymd', $dateStr)->toDateString();
+                                
+                                $id = \App\Modules\Purchase\Models\PurchaseRequest::whereDate('created_at', $date)
+                                    ->whereHas('branch', fn($q) => $q->where('code', $branchCode))
+                                    ->orderBy('id', 'asc')
+                                    ->skip($seq - 1)
+                                    ->take(1)
+                                    ->value('id');
+                                
+                                if ($id) {
+                                    return $query->where('purchase_request_id', $id);
+                                }
+                            } catch (\Exception $e) {
+                            }
+                        }
+                        
+                        // 2. Date only: YYMMDD
+                        if (preg_match('/^\d{6}$/', $search)) {
+                            try {
+                                $date = \Carbon\Carbon::createFromFormat('ymd', $search)->toDateString();
+                                return $query->whereHas('purchaseRequest', fn($q) => $q->whereDate('created_at', $date));
+                            } catch (\Exception $e) {
+                            }
+                        }
+
+                        // 3. Branch only starting with PR-: PR-BRANCHCODE
+                        if (preg_match('/^PR-([A-Z0-9]+)$/i', $search, $matches)) {
+                            $branchCode = $matches[1];
+                            return $query->whereHas('purchaseRequest.branch', fn($q) => $q->where('code', 'like', "%{$branchCode}%"));
+                        }
+
+                        // 4. Default fallback: search branch code or purchase request ID
+                        return $query->where(function (Builder $q) use ($search) {
+                            $q->whereHas('purchaseRequest.branch', fn($sub) => $sub->where('code', 'like', "%{$search}%"))
+                              ->orWhere('purchase_request_id', 'like', "%{$search}%");
+                        });
+                    })
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->join('purchase_requests', 'purchase_decisions.purchase_request_id', '=', 'purchase_requests.id')
+                                     ->orderBy('purchase_requests.created_at', $direction)
+                                     ->orderBy('purchase_requests.id', $direction)
+                                     ->select('purchase_decisions.*');
+                    }),
                 Tables\Columns\TextColumn::make('purchaseRequest.branch.name')
                     ->label('Branch')
                     ->searchable()
