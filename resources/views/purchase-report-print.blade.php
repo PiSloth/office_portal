@@ -129,10 +129,10 @@
             $qty = $inputs['quantity'] ?? 1;
             $totalQty += $qty;
             
-            $totalGrams += ($inputs['goldWeightGram'] ?? 0) * $qty;
-            $totalKyat += ($inputs['kyat'] ?? 0) * $qty;
-            $totalPae += ($inputs['pae'] ?? 0) * $qty;
-            $totalYawe += ($inputs['yawe'] ?? 0) * $qty;
+            $totalGrams += ($inputs['goldWeightGram'] ?? 0);
+            $totalKyat += ($inputs['kyat'] ?? 0);
+            $totalPae += ($inputs['pae'] ?? 0);
+            $totalYawe += ($inputs['yawe'] ?? 0);
             
             $totalPrice += $item->calculated_price;
         }
