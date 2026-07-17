@@ -1749,6 +1749,7 @@ class PurchaseRequestResource extends Resource
                                     'Customer Name',
                                     'Phone No.',
                                     'Product Name',
+                                    'Product Type',
                                     'Gold Grade',
                                     'Weight (Gram)',
                                     'Weight (K/P/Y)',
@@ -1770,6 +1771,8 @@ class PurchaseRequestResource extends Resource
                                     foreach ($record->items as $item) {
                                         $inputs = $item->dynamic_fields_json ?? [];
                                         $productName = $inputs['product_name'] ?? '-';
+                                        $purchaseTypeVal = $inputs['purchase_type'] ?? 'gb_product';
+                                        $calcType = ($purchaseTypeVal === 'other_product') ? 'Other' : 'GB';
                                         $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
                                         $weightGram = floatval($inputs['goldWeightGram'] ?? 0);
                                         $k = intval($inputs['kyat'] ?? 0);
@@ -1790,6 +1793,7 @@ class PurchaseRequestResource extends Resource
                                             $record->customer_name,
                                             $record->customer_phone,
                                             $productName,
+                                            $calcType,
                                             $goldGrade,
                                             number_format($weightGram, 2) . ' g',
                                             $weightKpy,
@@ -1818,6 +1822,7 @@ class PurchaseRequestResource extends Resource
                                 
                                 fputcsv($handle, [
                                     'Grand Total:',
+                                    '',
                                     '',
                                     '',
                                     '',

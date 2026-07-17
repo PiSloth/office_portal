@@ -15,10 +15,11 @@ class JewelryCalculator implements CalculatorContract
         if ((string)$reChange === '2') {
             $originalVoucherPrice = (float) ($inputs['original_voucher_price'] ?? 0);
             $finalPrice = $originalVoucherPrice - ($originalVoucherPrice * $percentDeduction);
+            $calculatedResult = floor($finalPrice / 100) * 100;
 
             return [
                 'status' => 'success',
-                'result' => floor($finalPrice / 100) * 100,
+                'result' => max(0, $calculatedResult - 100),
                 'message' => 'Percent ထည်ပြန်ဝယ်',
                 'details' => [
                     'total_weight' => 0,
@@ -116,9 +117,11 @@ class JewelryCalculator implements CalculatorContract
             $quantity = 1;
         }
 
+        $calculatedResult = floor($finalPrice / 100) * 100;
+
         return [
             'status' => 'success',
-            'result' => floor($finalPrice / 100) * 100,
+            'result' => max(0, $calculatedResult - 100),
             'message' => $reChange ? 'အလဲအထပ်ထည်' : 'ဆိုင်ထည်',
             'details' => [
                 'total_weight' => $totalWeight,
