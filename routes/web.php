@@ -57,14 +57,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('purchase-requests/report/print', function (\Illuminate\Http\Request $request) {
         $branchId = $request->query('branch_id');
         $date = $request->query('date');
+        $stateFilter = $request->query('state_filter', 'all');
+        
+        $paidStateIds = \App\Modules\Core\Workflow\Models\WorkflowState::where('name', 'Paid')->pluck('id')->toArray();
+        $afterPaidStateIds = [];
+        $queue = $paidStateIds;
+        
+        while (!empty($queue)) {
+            $currentStateId = array_shift($queue);
+            $nextStateIds = \App\Modules\Core\Workflow\Models\WorkflowTransition::where('from_state_id', $currentStateId)
+                ->pluck('to_state_id')
+                ->toArray();
+                
+            foreach ($nextStateIds as $nextStateId) {
+                if (!in_array($nextStateId, $paidStateIds) && !in_array($nextStateId, $afterPaidStateIds)) {
+                    $afterPaidStateIds[] = $nextStateId;
+                    $queue[] = $nextStateId;
+                }
+            }
+        }
         
         $query = \App\Modules\Purchase\Models\PurchaseItem::with(['purchaseRequest.branch', 'purchaseRequest.creator', 'productType'])
-            ->whereHas('purchaseRequest', function ($q) use ($branchId, $date) {
+            ->whereHas('purchaseRequest', function ($q) use ($branchId, $date, $stateFilter, $paidStateIds, $afterPaidStateIds) {
                 if ($branchId) {
                     $q->where('branch_id', $branchId);
                 }
                 if ($date) {
                     $q->whereDate('created_at', $date);
+                }
+                if ($stateFilter === 'paid_and_after') {
+                    $q->whereIn('workflow_state_id', array_merge($paidStateIds, $afterPaidStateIds));
+                } elseif ($stateFilter === 'before_paid') {
+                    $q->whereNotIn('workflow_state_id', array_merge($paidStateIds, $afterPaidStateIds));
                 }
             });
 

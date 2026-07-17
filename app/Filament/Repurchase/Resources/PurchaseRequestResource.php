@@ -1523,6 +1523,43 @@ class PurchaseRequestResource extends Resource
                 Tables\Filters\SelectFilter::make('workflow_state_id')
                     ->label('Status')
                     ->relationship('workflowState', 'name'),
+                Tables\Filters\SelectFilter::make('payment_workflow_status')
+                    ->label('Workflow State Group')
+                    ->options([
+                        'before_paid' => 'Before Paid',
+                        'paid_and_after' => 'Paid & After',
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+                        
+                        $paidStateIds = \App\Modules\Core\Workflow\Models\WorkflowState::where('name', 'Paid')->pluck('id')->toArray();
+                        $afterPaidStateIds = [];
+                        $queue = $paidStateIds;
+                        
+                        while (!empty($queue)) {
+                            $currentStateId = array_shift($queue);
+                            $nextStateIds = \App\Modules\Core\Workflow\Models\WorkflowTransition::where('from_state_id', $currentStateId)
+                                ->pluck('to_state_id')
+                                ->toArray();
+                                
+                            foreach ($nextStateIds as $nextStateId) {
+                                if (!in_array($nextStateId, $paidStateIds) && !in_array($nextStateId, $afterPaidStateIds)) {
+                                    $afterPaidStateIds[] = $nextStateId;
+                                    $queue[] = $nextStateId;
+                                }
+                            }
+                        }
+                        
+                        if ($data['value'] === 'paid_and_after') {
+                            return $query->whereIn('workflow_state_id', array_merge($paidStateIds, $afterPaidStateIds));
+                        } elseif ($data['value'] === 'before_paid') {
+                            return $query->whereNotIn('workflow_state_id', array_merge($paidStateIds, $afterPaidStateIds));
+                        }
+                        
+                        return $query;
+                    }),
                 Tables\Filters\SelectFilter::make('decision_status')
                     ->label('Decision Status')
                     ->options([
@@ -1664,6 +1701,105 @@ class PurchaseRequestResource extends Resource
             ->defaultSort('id', 'desc')
             ->bulkActions([
                 \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\BulkAction::make('export_items_excel')
+                        ->label('Export Selected Items to Excel')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('success')
+                        ->action(function (\Illuminate\Support\Collection $records) {
+                            $records->load(['items.purchaseRequest.branch', 'items.purchaseRequest.workflowState', 'items.productType']);
+                            
+                            return new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($records) {
+                                $handle = fopen('php://output', 'w');
+                                fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
+                                
+                                fputcsv($handle, [
+                                    'Sr.',
+                                    'Purchase No.',
+                                    'Customer Name',
+                                    'Phone No.',
+                                    'Product Name',
+                                    'Gold Grade',
+                                    'Weight (Gram)',
+                                    'Weight (K/P/Y)',
+                                    'Qty',
+                                    'ရ/မရ',
+                                    'Price'
+                                ]);
+                                
+                                $sr = 1;
+                                $totalGrams = 0.0;
+                                $totalKyat = 0;
+                                $totalPae = 0;
+                                $totalYawe = 0;
+                                $totalQty = 0;
+                                $totalPrice = 0;
+                                
+                                foreach ($records as $record) {
+                                    foreach ($record->items as $item) {
+                                        $inputs = $item->dynamic_fields_json ?? [];
+                                        $productName = $inputs['product_name'] ?? '-';
+                                        $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
+                                        $weightGram = floatval($inputs['goldWeightGram'] ?? 0);
+                                        $k = intval($inputs['kyat'] ?? 0);
+                                        $p = intval($inputs['pae'] ?? 0);
+                                        $y = intval($inputs['yawe'] ?? 0);
+                                        $weightKpy = "{$k}ကျပ် {$p}ပဲ {$y}ရွေး";
+                                        $qty = intval($inputs['quantity'] ?? 1);
+                                        $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
+                                        $priceVal = floatval($item->calculated_price);
+                                        $priceText = number_format($priceVal) . ' MMK';
+                                        
+                                        fputcsv($handle, [
+                                            $sr++,
+                                            $record->purchase_number,
+                                            $record->customer_name,
+                                            $record->customer_phone,
+                                            $productName,
+                                            $goldGrade,
+                                            number_format($weightGram, 2) . ' g',
+                                            $weightKpy,
+                                            $qty,
+                                            $isGood,
+                                            $priceText
+                                        ]);
+                                        
+                                        $totalGrams += $weightGram;
+                                        $totalKyat += $k;
+                                        $totalPae += $p;
+                                        $totalYawe += $y;
+                                        $totalQty += $qty;
+                                        $totalPrice += $priceVal;
+                                    }
+                                }
+                                
+                                $extraPae = floor($totalYawe / 8);
+                                $totalYawe = $totalYawe % 8;
+                                $totalPae += $extraPae;
+                                
+                                $extraKyat = floor($totalPae / 16);
+                                $totalPae = $totalPae % 16;
+                                $totalKyat += $extraKyat;
+                                
+                                fputcsv($handle, [
+                                    'Grand Total:',
+                                    '',
+                                    '',
+                                    '',
+                                    '',
+                                    '',
+                                    number_format($totalGrams, 2) . ' g',
+                                    "{$totalKyat}ကျပ် {$totalPae}ပဲ {$totalYawe}ရွေး",
+                                    $totalQty,
+                                    '',
+                                    number_format($totalPrice) . ' MMK'
+                                ]);
+                                
+                                fclose($handle);
+                            }, 200, [
+                                'Content-Type' => 'text/csv; charset=UTF-8',
+                                'Content-Disposition' => 'attachment; filename="purchase_items_export_' . now()->format('Y-m-d_H-i-s') . '.csv"',
+                            ]);
+                        }),
                     \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

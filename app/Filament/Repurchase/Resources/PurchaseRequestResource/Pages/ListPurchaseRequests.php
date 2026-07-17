@@ -28,11 +28,21 @@ class ListPurchaseRequests extends ListRecords
                         ->label('Report Date')
                         ->required()
                         ->default(now()),
+                    \Filament\Forms\Components\Select::make('state_filter')
+                        ->label('Workflow State')
+                        ->options([
+                            'all' => 'All States',
+                            'before_paid' => 'Before Paid',
+                            'paid_and_after' => 'Paid & After',
+                        ])
+                        ->default('all')
+                        ->required(),
                 ])
                 ->action(function (array $data) {
                     $queryParams = http_build_query([
                         'branch_id' => $data['branch_id'] ?? '',
                         'date' => $data['date'] ?? '',
+                        'state_filter' => $data['state_filter'] ?? 'all',
                     ]);
                     
                     $this->js("window.open('" . route('purchase-requests.report.print') . '?' . $queryParams . "', '_blank')");
