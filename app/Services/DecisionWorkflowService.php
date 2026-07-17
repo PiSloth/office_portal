@@ -195,19 +195,24 @@ class DecisionWorkflowService
                     ->where('action_status', 'OPEN')
                     ->first();
 
-                // Format boolean values as Yes/No for user-friendly remarks
+                // Format boolean values as Yes/No, and branch_id as branch names, for user-friendly remarks
                 $fieldModel = \App\Models\ProductTypeField::where('product_type_id', $productCheck->product->product_type_id)
                     ->where('field_name', $rule->criteria_field)
                     ->first();
                 $isBoolean = $fieldModel && $fieldModel->field_type === 'boolean';
+                $isBranch = $fieldModel && $fieldModel->field_type === 'branch_id';
 
                 $expectedValStr = $isBoolean
                     ? ($matchedFailure->expected_value === '1' || $matchedFailure->expected_value === 1 ? 'Yes' : 'No')
-                    : $matchedFailure->expected_value;
+                    : ($isBranch
+                        ? (\App\Models\Branch::find($matchedFailure->expected_value)?->name ?? 'Unknown Branch (' . $matchedFailure->expected_value . ')')
+                        : $matchedFailure->expected_value);
 
                 $actualValStr = $isBoolean
                     ? ($matchedFailure->actual_value === '1' || $matchedFailure->actual_value === 1 ? 'Yes' : 'No')
-                    : $matchedFailure->actual_value;
+                    : ($isBranch
+                        ? (\App\Models\Branch::find($matchedFailure->actual_value)?->name ?? 'Unknown Branch (' . $matchedFailure->actual_value . ')')
+                        : $matchedFailure->actual_value);
 
                 $remark = "System automatically created decision based on rule: '{$rule->name}' due to failure on field '{$rule->criteria_field}'. Expected: '{$expectedValStr}', Actual: '{$actualValStr}'.";
 

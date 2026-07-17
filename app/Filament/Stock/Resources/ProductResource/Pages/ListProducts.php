@@ -31,11 +31,20 @@ class ListProducts extends ListRecords
                         ->label('Product Type')
                         ->options(ProductType::query()->orderBy('name')->pluck('name', 'id')->all())
                         ->placeholder('Generic template')
-                        ->helperText('Leave empty for a generic template, or pick a product type to include its active dynamic fields.'),
+                        ->reactive()
+                        ->afterStateUpdated(fn ($state, callable $set) => $set('selected_fields', null)),
+                    Forms\Components\Hidden::make('selected_fields'),
+                    Forms\Components\ViewField::make('selected_fields_picker')
+                        ->view('filament.actions.custom-export-template')
+                        ->viewData([
+                            'productTypes' => \App\Models\ProductType::with(['productTypeFields' => fn ($q) => $q->where('is_active', true)])->get()->toArray(),
+                        ])
+                        ->columnSpanFull(),
                 ])
                 ->action(function (array $data) {
                     $query = array_filter([
                         'product_type_id' => $data['product_type_id'] ?? null,
+                        'fields' => $data['selected_fields'] ?? null,
                     ]);
 
                     return redirect()->route('product-import.template', $query);

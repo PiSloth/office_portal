@@ -21,39 +21,48 @@ class ProductImportTemplateController extends Controller
             ])->find($data['product_type_id'])
             : null;
 
-        $standardHeaders = [
-            'code',
-            'name',
-            'category_name',
-            'sub_category_name',
-            'location_code',
-            'barcode',
-            'qr_code',
-            'quantity',
-            'description',
+        $standardSamples = [
+            'code' => 'PRD-1001',
+            'name' => 'Sample Product',
+            'category_name' => 'Default Category',
+            'sub_category_name' => 'General',
+            'location_code' => 'LOC-001',
+            'barcode' => '1234567890123',
+            'qr_code' => 'QR-1001',
+            'quantity' => '100',
+            'description' => 'Imported from the template file',
         ];
 
         $dynamicFields = $productType?->productTypeFields ?? collect();
 
-        $headers = array_merge(
-            $standardHeaders,
-            $dynamicFields->map(fn (ProductTypeField $field) => strtolower($field->field_name))->all()
-        );
+        $requestedFields = $request->query('fields');
+        if (!empty($requestedFields)) {
+            $headers = explode(',', $requestedFields);
+            $sampleRow = [];
+            foreach ($headers as $header) {
+                $headerLower = strtolower(trim($header));
+                if (array_key_exists($headerLower, $standardSamples)) {
+                    $sampleRow[] = $standardSamples[$headerLower];
+                } else {
+                    $field = $dynamicFields->first(fn($f) => strtolower($f->field_name) === $headerLower);
+                    if ($field) {
+                        $sampleRow[] = $this->sampleValueForField($field);
+                    } else {
+                        $sampleRow[] = '';
+                    }
+                }
+            }
+        } else {
+            $standardHeaders = array_keys($standardSamples);
+            $headers = array_merge(
+                $standardHeaders,
+                $dynamicFields->map(fn (ProductTypeField $field) => strtolower($field->field_name))->all()
+            );
 
-        $sampleRow = [
-            'PRD-1001',
-            'Sample Product',
-            'Default Category',
-            'General',
-            'LOC-001',
-            '1234567890123',
-            'QR-1001',
-            '100',
-            'Imported from the template file',
-        ];
-
-        foreach ($dynamicFields as $field) {
-            $sampleRow[] = $this->sampleValueForField($field);
+            $sampleRow = array_values($standardSamples);
+            foreach ($dynamicFields as $field) {
+                $sampleRow[] = $this->sampleValueForField($field);
+            }
         }
 
         $fileName = $productType
@@ -78,6 +87,7 @@ class ProductImportTemplateController extends Controller
             'decimal' => '12.5',
             'date' => now()->toDateString(),
             'boolean' => 'yes',
+            'branch_id' => 'Branch A',
             'textarea', 'select', 'text' => 'Sample ' . Str::headline($field->field_label),
             default => 'Sample Value',
         };

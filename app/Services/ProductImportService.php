@@ -147,6 +147,17 @@ class ProductImportService
                                 $errors[] = "Field '{$field->field_label}' must be 'yes' or 'no'.";
                             }
                         }
+                        if ($field->field_type === 'branch_id') {
+                            $branch = \App\Models\Branch::where('code', $val)
+                                ->orWhere('name', $val)
+                                ->orWhere('id', $val)
+                                ->first();
+                            if ($branch) {
+                                $val = (string) $branch->id;
+                            } else {
+                                $errors[] = "Branch '{$val}' not found for field '{$field->field_label}'.";
+                            }
+                        }
 
                         if ($fName === 'weight_g' && is_numeric($val)) {
                             $val = (string) round((float) $val, 2);

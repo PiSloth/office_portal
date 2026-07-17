@@ -38,6 +38,7 @@ class ProductTypeFieldsRelationManager extends RelationManager
                         'textarea' => 'Long Text / Textarea',
                         'select' => 'Dropdown / Select Option',
                         'boolean' => 'Yes/No (Boolean)',
+                        'branch_id' => 'Branch Selection (Relationship)',
                     ]),
                 Forms\Components\Toggle::make('required')
                     ->label('Is Required Field?')

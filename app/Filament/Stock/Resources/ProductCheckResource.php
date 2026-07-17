@@ -444,6 +444,8 @@ class ProductCheckResource extends Resource
                                                 '1' => 'Yes',
                                                 '0' => 'No',
                                             ]),
+                                        'branch_id' => Forms\Components\Select::make('dynamic_attributes.' . $field->field_name)
+                                            ->options(\App\Models\Branch::pluck('name', 'id')->toArray()),
                                         default => Forms\Components\TextInput::make('dynamic_attributes.' . $field->field_name),
                                     };
 

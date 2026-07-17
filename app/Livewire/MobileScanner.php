@@ -79,7 +79,19 @@ class MobileScanner extends Component
     public function mount(): void
     {
         abort_unless(auth()->check() && auth()->user()->hasAnyRole(['super-admin', 'admin', 'manager', 'checker', 'Super Admin', 'Admin', 'Supervisor', 'Checker']), 403);
-        $session = CheckSession::whereIn('status', ['DRAFT', 'OPEN'])->latest('started_at')->first();
+        $session = CheckSession::where(function ($query) {
+                $query->where('assigned_user_id', auth()->id())
+                    ->orWhereHas('assignedUsers', function ($q) {
+                        $q->where('users.id', auth()->id());
+                    });
+            })
+            ->whereIn('status', ['DRAFT', 'OPEN'])
+            ->latest('started_at')
+            ->first();
+
+        if (!$session) {
+            $session = CheckSession::whereIn('status', ['DRAFT', 'OPEN'])->latest('started_at')->first();
+        }
         $this->checkSessionId = $session?->id;
         $this->productTypeId = $session?->product_type_id;
         $this->scanConfigId = $session?->scan_config_id;
@@ -347,7 +359,11 @@ class MobileScanner extends Component
             
             foreach ($fields as $field) {
                 $this->createProductDynamicFields[] = $field->toArray();
-                $this->createProductDynamicValues[$field->field_name] = '';
+                if (($field->field_type ?? '') === 'branch_id') {
+                    $this->createProductDynamicValues[$field->field_name] = (string)(auth()->user()->branch_id ?? '');
+                } else {
+                    $this->createProductDynamicValues[$field->field_name] = '';
+                }
             }
         }
     }
@@ -379,10 +395,18 @@ class MobileScanner extends Component
         ];
 
         foreach ($this->createProductDynamicFields as $field) {
-            if (isset($field['required']) && $field['required']) {
+            if (($field['field_type'] ?? '') === 'branch_id') {
+                $rules['createProductDynamicValues.' . $field['field_name']] = 'nullable';
+            } else if (isset($field['required']) && $field['required']) {
                 $rules['createProductDynamicValues.' . $field['field_name']] = 'required';
             } else {
                 $rules['createProductDynamicValues.' . $field['field_name']] = 'nullable';
+            }
+        }
+
+        foreach ($this->createProductDynamicFields as $field) {
+            if (($field['field_type'] ?? '') === 'branch_id') {
+                $this->createProductDynamicValues[$field['field_name']] = (string)(auth()->user()->branch_id ?? '');
             }
         }
 
@@ -615,15 +639,22 @@ class MobileScanner extends Component
         $product = $this->matchedProductId ? Product::with('attributeValues')->find($this->matchedProductId) : null;
         if (! $product) return;
 
+        $dynamicFields = \App\Models\ProductTypeField::where('product_type_id', $product->product_type_id)->get();
+
         foreach ($this->scanConfigFields as $fieldConfig) {
             $fieldName = $fieldConfig['field'] ?? null;
             if (! $fieldName || ($fieldConfig['source'] ?? 'product') !== 'product') continue;
 
-            $this->actualValues[$fieldName] = match ($fieldName) {
-                'location_id', 'category_id', 'sub_category_id' => $product->{$fieldName},
-                'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $product->{$fieldName},
-                default => $product->attributeValues->firstWhere('field_name', $fieldName)?->value,
-            };
+            $fModel = $dynamicFields->firstWhere('field_name', $fieldName);
+            if ($fModel && $fModel->field_type === 'branch_id') {
+                $this->actualValues[$fieldName] = (string)(auth()->user()->branch_id ?? '');
+            } else {
+                $this->actualValues[$fieldName] = match ($fieldName) {
+                    'location_id', 'category_id', 'sub_category_id' => $product->{$fieldName},
+                    'code', 'barcode', 'qr_code', 'name', 'description', 'status' => $product->{$fieldName},
+                    default => $product->attributeValues->firstWhere('field_name', $fieldName)?->value,
+                };
+            }
         }
     }
 
@@ -700,9 +731,16 @@ class MobileScanner extends Component
         
         if ($scanConfig) {
             $actualValues = [];
+            $dynamicFields = \App\Models\ProductTypeField::where('product_type_id', $check->product->product_type_id)->get();
             foreach (data_get($scanConfig->config_json, 'fields', []) as $fieldConfig) {
                 $fName = $fieldConfig['field'] ?? null;
                 if (! $fName || ($fieldConfig['source'] ?? 'product') !== 'product') continue;
+                
+                $fModel = $dynamicFields->firstWhere('field_name', $fName);
+                if ($fModel && $fModel->field_type === 'branch_id') {
+                    $actualValues[$fName] = (string)(auth()->user()->branch_id ?? '');
+                    continue;
+                }
                 
                 if ($check->product->created_during_pickup) {
                     if ($fName === 'quantity') {

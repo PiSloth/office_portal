@@ -696,6 +696,9 @@
                                                             $field['field_name'],
                                                         );
                                                         $isEditable = $scf && ($scf['is_editable_in_table'] ?? false);
+                                                        if (($field['field_type'] ?? '') === 'branch_id') {
+                                                            $isEditable = false;
+                                                        }
                                                         $isCompare = $scf && ($scf['compare'] ?? false);
 
                                                         $actualVal = null;
@@ -733,6 +736,11 @@
                                                                 : ($productVal !== ''
                                                                     ? $productVal
                                                                     : '---');
+
+                                                        if (($field['field_type'] ?? '') === 'branch_id' && $displayVal !== '---') {
+                                                            $branch = \App\Models\Branch::find($displayVal);
+                                                            $displayVal = $branch ? $branch->name : 'Unknown Branch (' . $displayVal . ')';
+                                                        }
 
                                                         // Calculate match status on the fly if not evaluated yet, but only if it's supposed to be compared
 $showIcon = false;
@@ -851,7 +859,7 @@ if ($isCompare) {
                                                             @endif
                                                         </div>
 
-                                                        @if (filter_var($scf['is_quickcheck'] ?? false, FILTER_VALIDATE_BOOLEAN) && blank($actualVal))
+                                                        @if (filter_var($scf['is_quickcheck'] ?? false, FILTER_VALIDATE_BOOLEAN) && blank($actualVal) && ($field['field_type'] ?? '') !== 'branch_id')
                                                             <button type="button"
                                                                 wire:click="updateInlineCheckValue({{ $check->id }}, '{{ $field['field_name'] }}', '{{ addslashes($productVal) }}')"
                                                                 class="mt-1 inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-200 transition shrink-0"
@@ -1137,55 +1145,61 @@ if ($isCompare) {
                     </div>
 
                     @foreach ($createProductDynamicFields as $field)
-                        <div class="{{ ($field['field_type'] ?? '') === 'textarea' ? 'md:col-span-2' : '' }}">
-                            <label
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $field['field_label'] }}
-                                @if (isset($field['required']) && $field['required'])
-                                    <span class="text-rose-500">*</span>
+                        @if (($field['field_type'] ?? '') === 'branch_id')
+                            <div class="hidden">
+                                <input type="hidden" wire:model="createProductDynamicValues.{{ $field['field_name'] }}">
+                            </div>
+                        @else
+                            <div class="{{ ($field['field_type'] ?? '') === 'textarea' ? 'md:col-span-2' : '' }}">
+                                <label
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $field['field_label'] }}
+                                    @if (isset($field['required']) && $field['required'])
+                                        <span class="text-rose-500">*</span>
+                                    @endif
+                                </label>
+
+                                @if ($field['field_type'] === 'textarea')
+                                    <textarea wire:model="createProductDynamicValues.{{ $field['field_name'] }}" rows="2"
+                                        class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"></textarea>
+                                @elseif ($field['field_type'] === 'boolean')
+                                    <select wire:model="createProductDynamicValues.{{ $field['field_name'] }}"
+                                        class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                        <option value="">Select...</option>
+                                        <option value="1">Yes</option>
+                                        <option value="0">No</option>
+                                    </select>
+                                @elseif ($field['field_type'] === 'select')
+                                    <select wire:model="createProductDynamicValues.{{ $field['field_name'] }}"
+                                        class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                        <option value="">Select option</option>
+                                        <!-- Options would be populated here if available -->
+                                    </select>
+                                @else
+                                    @php
+                                        $inputType = match ($field['field_type'] ?? 'text') {
+                                            'number' => 'number',
+                                            'decimal' => 'number',
+                                            'date' => 'date',
+                                            default => 'text',
+                                        };
+                                        $stepAttr =
+                                            $field['field_type'] === 'decimal'
+                                                ? 'any'
+                                                : ($field['field_type'] === 'number'
+                                                    ? '1'
+                                                    : null);
+                                    @endphp
+                                    <input wire:model="createProductDynamicValues.{{ $field['field_name'] }}"
+                                        type="{{ $inputType }}"
+                                        @if ($stepAttr) step="{{ $stepAttr }}" @endif
+                                        class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                                 @endif
-                            </label>
 
-                            @if ($field['field_type'] === 'textarea')
-                                <textarea wire:model="createProductDynamicValues.{{ $field['field_name'] }}" rows="2"
-                                    class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"></textarea>
-                            @elseif ($field['field_type'] === 'boolean')
-                                <select wire:model="createProductDynamicValues.{{ $field['field_name'] }}"
-                                    class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                                    <option value="">Select...</option>
-                                    <option value="1">Yes</option>
-                                    <option value="0">No</option>
-                                </select>
-                            @elseif ($field['field_type'] === 'select')
-                                <select wire:model="createProductDynamicValues.{{ $field['field_name'] }}"
-                                    class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                                    <option value="">Select option</option>
-                                    <!-- Options would be populated here if available -->
-                                </select>
-                            @else
-                                @php
-                                    $inputType = match ($field['field_type'] ?? 'text') {
-                                        'number' => 'number',
-                                        'decimal' => 'number',
-                                        'date' => 'date',
-                                        default => 'text',
-                                    };
-                                    $stepAttr =
-                                        $field['field_type'] === 'decimal'
-                                            ? 'any'
-                                            : ($field['field_type'] === 'number'
-                                                ? '1'
-                                                : null);
-                                @endphp
-                                <input wire:model="createProductDynamicValues.{{ $field['field_name'] }}"
-                                    type="{{ $inputType }}"
-                                    @if ($stepAttr) step="{{ $stepAttr }}" @endif
-                                    class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                            @endif
-
-                            @error('createProductDynamicValues.' . $field['field_name'])
-                                <span class="text-xs text-rose-500">{{ $message }}</span>
-                            @enderror
-                        </div>
+                                @error('createProductDynamicValues.' . $field['field_name'])
+                                    <span class="text-xs text-rose-500">{{ $message }}</span>
+                                @enderror
+                            </div>
+                        @endif
                     @endforeach
                 </div>
                 <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:justify-end">
