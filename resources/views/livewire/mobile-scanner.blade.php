@@ -1,4 +1,4 @@
-<div class="min-h-screen overflow-x-hidden bg-slate-50 py-3 sm:py-8" x-data="{
+<div class="min-h-screen overflow-x-hidden bg-slate-50 dark:bg-gray-950 py-3 sm:py-8" x-data="{
     showScannerModal: @entangle('showScannerModal'),
     showMatchedModal: @entangle('showMatchedModal'),
     showCreateLocationModal: @entangle('showCreateLocationModal'),
@@ -489,24 +489,24 @@
                 <span class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Legend:</span>
                 <div class="flex items-center gap-2">
                     <span
-                        class="w-4 h-4 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-800 shrink-0"></span>
+                        class="w-4 h-4 rounded-md bg-emerald-100 border border-emerald-300 dark:bg-emerald-500 dark:border-emerald-400 shrink-0"></span>
                     <span class="font-medium text-gray-600 dark:text-gray-300">Pass (Matches system
                         expectations)</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="w-4 h-4 rounded-md bg-rose-50 border border-rose-200 text-rose-800 shrink-0"></span>
+                    <span class="w-4 h-4 rounded-md bg-rose-100 border border-rose-200 dark:bg-rose-500 dark:border-rose-400 shrink-0"></span>
                     <span class="font-medium text-gray-600 dark:text-gray-300">Fail (Mismatch / tolerance
                         exceeded)</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span
-                        class="w-4 h-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800 shrink-0"></span>
+                        class="w-4 h-4 rounded-md bg-amber-100 border border-amber-200 dark:bg-amber-500 dark:border-amber-400 shrink-0"></span>
                     <span class="font-medium text-gray-600 dark:text-gray-300">Pending (Awaiting scan /
                         verification)</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span
-                        class="w-4 h-4 rounded-md bg-violet-50 border border-violet-200 text-violet-800 dark:bg-violet-950/20 dark:border-violet-900/40 shrink-0"></span>
+                        class="w-4 h-4 rounded-md bg-violet-100 border border-violet-200 dark:bg-violet-500 dark:border-violet-400 shrink-0"></span>
                     <span class="font-medium text-gray-600 dark:text-gray-300">Unmatched (Barcode not found in master
                         data)</span>
                 </div>
@@ -515,12 +515,21 @@
             <!-- Location Scan Stats -->
             <div
                 class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Current Location:</span>
-                    <span
-                        class="px-2.5 py-1 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
-                        {{ $selectedLocationName }}
-                    </span>
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Current Location:</span>
+                        <span
+                            class="px-2.5 py-1 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
+                            {{ $selectedLocationName }}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Active Branch:</span>
+                        <span
+                            class="px-2.5 py-1 rounded-lg text-sm font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-900/50">
+                            {{ auth()->user()->branch?->name ?? 'None' }}
+                        </span>
+                    </div>
                 </div>
                 <div class="flex items-center gap-6">
                     <div class="flex items-center gap-1.5 text-sm">

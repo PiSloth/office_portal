@@ -31,6 +31,7 @@ class PurchaseRequestResource extends Resource
         return $schema
             ->components([
                 \Filament\Schemas\Components\Section::make('Customer Details')
+                    ->key('customer_section')
                     ->headerActions([
                         \Filament\Actions\Action::make('edit_customer')
                             ->label('Edit Customer Info')
@@ -203,6 +204,11 @@ class PurchaseRequestResource extends Resource
                                         $html .= '</div>';
                                     }
                                 }
+                                
+                                if (blank($get('customer_name') ?: $record?->customer_name)) {
+                                    $html .= '<div class="text-red-600 dark:text-red-400 font-semibold text-xs mt-3 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-2.5 rounded-lg">⚠️ Customer နာမည် မဖြစ်မနေထည့်မှသာ ရှေ့ဆက်ခွင့်ရှိသည်။</div>';
+                                }
+                                
                                 $html .= '</div>';
                                 return new \Illuminate\Support\HtmlString($html);
                             }),
@@ -218,6 +224,17 @@ class PurchaseRequestResource extends Resource
                             ->label('GB Calculator')
                             ->icon('heroicon-m-calculator')
                             ->extraAttributes(['style' => 'background-color: #fffff0; color: #3d3d29; border: 1px solid #d1d1c4; font-weight: bold;'])
+                            ->beforeFormFilled(function (\Filament\Actions\Action $action, \Filament\Schemas\Components\Utilities\Get $get, $livewire) {
+                                if (blank($get('customer_name'))) {
+                                    $action->halt();
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Customer Info Required')
+                                        ->body('Please provide customer details first.')
+                                        ->warning()
+                                        ->send();
+                                    $livewire->mountAction('edit_customer', [], ['schemaComponent' => 'form.customer_section']);
+                                }
+                            })
                             ->modalHeading('GB Product Calculator')
                             ->modalWidth('4xl')
                             ->form([
@@ -459,6 +476,17 @@ class PurchaseRequestResource extends Resource
                             ->label('Other Calculator')
                             ->icon('heroicon-m-calculator')
                             ->extraAttributes(['style' => 'background-color: #ffe4e1; color: #800000; border: 1px solid #e1b4b4; font-weight: bold;'])
+                            ->beforeFormFilled(function (\Filament\Actions\Action $action, \Filament\Schemas\Components\Utilities\Get $get, $livewire) {
+                                if (blank($get('customer_name'))) {
+                                    $action->halt();
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Customer Info Required')
+                                        ->body('Please provide customer details first.')
+                                        ->warning()
+                                        ->send();
+                                    $livewire->mountAction('edit_customer', [], ['schemaComponent' => 'form.customer_section']);
+                                }
+                            })
                             ->modalHeading('Other Product Calculator')
                             ->modalWidth('4xl')
                             ->form([
@@ -1706,7 +1734,7 @@ class PurchaseRequestResource extends Resource
                         ->icon('heroicon-o-document-arrow-down')
                         ->color('success')
                         ->action(function (\Illuminate\Support\Collection $records) {
-                            $records->load(['items.purchaseRequest.branch', 'items.purchaseRequest.workflowState', 'items.productType']);
+                            $records->load(['items.purchaseRequest.branch', 'items.purchaseRequest.workflowState', 'items.purchaseRequest.creator', 'items.productType']);
                             
                             return new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($records) {
                                 $handle = fopen('php://output', 'w');
@@ -1714,7 +1742,10 @@ class PurchaseRequestResource extends Resource
                                 
                                 fputcsv($handle, [
                                     'Sr.',
+                                    'Branch',
+                                    'Date',
                                     'Purchase No.',
+                                    'Created By',
                                     'Customer Name',
                                     'Phone No.',
                                     'Product Name',
@@ -1723,6 +1754,7 @@ class PurchaseRequestResource extends Resource
                                     'Weight (K/P/Y)',
                                     'Qty',
                                     'ရ/မရ',
+                                    'Workflow State',
                                     'Price'
                                 ]);
                                 
@@ -1751,7 +1783,10 @@ class PurchaseRequestResource extends Resource
                                         
                                         fputcsv($handle, [
                                             $sr++,
+                                            $record->branch?->name ?? 'N/A',
+                                            $record->created_at?->format('Y-m-d') ?? 'N/A',
                                             $record->purchase_number,
+                                            $record->creator?->name ?? 'System',
                                             $record->customer_name,
                                             $record->customer_phone,
                                             $productName,
@@ -1760,6 +1795,7 @@ class PurchaseRequestResource extends Resource
                                             $weightKpy,
                                             $qty,
                                             $isGood,
+                                            $record->workflowState?->name ?? 'Draft',
                                             $priceText
                                         ]);
                                         
@@ -1787,9 +1823,13 @@ class PurchaseRequestResource extends Resource
                                     '',
                                     '',
                                     '',
+                                    '',
+                                    '',
+                                    '',
                                     number_format($totalGrams, 2) . ' g',
                                     "{$totalKyat}ကျပ် {$totalPae}ပဲ {$totalYawe}ရွေး",
                                     $totalQty,
+                                    '',
                                     '',
                                     number_format($totalPrice) . ' MMK'
                                 ]);

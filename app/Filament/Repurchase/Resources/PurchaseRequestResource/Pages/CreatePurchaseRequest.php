@@ -51,6 +51,16 @@ class CreatePurchaseRequest extends CreateRecord
             $this->halt();
         }
 
+        if (empty($this->data['customer_name'])) {
+            \Filament\Notifications\Notification::make()
+                ->title('Customer Info Required')
+                ->body('Customer နာမည် မဖြစ်မနေထည့်မှသာ ရှေ့ဆက်ခွင့်ရှိသည်။')
+                ->danger()
+                ->send();
+                
+            $this->halt();
+        }
+
         if (empty($this->data['items'])) {
             \Filament\Notifications\Notification::make()
                 ->title('Validation Error')
