@@ -14,6 +14,7 @@ use App\Filament\Stock\Widgets\UserCheckedProductsLineChartWidget;
 use App\Filament\Stock\Widgets\CategoryCheckReportWidget;
 use App\Filament\Stock\Widgets\PickupAndUnmatchedSummaryWidget;
 use App\Filament\Stock\Widgets\DecisionRuleSummaryWidget;
+use App\Filament\Stock\Widgets\ProductPivotReportWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
@@ -22,6 +23,7 @@ class Dashboard extends BaseDashboard
     {
         return [
             AdminStatsWidget::class,
+            ProductPivotReportWidget::class,
             PickupAndUnmatchedSummaryWidget::class,
             DecisionRuleSummaryWidget::class,
             ProductImportVsCheckedPieChartWidget::class,
