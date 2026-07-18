@@ -51,6 +51,27 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            font-size: 11px;
+        }
+
+        .summary-side .checklist-title {
+            font-size: 11px;
+        }
+
+        .summary-side .checklist-item {
+            font-size: 11px;
+        }
+
+        .summary-side .checklist-sub {
+            font-size: 11px;
+        }
+
+        .summary-side .summary-footer {
+            font-size: 11px;
+        }
+
+        .summary-side .sig-box {
+            font-size: 11px;
         }
 
         .cut-line {
@@ -355,7 +376,7 @@
 
                 <!-- Compact Meta -->
                 <div
-                    style="font-size: 7.5px; line-height: 1.25; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1mm; margin-bottom: 2mm;">
+                    style="font-size: 11px; line-height: 1.25; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1mm; margin-bottom: 2mm;">
                     <div><span class="meta-label" style="display:inline;">No:</span> <span class="meta-value"
                             style="display:inline;">{{ $record->purchase_number }}</span></div>
                     <div><span class="meta-label" style="display:inline;">Status:</span> <span class="meta-value"
@@ -417,10 +438,10 @@
 
             <!-- Company Portion Footer -->
             <div class="summary-footer">
-                <div style="font-weight: 700; font-size: 8.5px; color: #111827; margin-bottom: 1mm;">
+                <div style="font-weight: 700; font-size: 11px; color: #111827; margin-bottom: 1mm;">
                     Total: {{ number_format($record->total_amount) }} MMK
                 </div>
-                <div class="sig-box" style="margin-top: 1mm; font-size: 7.5px;">Bagger Signature</div>
+                <div class="sig-box" style="margin-top: 1mm; font-size: 11px;">Bagger Signature</div>
             </div>
         </div>
     </div>

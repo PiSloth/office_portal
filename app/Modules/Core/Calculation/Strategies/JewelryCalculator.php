@@ -19,7 +19,7 @@ class JewelryCalculator implements CalculatorContract
 
             return [
                 'status' => 'success',
-                'result' => max(0, $calculatedResult - 100),
+                'result' => max(0, $calculatedResult),
                 'message' => 'Percent ထည်ပြန်ဝယ်',
                 'details' => [
                     'total_weight' => 0,
@@ -121,7 +121,7 @@ class JewelryCalculator implements CalculatorContract
 
         return [
             'status' => 'success',
-            'result' => max(0, $calculatedResult - 100),
+            'result' => max(0, $calculatedResult),
             'message' => $reChange ? 'အလဲအထပ်ထည်' : 'ဆိုင်ထည်',
             'details' => [
                 'total_weight' => $totalWeight,
