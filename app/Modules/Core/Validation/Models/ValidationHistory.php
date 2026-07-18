@@ -36,9 +36,10 @@ class ValidationHistory extends Model
                     $rule = $history->rule;
                     $fieldName = $rule ? ($rule->label ?: $rule->field_name) : 'unknown_field';
                     
-                    \App\Modules\Purchase\Models\FailCheck::create([
+                    \App\Modules\Purchase\Models\FailCheck::updateOrCreate([
                         'purchase_request_id' => $purchaseRequestId,
                         'field_name' => $fieldName,
+                    ], [
                         'expected_value' => $history->expected_value,
                         'actual_value' => $history->input_value,
                         'remark' => $history->remarks,

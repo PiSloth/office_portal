@@ -46,6 +46,15 @@ class PurchaseDecisionResource extends Resource
                     ->visible(fn (?PurchaseDecision $record) => $record !== null)
                     ->columnSpanFull(),
 
+                \Filament\Schemas\Components\Section::make('Check History Summary on Failed Fields')
+                    ->schema([
+                        Forms\Components\Placeholder::make('failed_fields_histories')
+                            ->hiddenLabel()
+                            ->content(fn (?PurchaseDecision $record) => view('filament.repurchase.decision-histories-table', ['record' => $record])),
+                    ])
+                    ->visible(fn (?PurchaseDecision $record) => $record !== null && $record->purchaseRequest?->failChecks?->isNotEmpty())
+                    ->columnSpanFull(),
+
                 Forms\Components\Select::make('purchase_request_id')
                     ->relationship('purchaseRequest', 'id')
                     ->getOptionLabelFromRecordUsing(fn ($record) => $record->purchase_number)

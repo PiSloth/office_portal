@@ -8,34 +8,49 @@ $kernel->bootstrap();
 
 use Illuminate\Support\Facades\DB;
 
-$datesSubquery = DB::table('purchase_requests')
-    ->selectRaw('DATE(created_at) as id')
-    ->whereNull('deleted_at')
-    ->union(
-        DB::table('daily_price_histories')->selectRaw('DATE(created_at) as id')
-    );
-
-$query = \App\Models\DailyPriceHistory::query()
-    ->fromSub($datesSubquery, 'daily_price_histories')
-    ->selectRaw('daily_price_histories.id as id, daily_price_histories.id as missing_date')
-    ->whereNotExists(function ($query) {
-        $query->selectRaw(1)
-            ->from('announcement_gold_prices')
-            ->whereRaw('DATE(announcement_gold_prices.announcement_datetime) = daily_price_histories.id');
+$rows = DB::table('validation_histories as vh')
+    ->join('validation_rules as vr', 'vh.rule_id', '=', 'vr.id')
+    ->leftJoin('purchase_items as pi', function($join) {
+        $join->on('vh.validatable_id', '=', 'pi.id')
+             ->where('vh.validatable_type', '=', \App\Modules\Purchase\Models\PurchaseItem::class);
     })
-    ->groupBy('daily_price_histories.id');
+    ->join('purchase_requests as pr', function ($join) {
+        $join->on(function ($query) {
+            $query->on('vh.validatable_id', '=', 'pr.id')
+                  ->where('vh.validatable_type', '=', \App\Modules\Purchase\Models\PurchaseRequest::class);
+        })
+        ->orOn(function ($query) {
+            $query->on('pi.purchase_request_id', '=', 'pr.id')
+                  ->where('vh.validatable_type', '=', \App\Modules\Purchase\Models\PurchaseItem::class);
+        });
+    })
+    ->leftJoin('branches as b', 'pr.branch_id', '=', 'b.id')
+    ->leftJoin('workflow_states as ws', 'pr.workflow_state_id', '=', 'ws.id')
+    ->where('vh.status', '=', 'FAIL')
+    ->whereNull('pr.deleted_at')
+    ->select([
+        'vr.label as rule_label',
+        'vr.field_name as rule_field',
+        'b.name as branch_name',
+        'vh.input_value',
+        'vh.expected_value',
+        'ws.name as state_name',
+        'ws.is_end'
+    ])
+    ->get();
 
-echo "SQL: " . $query->toSql() . "\n\n";
-
-try {
-    $results = $query->get();
-    echo "Total rows: " . $results->count() . "\n";
-    foreach ($results as $row) {
-        echo "id: {$row->id}, missing_date: {$row->missing_date}\n";
-    }
-} catch (\Exception $e) {
-    echo "Error: " . $e->getMessage() . "\n";
+foreach ($rows as $row) {
+    echo "Field: " . ($row->rule_label ?: $row->rule_field) . " | Branch: {$row->branch_name} | Actual: {$row->input_value} | Expected: {$row->expected_value} | State: {$row->state_name} (is_end: {$row->is_end})\n";
 }
+
+
+
+
+
+
+
+
+
 
 
 
