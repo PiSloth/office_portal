@@ -90,6 +90,7 @@
                 overflow-x: auto;
                 border: 1px solid #e4e4e7;
                 border-radius: 12px;
+                margin-bottom: 24px;
             }
             .dark .table-container {
                 border-color: #27272a;
@@ -196,6 +197,18 @@
                 background-color: #78350f;
                 color: #fbbf24;
             }
+            .section-divider-title {
+                font-size: 0.95rem;
+                font-weight: 700;
+                color: #111827;
+                margin: 28px 0 12px 0;
+                padding-bottom: 8px;
+                border-bottom: 2px solid #e4e4e7;
+            }
+            .dark .section-divider-title {
+                color: #fafafa;
+                border-color: #27272a;
+            }
         </style>
 
         <div class="pivot-header">
@@ -244,7 +257,8 @@
             </div>
         </div>
 
-        <!-- Table -->
+        <!-- Standard Numeric/Count Table -->
+        <div class="section-divider-title">Standard Failed Fields Summary (Number & Counts)</div>
         <div class="table-container">
             <table class="pivot-table">
                 <thead class="pivot-thead">
@@ -261,7 +275,6 @@
                             $safeId = md5($fieldName);
                             $isExpanded = "expanded['{$safeId}'] === true";
                         @endphp
-                        <!-- Field Name Row (Parent) -->
                         <tr class="category-row"
                             @click="expanded['{{ $safeId }}'] = expanded['{{ $safeId }}'] === true ? false : true">
                             <td class="pivot-td">
@@ -286,7 +299,6 @@
                             </td>
                         </tr>
 
-                        <!-- Branch Rows (Default Collapsed) -->
                         @foreach($data['branches'] as $branchName => $brVal)
                             <tr class="branch-row" x-show="{{ $isExpanded }}" x-transition>
                                 <td class="pivot-td" style="padding-left: 40px; font-style: italic;">
@@ -307,6 +319,86 @@
                         <tr>
                             <td colspan="4" class="pivot-td text-center" style="padding: 32px; text-align: center; font-style: italic; color: #a1a1aa;">
                                 No records found matching the filter criteria.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Boolean Mismatch Analysis Table (ရ/မရ Fields) -->
+        <div class="section-divider-title">Boolean / Checklist Failed Fields Analysis (e.g. ရ/မရ)</div>
+        <div class="table-container">
+            <table class="pivot-table">
+                <thead class="pivot-thead">
+                    <tr>
+                        <th class="pivot-th">Failed Field > Branch > Scenario</th>
+                        <th class="pivot-th text-right">Expected</th>
+                        <th class="pivot-th text-right">Actual</th>
+                        <th class="pivot-th text-right">Difference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($booleanReport as $fieldName => $data)
+                        @php
+                            $safeId = md5($fieldName . '_bool');
+                            $isExpanded = "expanded['{$safeId}'] === true";
+                        @endphp
+                        <!-- Field Header Row -->
+                        <tr class="category-row"
+                            @click="expanded['{{ $safeId }}'] = expanded['{{ $safeId }}'] === true ? false : true">
+                            <td class="pivot-td">
+                                <div class="category-cell">
+                                    <svg class="arrow-icon" :class="expanded['{{ $safeId }}'] === true ? 'arrow-rotated' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                    <span>{{ $fieldName }}</span>
+                                    <span class="type-badge" style="background-color: #d1fae5; color: #065f46;">Boolean</span>
+                                </div>
+                            </td>
+                            <td class="pivot-td text-right font-bold" colspan="3" style="font-size: 0.75rem; color: #71717a;">
+                                Click to view scenarios per branch
+                            </td>
+                        </tr>
+
+                        <!-- Branch scenarios (Expected True -> False, Expected False -> True) -->
+                        @foreach($data['branches'] as $branchName => $brVal)
+                            <!-- Scenario 1: Expected True -> Actual False -->
+                            <tr class="branch-row" x-show="{{ $isExpanded }}" x-transition>
+                                <td class="pivot-td" style="padding-left: 40px; font-style: italic;">
+                                    {{ $branchName }} <span style="color: #6b7280; font-size: 0.75rem;">(Expected True &rarr; False)</span>
+                                </td>
+                                <td class="pivot-td text-right">
+                                    {{ number_format($brVal['true_to_false_count']) }} ({{ number_format($brVal['true_to_false_weight'], 2) }}g)
+                                </td>
+                                <td class="pivot-td text-right" style="color: #ef4444;">
+                                    0 (0.00g)
+                                </td>
+                                <td class="pivot-td text-right font-bold" style="color: #ef4444;">
+                                    {{ number_format($brVal['true_to_false_count']) }} ({{ number_format($brVal['true_to_false_weight'], 2) }}g)
+                                </td>
+                            </tr>
+
+                            <!-- Scenario 2: Expected False -> Actual True -->
+                            <tr class="branch-row" x-show="{{ $isExpanded }}" x-transition style="border-bottom: 1px solid #e4e4e7;">
+                                <td class="pivot-td" style="padding-left: 40px; font-style: italic;">
+                                    {{ $branchName }} <span style="color: #6b7280; font-size: 0.75rem;">(Expected False &rarr; True)</span>
+                                </td>
+                                <td class="pivot-td text-right">
+                                    {{ number_format($brVal['false_to_true_count']) }} ({{ number_format($brVal['false_to_true_weight'], 2) }}g)
+                                </td>
+                                <td class="pivot-td text-right" style="color: #10b981;">
+                                    0 (0.00g)
+                                </td>
+                                <td class="pivot-td text-right font-bold" style="color: #10b981;">
+                                    {{ number_format($brVal['false_to_true_count']) }} ({{ number_format($brVal['false_to_true_weight'], 2) }}g)
+                                </td>
+                            </tr>
+                        @endforeach
+                    @empty
+                        <tr>
+                            <td colspan="4" class="pivot-td text-center" style="padding: 32px; text-align: center; font-style: italic; color: #a1a1aa;">
+                                No boolean failed check records found matching the filter criteria.
                             </td>
                         </tr>
                     @endforelse
