@@ -20,6 +20,8 @@ class FailedFieldSummaryPivotWidget extends Widget
     public function mount(): void
     {
         $this->workflowFilterMode = 'end_states';
+        $this->startDate = now()->startOfWeek()->toDateString();
+        $this->endDate = now()->endOfWeek()->toDateString();
     }
 
     public function getViewData(): array
@@ -183,36 +185,55 @@ class FailedFieldSummaryPivotWidget extends Widget
                     $isNumeric = false;
                 }
 
-                // Group by branch under this field
+                // Group by branch and scenario under this field
                 $branchesData = [];
                 foreach ($fieldRows as $row) {
                     $branchName = $row->branch_name ?: 'No Branch';
                     if (!isset($branchesData[$branchName])) {
                         $branchesData[$branchName] = [
-                            'actual_sum' => 0.0,
-                            'expected_sum' => 0.0,
-                            'count' => 0,
+                            'exp_less_act' => [
+                                'expected_sum' => 0.0,
+                                'actual_sum' => 0.0,
+                                'count' => 0,
+                            ],
+                            'exp_greater_act' => [
+                                'expected_sum' => 0.0,
+                                'actual_sum' => 0.0,
+                                'count' => 0,
+                            ],
                         ];
                     }
 
-                    $actualClean = $this->cleanNumeric($row->actual_value);
-                    $expectedClean = $this->cleanNumeric($row->expected_value);
+                    $actualClean = (float)$this->cleanNumeric($row->actual_value);
+                    $expectedClean = (float)$this->cleanNumeric($row->expected_value);
 
                     if ($isNumeric) {
-                        $branchesData[$branchName]['actual_sum'] += (float) ($actualClean ?? 0);
-                        $branchesData[$branchName]['expected_sum'] += (float) ($expectedClean ?? 0);
+                        if ($expectedClean < $actualClean) {
+                            $branchesData[$branchName]['exp_less_act']['expected_sum'] += $expectedClean;
+                            $branchesData[$branchName]['exp_less_act']['actual_sum'] += $actualClean;
+                            $branchesData[$branchName]['exp_less_act']['count']++;
+                        } elseif ($expectedClean > $actualClean) {
+                            $branchesData[$branchName]['exp_greater_act']['expected_sum'] += $expectedClean;
+                            $branchesData[$branchName]['exp_greater_act']['actual_sum'] += $actualClean;
+                            $branchesData[$branchName]['exp_greater_act']['count']++;
+                        } else {
+                            $branchesData[$branchName]['exp_less_act']['expected_sum'] += $expectedClean;
+                            $branchesData[$branchName]['exp_less_act']['actual_sum'] += $actualClean;
+                            $branchesData[$branchName]['exp_less_act']['count']++;
+                        }
+                    } else {
+                        $branchesData[$branchName]['exp_less_act']['count']++;
                     }
-                    $branchesData[$branchName]['count']++;
                 }
 
                 // Calculate parent totals
                 $parentActual = 0.0;
                 $parentExpected = 0.0;
                 $parentCount = 0;
-                foreach ($branchesData as $brName => $brVal) {
-                    $parentActual += $brVal['actual_sum'];
-                    $parentExpected += $brVal['expected_sum'];
-                    $parentCount += $brVal['count'];
+                foreach ($branchesData as $brName => $scenarios) {
+                    $parentExpected += $scenarios['exp_less_act']['expected_sum'] + $scenarios['exp_greater_act']['expected_sum'];
+                    $parentActual += $scenarios['exp_less_act']['actual_sum'] + $scenarios['exp_greater_act']['actual_sum'];
+                    $parentCount += $scenarios['exp_less_act']['count'] + $scenarios['exp_greater_act']['count'];
                 }
 
                 $reportData[$fieldName] = [

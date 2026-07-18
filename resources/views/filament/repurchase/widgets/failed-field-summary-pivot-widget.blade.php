@@ -263,10 +263,10 @@
             <table class="pivot-table">
                 <thead class="pivot-thead">
                     <tr>
-                        <th class="pivot-th">Failed Field > Branch</th>
+                        <th class="pivot-th">Failed Field > Branch > Scenario</th>
                         <th class="pivot-th text-right">Sum of Expected</th>
-                        <th class="pivot-th text-right">Sum of Actual (Mismatched)</th>
-                        <th class="pivot-th text-right">Total Fail Count</th>
+                        <th class="pivot-th text-right">Sum of Actual</th>
+                        <th class="pivot-th text-right">Difference (Gain/Loss)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -291,27 +291,58 @@
                             <td class="pivot-td text-right">
                                 {{ $data['is_numeric'] ? number_format($data['expected_total'], 2) : 'N/A' }}
                             </td>
-                            <td class="pivot-td text-right" style="color: #b91c1c; font-weight: bold;">
+                            <td class="pivot-td text-right">
                                 {{ $data['is_numeric'] ? number_format($data['actual_total'], 2) : 'N/A' }}
                             </td>
-                            <td class="pivot-td text-right" style="font-weight: 800;">
-                                {{ number_format($data['count_total']) }}
+                            
+                            @php
+                                $netDiff = $data['actual_total'] - $data['expected_total'];
+                                $netColor = $netDiff > 0 ? 'color: #059669; font-weight: bold;' : ($netDiff < 0 ? 'color: #b91c1c; font-weight: bold;' : 'font-weight: bold;');
+                                $netText = $netDiff > 0 ? '+' . number_format($netDiff, 2) . ' (Gain)' : ($netDiff < 0 ? number_format($netDiff, 2) . ' (Loss)' : '0.00');
+                            @endphp
+                            <td class="pivot-td text-right" style="{{ $netColor }}">
+                                {{ $data['is_numeric'] ? $netText : number_format($data['count_total']) . ' Fails' }}
                             </td>
                         </tr>
 
-                        @foreach($data['branches'] as $branchName => $brVal)
+                        @foreach($data['branches'] as $branchName => $scenarios)
+                            <!-- Scenario 1: Expected < Actual (Gain) -->
                             <tr class="branch-row" x-show="{{ $isExpanded }}" x-transition>
                                 <td class="pivot-td" style="padding-left: 40px; font-style: italic;">
-                                    {{ $branchName }}
+                                    {{ $branchName }} <span style="color: #6b7280; font-size: 0.75rem;">(Expected &lt; Actual &rarr; Gain)</span>
                                 </td>
                                 <td class="pivot-td text-right">
-                                    {{ $data['is_numeric'] ? number_format($brVal['expected_sum'], 2) : 'N/A' }}
-                                </td>
-                                <td class="pivot-td text-right" style="color: #ef4444;">
-                                    {{ $data['is_numeric'] ? number_format($brVal['actual_sum'], 2) : 'N/A' }}
+                                    {{ $data['is_numeric'] ? number_format($scenarios['exp_less_act']['expected_sum'], 2) : 'N/A' }}
                                 </td>
                                 <td class="pivot-td text-right">
-                                    {{ number_format($brVal['count']) }}
+                                    {{ $data['is_numeric'] ? number_format($scenarios['exp_less_act']['actual_sum'], 2) : 'N/A' }}
+                                </td>
+                                
+                                @php
+                                    $diffLess = $scenarios['exp_less_act']['actual_sum'] - $scenarios['exp_less_act']['expected_sum'];
+                                @endphp
+                                <td class="pivot-td text-right" style="color: #059669; font-weight: 600;">
+                                    {{ $data['is_numeric'] ? '+' . number_format($diffLess, 2) : number_format($scenarios['exp_less_act']['count']) }}
+                                </td>
+                            </tr>
+
+                            <!-- Scenario 2: Expected > Actual (Loss) -->
+                            <tr class="branch-row" x-show="{{ $isExpanded }}" x-transition style="border-bottom: 1px solid #e4e4e7;">
+                                <td class="pivot-td" style="padding-left: 40px; font-style: italic;">
+                                    {{ $branchName }} <span style="color: #6b7280; font-size: 0.75rem;">(Expected &gt; Actual &rarr; Loss)</span>
+                                </td>
+                                <td class="pivot-td text-right">
+                                    {{ $data['is_numeric'] ? number_format($scenarios['exp_greater_act']['expected_sum'], 2) : 'N/A' }}
+                                </td>
+                                <td class="pivot-td text-right">
+                                    {{ $data['is_numeric'] ? number_format($scenarios['exp_greater_act']['actual_sum'], 2) : 'N/A' }}
+                                </td>
+                                
+                                @php
+                                    $diffGreater = $scenarios['exp_greater_act']['actual_sum'] - $scenarios['exp_greater_act']['expected_sum'];
+                                @endphp
+                                <td class="pivot-td text-right" style="color: #b91c1c; font-weight: 600;">
+                                    {{ $data['is_numeric'] ? number_format($diffGreater, 2) : number_format($scenarios['exp_greater_act']['count']) }}
                                 </td>
                             </tr>
                         @endforeach
@@ -344,7 +375,6 @@
                             $safeId = md5($fieldName . '_bool');
                             $isExpanded = "expanded['{$safeId}'] === true";
                         @endphp
-                        <!-- Field Header Row -->
                         <tr class="category-row"
                             @click="expanded['{{ $safeId }}'] = expanded['{{ $safeId }}'] === true ? false : true">
                             <td class="pivot-td">
@@ -361,7 +391,6 @@
                             </td>
                         </tr>
 
-                        <!-- Branch scenarios (Expected True -> False, Expected False -> True) -->
                         @foreach($data['branches'] as $branchName => $brVal)
                             <!-- Scenario 1: Expected True -> Actual False -->
                             <tr class="branch-row" x-show="{{ $isExpanded }}" x-transition>
