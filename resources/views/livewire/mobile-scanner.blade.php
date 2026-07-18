@@ -194,86 +194,108 @@
         <!-- Header -->
 
         <div class="grid gap-2 sm:flex sm:items-center sm:gap-3">
-            <select wire:model.live="selectedLocationId"
-                class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white sm:w-auto">
-                @foreach ($locations as $loc)
-                    <option value="{{ $loc->id }}">{{ $loc->name }}</option>
-                @endforeach
-            </select>
-            <button type="button" @click="showCreateLocationModal = true"
-                class="inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-50 px-3 text-sm font-semibold text-amber-700 hover:bg-amber-100 sm:bg-transparent sm:px-0 sm:text-amber-600 sm:hover:bg-transparent sm:hover:text-amber-500">
-                + New Location
-            </button>
-            <div class="relative w-full sm:w-auto" x-data="{ openCols: false }" @click.outside="openCols = false">
-                <button type="button" @click="openCols = !openCols"
-                    class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 dark:bg-gray-900 dark:text-white dark:ring-gray-700 sm:w-auto">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <!-- Searchable Location Dropdown -->
+            <div class="relative w-full sm:w-64 z-40" x-data="{
+                open: false,
+                search: '',
+                selectedId: @entangle('selectedLocationId').live,
+                get locations() {
+                    try {
+                        const el = document.getElementById('locations-source');
+                        if (el) {
+                            return JSON.parse(el.getAttribute('data-list') || '[]');
+                        }
+                    } catch(e) {}
+                    return [];
+                },
+                get selectedName() {
+                    let loc = this.locations.find(l => l.id == this.selectedId);
+                    return loc ? loc.name : 'Select Location...';
+                },
+                get filteredLocations() {
+                    if (!this.search) return this.locations;
+                    return this.locations.filter(l => l.name.toLowerCase().includes(this.search.toLowerCase()));
+                },
+                get exactMatch() {
+                    return this.locations.some(l => l.name.toLowerCase() === this.search.trim().toLowerCase());
+                },
+                selectLocation(id) {
+                    this.selectedId = id;
+                    this.open = false;
+                    this.search = '';
+                }
+            }" 
+            @location-created.window="open = false; search = '';"
+            @click.outside="open = false" 
+            @keydown.escape.window="open = false">
+                <!-- Hidden dynamic locations source -->
+                <div class="hidden" id="locations-source" data-list="{{ json_encode($locations->map(fn($l) => ['id' => $l->id, 'name' => $l->name])->toArray()) }}"></div>
+                <!-- Dropdown Trigger Button -->
+                <button type="button" @click="open = !open; if(open) { $nextTick(() => $refs.searchInput.focus()); }" 
+                    class="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-left text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700/50">
+                    <span class="truncate" x-text="selectedName"></span>
+                    <svg class="h-4 w-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                        <path d="M7 7l3-3 3 3m0 6l-3 3-3-3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    Columns
                 </button>
-                <!-- Columns Dropdown Menu -->
-                <div x-cloak x-show="openCols" x-transition:enter="transition ease-out duration-100"
+
+                <!-- Dropdown Content -->
+                <div x-cloak x-show="open" 
+                    x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="transform opacity-0 scale-95"
                     x-transition:enter-end="transform opacity-100 scale-100"
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="transform opacity-100 scale-100"
                     x-transition:leave-end="transform opacity-0 scale-95"
-                    class="absolute left-0 sm:left-auto sm:right-0 z-50 mt-2 w-56 origin-top-right rounded-2xl bg-white p-3 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-gray-800 dark:ring-gray-700">
-                    <p
-                        class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-2">
-                        Show/Hide Columns</p>
-                    <div class="space-y-1">
-                        <label
-                            class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" x-model="visibleColumns.barcode"
-                                class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
-                            <span>Barcode</span>
-                        </label>
-                        <label
-                            class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" x-model="visibleColumns.product_name"
-                                class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
-                            <span>Product Name</span>
-                        </label>
-                        <label
-                            class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" x-model="visibleColumns.pickedup_qty"
-                                class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
-                            <span>Pickedup</span>
-                        </label>
-                        <label
-                            class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" x-model="visibleColumns.record_qty"
-                                class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
-                            <span>Record Qty</span>
-                        </label>
-                        <label
-                            class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" x-model="visibleColumns.closing_stock"
-                                class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
-                            <span>Closing Stock</span>
-                        </label>
-                        <label
-                            class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" x-model="visibleColumns.actions"
-                                class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
-                            <span>Actions</span>
-                        </label>
-                        @foreach ($productTypeDynamicFields as $field)
-                            @php $isRequired = collect($scanConfigFields)->where('field', $field['field_name'])->where('required', true)->isNotEmpty(); @endphp
-                            <label
-                                class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                                <input type="checkbox" x-model="visibleColumns.{{ $field['field_name'] }}"
-                                    @if ($isRequired) disabled checked class="rounded border-gray-300 text-amber-500 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800"
-                                    @else class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800" @endif>
-                                <span>{{ $field['field_label'] }} @if ($isRequired)
-                                        *
-                                    @endif
-                                </span>
-                            </label>
-                        @endforeach
+                    class="absolute left-0 mt-1.5 w-full min-w-[240px] rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-black/5 dark:bg-gray-900 dark:ring-gray-800 focus:outline-none">
+                    
+                    <!-- Search Box -->
+                    <div class="relative p-1">
+                        <input type="text" x-model="search" x-ref="searchInput" placeholder="Search location..." 
+                            class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-1.5 text-xs text-gray-900 focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                            @keydown.enter.prevent="
+                                if (search.trim() && !exactMatch) {
+                                    $wire.createLocationByName(search.trim());
+                                    open = false;
+                                    search = '';
+                                }
+                            "
+                        />
+                    </div>
+
+                    <!-- Options List -->
+                    <div class="max-h-60 overflow-y-auto mt-1 space-y-0.5 custom-scrollbar">
+                        <!-- Listed Locations -->
+                        <template x-for="loc in filteredLocations" :key="loc.id">
+                            <button type="button" @click="selectLocation(loc.id)"
+                                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs text-gray-700 hover:bg-slate-50 dark:text-gray-300 dark:hover:bg-slate-800/60"
+                                :class="{'bg-amber-50/50 text-amber-900 font-medium dark:bg-amber-950/20 dark:text-amber-300': loc.id == selectedId}">
+                                <span class="truncate" x-text="loc.name"></span>
+                                <template x-if="loc.id == selectedId">
+                                    <svg class="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </template>
+                            </button>
+                        </template>
+
+                        <!-- "Create new" Option -->
+                        <template x-if="search.trim() !== '' && !exactMatch">
+                            <button type="button" @click="$wire.createLocationByName(search.trim()); open = false; search = '';"
+                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950/20 border-t border-dashed border-gray-100 dark:border-gray-800/80 mt-1">
+                                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span class="truncate">Create "<span x-text="search.trim()"></span>"</span>
+                            </button>
+                        </template>
+
+                        <!-- Empty State (No results & no search term) -->
+                        <template x-if="filteredLocations.length === 0 && search.trim() === ''">
+                            <div class="px-3 py-2 text-xs text-gray-500 text-center dark:text-gray-400">
+                                No locations found
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -490,64 +512,104 @@
                 <div class="flex items-center gap-2">
                     <span
                         class="w-4 h-4 rounded-md bg-emerald-100 border border-emerald-300 dark:bg-emerald-500 dark:border-emerald-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Pass (Matches system
-                        expectations)</span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Pass</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="w-4 h-4 rounded-md bg-rose-100 border border-rose-200 dark:bg-rose-500 dark:border-rose-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Fail (Mismatch / tolerance
-                        exceeded)</span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Fail</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span
                         class="w-4 h-4 rounded-md bg-amber-100 border border-amber-200 dark:bg-amber-500 dark:border-amber-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Pending (Awaiting scan /
-                        verification)</span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Pending</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span
                         class="w-4 h-4 rounded-md bg-violet-100 border border-violet-200 dark:bg-violet-500 dark:border-violet-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Unmatched (Barcode not found in master
-                        data)</span>
+                    <span class="font-medium text-gray-600 dark:text-gray-300">Unmatched</span>
                 </div>
             </div>
 
-            <!-- Location Scan Stats -->
-            <div
-                class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
-                <div class="flex flex-wrap items-center gap-4">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Current Location:</span>
-                        <span
-                            class="px-2.5 py-1 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
-                            {{ $selectedLocationName }}
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Active Branch:</span>
-                        <span
-                            class="px-2.5 py-1 rounded-lg text-sm font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-900/50">
-                            {{ auth()->user()->branch?->name ?? 'None' }}
-                        </span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-6">
-                    <div class="flex items-center gap-1.5 text-sm">
-                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Products:</span>
-                        <strong
-                            class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedCount }}</strong>
-                    </div>
-                    <div class="w-px h-4 bg-slate-200 dark:bg-slate-800"></div>
-                    <div class="flex items-center gap-1.5 text-sm">
-                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Quantity:</span>
-                        <strong
-                            class="text-slate-900 dark:text-white font-extrabold text-base">{{ $locationScannedQty }}</strong>
-                    </div>
-                </div>
-            </div>
 
             <!-- Checks Table Grouped by Location -->
-            <div class="min-w-0 space-y-8">
+            <div class="min-w-0 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-slate-800 dark:text-white">Recent Checks</h2>
+                    
+                    <div class="relative" x-data="{ openCols: false }" @click.outside="openCols = false">
+                        <button type="button" @click="openCols = !openCols"
+                            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 dark:bg-gray-900 dark:text-white dark:ring-gray-700">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Columns
+                        </button>
+                        <!-- Columns Dropdown Menu -->
+                        <div x-cloak x-show="openCols" x-transition:enter="transition ease-out duration-100"
+                            x-transition:enter-start="transform opacity-0 scale-95"
+                            x-transition:enter-end="transform opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-75"
+                            x-transition:leave-start="transform opacity-100 scale-100"
+                            x-transition:leave-end="transform opacity-0 scale-95"
+                            class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-2xl bg-white p-3 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-gray-800 dark:ring-gray-700">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-2">
+                                Show/Hide Columns</p>
+                            <div class="space-y-1">
+                                <label
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input type="checkbox" x-model="visibleColumns.barcode"
+                                        class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Barcode</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input type="checkbox" x-model="visibleColumns.product_name"
+                                        class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Product Name</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input type="checkbox" x-model="visibleColumns.pickedup_qty"
+                                        class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Pickedup</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input type="checkbox" x-model="visibleColumns.record_qty"
+                                        class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Record Qty</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input type="checkbox" x-model="visibleColumns.closing_stock"
+                                        class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Closing Stock</span>
+                                </label>
+                                <label
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input type="checkbox" x-model="visibleColumns.actions"
+                                        class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Actions</span>
+                                </label>
+                                @foreach ($productTypeDynamicFields as $field)
+                                    @php $isRequired = collect($scanConfigFields)->where('field', $field['field_name'])->where('required', true)->isNotEmpty(); @endphp
+                                    <label
+                                        class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <input type="checkbox" x-model="visibleColumns.{{ $field['field_name'] }}"
+                                            @if ($isRequired) disabled checked class="rounded border-gray-300 text-amber-500 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800"
+                                            @else class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800" @endif>
+                                        <span>{{ $field['field_label'] }} @if ($isRequired)
+                                                *
+                                            @endif
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 @forelse($recentChecksGrouped as $locationName => $checks)
                     <div
                         class="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-gray-900 sm:rounded-3xl">
@@ -558,6 +620,44 @@
                         <div class="w-full max-w-full overflow-x-auto overscroll-x-contain">
                             <table class="w-full text-left text-sm text-gray-600 dark:text-gray-300 min-w-[600px]">
                                 <thead>
+                                    <!-- Stats Row styled like a table row -->
+                                    <tr class="bg-slate-50/50 dark:bg-slate-800/40 border-b border-gray-100 dark:border-gray-800">
+                                        <td colspan="100%" class="px-4 py-3">
+                                            <div class="flex flex-wrap items-center justify-between gap-4">
+                                                <div class="flex flex-wrap items-center gap-4">
+                                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                        <span>Session:</span>
+                                                        <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 font-bold">
+                                                            {{ $selectedSessionName }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                        <span>Current Location:</span>
+                                                        <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-100 dark:border-amber-900/50 font-bold">
+                                                            {{ $locationName }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                        <span>Active Branch:</span>
+                                                        <span class="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-100 dark:border-teal-900/50 font-bold">
+                                                            {{ auth()->user()->branch?->name ?? 'None' }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-5 text-xs">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Products:</span>
+                                                        <strong class="text-slate-900 dark:text-white font-extrabold text-sm">{{ $locationStats->get($locationName)?->count ?? 0 }}</strong>
+                                                    </div>
+                                                    <div class="w-px h-3 bg-slate-200 dark:bg-slate-800"></div>
+                                                    <div class="flex items-center gap-1.5">
+                                                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Quantity:</span>
+                                                        <strong class="text-slate-900 dark:text-white font-extrabold text-sm">{{ $locationStats->get($locationName)?->qty ?? 0 }}</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                     <tr
                                         class="border-b border-gray-200 dark:border-gray-700 uppercase tracking-wider text-xs whitespace-nowrap">
                                         <th x-show="visibleColumns.barcode"

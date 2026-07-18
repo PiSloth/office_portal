@@ -134,6 +134,45 @@ class MobileScanner extends Component
         $this->newLocationDescription = null;
     }
 
+    public function createLocationByName(string $name)
+    {
+        $name = trim($name);
+        if (empty($name)) {
+            return;
+        }
+
+        $existing = Location::where('name', $name)->first();
+        if ($existing) {
+            $this->selectedLocationId = $existing->id;
+            session(['scanner_selected_location_id' => $existing->id]);
+            $this->dispatch('location-created', [
+                'id' => $existing->id,
+                'name' => $existing->name
+            ]);
+            return;
+        }
+
+        $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 8)) . '-' . rand(100, 999);
+        $loc = Location::create([
+            'code' => $code,
+            'name' => $name,
+            'description' => 'Created via scanner location search'
+        ]);
+        $this->selectedLocationId = $loc->id;
+        session(['scanner_selected_location_id' => $loc->id]);
+
+        $this->dispatch('location-created', [
+            'id' => $loc->id,
+            'name' => $loc->name
+        ]);
+
+        Notification::make()
+            ->title('Location created')
+            ->body("Location '{$name}' has been created successfully.")
+            ->success()
+            ->send();
+    }
+
     public function updatedProductTypeId(): void
     {
         $this->scanConfigId = null;
@@ -868,14 +907,15 @@ class MobileScanner extends Component
         });
 
         $selectedLocation = Location::find($this->selectedLocationId);
-        $locationScannedCount = ProductCheck::where('check_session_id', $this->checkSessionId)
+        $selectedSession = CheckSession::find($this->checkSessionId);
+        
+        $locationStats = ProductCheck::where('check_session_id', $this->checkSessionId)
             ->where('checked_by', auth()->id())
-            ->where('location_id', $this->selectedLocationId)
-            ->count();
-        $locationScannedQty = (int) ProductCheck::where('check_session_id', $this->checkSessionId)
-            ->where('checked_by', auth()->id())
-            ->where('location_id', $this->selectedLocationId)
-            ->sum('quantity');
+            ->leftJoin('locations', 'product_checks.location_id', '=', 'locations.id')
+            ->selectRaw('COALESCE(locations.name, "Unknown Location") as location_name, COUNT(*) as count, SUM(quantity) as qty')
+            ->groupBy('location_name')
+            ->get()
+            ->keyBy('location_name');
 
         return view('livewire.mobile-scanner', [
             'sessions' => CheckSession::latest('started_at')->get(),
@@ -884,8 +924,8 @@ class MobileScanner extends Component
             'decisionTypes' => DecisionType::where('is_active', true)->orderBy('name')->get(),
             'recentChecksGrouped' => $recentChecksGrouped,
             'selectedLocationName' => $selectedLocation?->name ?? 'None',
-            'locationScannedCount' => $locationScannedCount,
-            'locationScannedQty' => $locationScannedQty,
+            'selectedSessionName' => $selectedSession?->name ?? 'None',
+            'locationStats' => $locationStats,
             'scanConfigs' => $this->productTypeId
                 ? ScanConfig::where('product_type_id', $this->productTypeId)->where('is_active', true)->orderBy('name')->get()
                 : collect(),
