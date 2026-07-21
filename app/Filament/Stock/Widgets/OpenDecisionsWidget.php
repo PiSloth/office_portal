@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 
 class OpenDecisionsWidget extends TableWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected static ?string $heading = 'Open Decisions';
 
     protected int | string | array $columnSpan = 'full';

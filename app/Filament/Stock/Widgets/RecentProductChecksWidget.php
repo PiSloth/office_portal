@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 
 class RecentProductChecksWidget extends TableWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected static ?string $heading = 'Recent Product Checks';
 
     protected int | string | array $columnSpan = 'full';

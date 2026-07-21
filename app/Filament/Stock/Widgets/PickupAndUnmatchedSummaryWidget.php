@@ -12,6 +12,8 @@ use Filament\Widgets\TableWidget;
 
 class PickupAndUnmatchedSummaryWidget extends TableWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected static ?string $heading = 'Pickup & Unmatched Check Summary';
 
     protected int | string | array $columnSpan = 'full';

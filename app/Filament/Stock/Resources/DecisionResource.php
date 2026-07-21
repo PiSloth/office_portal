@@ -12,6 +12,8 @@ use BackedEnum;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Resource;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -61,6 +63,89 @@ class DecisionResource extends Resource
                 Forms\Components\Hidden::make('decision_by')
                     ->default(fn() => auth()->id()),
             ])->columns(2),
+        ]);
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->schema([
+            Section::make('Decision Details')
+                ->schema([
+                    TextEntry::make('decisionType.name')->label('Decision Type'),
+                    TextEntry::make('action_status')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'OPEN' => 'warning',
+                            'IN_PROGRESS' => 'info',
+                            'DONE' => 'success',
+                            'REJECTED' => 'danger',
+                            default => 'gray',
+                        }),
+                    TextEntry::make('assignedTo.name')->label('Assigned To'),
+                    TextEntry::make('decisionBy.name')->label('Decision By'),
+                    TextEntry::make('created_at')->dateTime()->label('Created At'),
+                    TextEntry::make('remark')->columnSpanFull()->label('Remark'),
+                ])
+                ->columns(2),
+
+            Section::make('Checked Product Info')
+                ->schema([
+                    TextEntry::make('productCheck.product.code')->label('Product Code'),
+                    TextEntry::make('productCheck.product.name')->label('Product Name'),
+                    TextEntry::make('productCheck.barcode')->label('Checked Barcode'),
+                    TextEntry::make('productCheck.product.category.name')->label('Category'),
+                    TextEntry::make('productCheck.product.subCategory.name')->label('Sub-Category')->default('---'),
+                    TextEntry::make('productCheck.location.name')->label('Location'),
+                    TextEntry::make('productCheck.quantity')->label('Checked Quantity'),
+                    TextEntry::make('productCheck.product.quantity')->label('System Quantity'),
+                ])
+                ->columns(2),
+
+            Section::make('Check Summary')
+                ->schema([
+                    TextEntry::make('productCheck.checkSession.name')->label('Check Session'),
+                    TextEntry::make('productCheck.checkedBy.name')->label('Checked By'),
+                    TextEntry::make('productCheck.checked_at')->dateTime()->label('Checked At'),
+                    TextEntry::make('productCheck.result_status')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'PASS' => 'success',
+                            'FAIL' => 'danger',
+                            'WARNING' => 'warning',
+                            'UNMATCHED' => 'danger',
+                            default => 'gray',
+                        })
+                        ->state(fn ($record) => $record->productCheck?->result_status),
+                ])
+                ->columns(2),
+
+            Section::make('Checked Values / Attributes')
+                ->schema([
+                    RepeatableEntry::make('check_values')
+                        ->label('Attribute Comparison')
+                        ->state(fn ($record) => $record->productCheck?->checkValues->map(fn ($value) => [
+                            'field_name' => $value->field_name,
+                            'expected_value' => $value->expected_value,
+                            'actual_value' => $value->actual_value,
+                            'difference_value' => $value->difference_value,
+                            'status' => $value->status,
+                        ])->all() ?? [])
+                        ->schema([
+                            TextEntry::make('field_name')->label('Field Name'),
+                            TextEntry::make('expected_value')->label('Expected (DB)'),
+                            TextEntry::make('actual_value')->label('Actual (Checked)'),
+                            TextEntry::make('difference_value')->label('Difference'),
+                            TextEntry::make('status')
+                                ->badge()
+                                ->color(fn (string $state): string => match ($state) {
+                                    'PASS' => 'success',
+                                    'FAIL' => 'danger',
+                                    'WARNING' => 'warning',
+                                    default => 'gray',
+                                }),
+                        ])
+                        ->columns(5),
+                ]),
         ]);
     }
 

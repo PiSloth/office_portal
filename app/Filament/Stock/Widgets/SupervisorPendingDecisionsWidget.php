@@ -8,6 +8,8 @@ use Filament\Widgets\Widget;
 
 class SupervisorPendingDecisionsWidget extends Widget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected string $view = 'dashboard-supervisor-pending-decisions';
 
     protected int | string | array $columnSpan = 'full';

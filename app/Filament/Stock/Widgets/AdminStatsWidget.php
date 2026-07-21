@@ -11,6 +11,8 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class AdminStatsWidget extends StatsOverviewWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected int | string | array $columnSpan = 'full';
 
     protected function getStats(): array

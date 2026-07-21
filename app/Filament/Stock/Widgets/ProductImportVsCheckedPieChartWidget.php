@@ -10,6 +10,8 @@ use Filament\Widgets\ChartWidget;
 
 class ProductImportVsCheckedPieChartWidget extends ChartWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected ?string $heading = 'Imported vs Checked Products';
 
     public ?string $filter = null;

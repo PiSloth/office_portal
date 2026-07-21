@@ -11,6 +11,8 @@ use Filament\Widgets\TableWidget;
 
 class CategoryCheckReportWidget extends TableWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected static ?string $heading = 'Sub Category Check Report';
 
     protected int | string | array $columnSpan = 'full';

@@ -13,6 +13,8 @@ use Filament\Widgets\TableWidget;
 
 class DecisionRuleSummaryWidget extends TableWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected static ?string $heading = 'Decision Rule Statistics Summary';
 
     protected int | string | array $columnSpan = 'full';

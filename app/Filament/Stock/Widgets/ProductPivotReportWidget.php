@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 class ProductPivotReportWidget extends Widget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected string $view = 'filament.stock.widgets.product-pivot-report-widget';
 
     protected int | string | array $columnSpan = 'full';

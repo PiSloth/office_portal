@@ -9,6 +9,8 @@ use Illuminate\Support\Collection;
 
 class ProductTypeCheckedPieChartWidget extends ChartWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected ?string $heading = 'Checked Product Types';
 
     public ?string $filter = null;

@@ -8,6 +8,8 @@ use Filament\Widgets\ChartWidget;
 
 class DelayedDecisionStatusChartWidget extends ChartWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected ?string $heading = 'Delayed Decision Status';
 
     protected int | string | array $columnSpan = 1;

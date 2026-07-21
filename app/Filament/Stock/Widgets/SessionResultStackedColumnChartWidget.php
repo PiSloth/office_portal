@@ -8,6 +8,8 @@ use Filament\Widgets\ChartWidget;
 
 class SessionResultStackedColumnChartWidget extends ChartWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     protected ?string $heading = 'Check Results by Session';
 
     public ?string $filter = null;

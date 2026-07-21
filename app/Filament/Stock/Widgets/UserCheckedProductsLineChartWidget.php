@@ -13,6 +13,8 @@ use Illuminate\Support\Carbon;
 
 class UserCheckedProductsLineChartWidget extends ChartWidget
 {
+    protected ?string $pollingInterval = '5s';
+
     use HasFiltersSchema;
 
     protected ?string $heading = 'Checked Products by User';
