@@ -52,6 +52,14 @@ class ProductPivotReportWidget extends Widget
                      ->where('pc.check_session_id', '=', $this->selectedSessionId)
                      ->whereNull('pc.deleted_at');
             });
+            $query->leftJoin('product_import_batches as pib', 'p.import_batch_id', '=', 'pib.id')
+                ->where(function($q) {
+                    $q->where('pib.check_session_id', $this->selectedSessionId)
+                      ->orWhere(function($sq) {
+                          $sq->where('p.created_during_pickup', 1)
+                            ->whereNotNull('pc.id');
+                      });
+                });
         } else {
             $query->leftJoin('product_checks as pc', function($join) {
                 $join->on('p.id', '=', 'pc.product_id')
@@ -60,7 +68,7 @@ class ProductPivotReportWidget extends Widget
         }
 
         $query->select([
-            'sc.id as sub_category_id',
+            DB::raw('MIN(sc.id) as sub_category_id'),
             'sc.name as sub_category_name',
             'b.id as branch_id',
             'b.name as branch_name',
@@ -76,7 +84,7 @@ class ProductPivotReportWidget extends Widget
             DB::raw('SUM(CASE WHEN (p.created_during_pickup = 0 OR p.created_during_pickup IS NULL) AND pc.id IS NOT NULL THEN CAST(COALESCE(weight_pav.value, 0) AS DECIMAL(12,4)) ELSE 0 END) as checked_weight')
         ]);
 
-        $rows = $query->groupBy('sc.id', 'sc.name', 'b.id', 'b.name')
+        $rows = $query->groupBy('sc.name', 'b.id', 'b.name')
             ->orderBy('sc.name', 'asc')
             ->orderBy('b.name', 'asc')
             ->get();
