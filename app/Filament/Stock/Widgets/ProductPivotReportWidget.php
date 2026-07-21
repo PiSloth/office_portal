@@ -92,9 +92,7 @@ class ProductPivotReportWidget extends Widget
         // Structure reportData
         $reportData = [];
         foreach ($rows as $row) {
-            $subCategoryId = $row->sub_category_id ?? 0;
             $subCategoryName = $row->sub_category_name ?? 'No Sub Category';
-            $branchId = $row->branch_id ?? 0;
             $branchName = $row->branch_name ?? 'No Branch';
 
             $isQtyMode = $this->displayMode === 'qty';
@@ -118,8 +116,10 @@ class ProductPivotReportWidget extends Widget
                 }
             }
 
-            if (!isset($reportData[$subCategoryId])) {
-                $reportData[$subCategoryId] = [
+            $scKey = trim(mb_strtolower($subCategoryName));
+
+            if (!isset($reportData[$scKey])) {
+                $reportData[$scKey] = [
                     'name' => $subCategoryName,
                     'imported' => 0,
                     'during_created' => 0,
@@ -129,19 +129,27 @@ class ProductPivotReportWidget extends Widget
                 ];
             }
 
-            $reportData[$subCategoryId]['branches'][] = [
-                'name' => $branchName,
-                'imported' => $imported,
-                'during_created' => $duringCreated,
-                'checked' => $checked,
-                'balance' => $balance
-            ];
+            $branchKey = trim(mb_strtolower($branchName));
+            if (!isset($reportData[$scKey]['branches'][$branchKey])) {
+                $reportData[$scKey]['branches'][$branchKey] = [
+                    'name' => $branchName,
+                    'imported' => 0,
+                    'during_created' => 0,
+                    'checked' => 0,
+                    'balance' => 0
+                ];
+            }
+
+            $reportData[$scKey]['branches'][$branchKey]['imported'] += $imported;
+            $reportData[$scKey]['branches'][$branchKey]['during_created'] += $duringCreated;
+            $reportData[$scKey]['branches'][$branchKey]['checked'] += $checked;
+            $reportData[$scKey]['branches'][$branchKey]['balance'] += $balance;
 
             // Accumulate parent counts
-            $reportData[$subCategoryId]['imported'] += $imported;
-            $reportData[$subCategoryId]['during_created'] += $duringCreated;
-            $reportData[$subCategoryId]['checked'] += $checked;
-            $reportData[$subCategoryId]['balance'] += $balance;
+            $reportData[$scKey]['imported'] += $imported;
+            $reportData[$scKey]['during_created'] += $duringCreated;
+            $reportData[$scKey]['checked'] += $checked;
+            $reportData[$scKey]['balance'] += $balance;
         }
 
         // If a subcategory has no branches after filtering, we remove it from the list
@@ -150,6 +158,19 @@ class ProductPivotReportWidget extends Widget
                 unset($reportData[$id]);
             }
         }
+
+        // Sort subcategories alphabetically by name
+        uksort($reportData, function($a, $b) use ($reportData) {
+            return strcasecmp($reportData[$a]['name'], $reportData[$b]['name']);
+        });
+
+        // Sort branches alphabetically for each subcategory
+        foreach ($reportData as $scKey => &$scData) {
+            uasort($scData['branches'], function($a, $b) {
+                return strcasecmp($a['name'], $b['name']);
+            });
+        }
+        unset($scData);
 
         // Calculate Grand Totals
         $grandTotal = [
