@@ -15,6 +15,7 @@ class PurchaseRequest extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'purchase_number',
         'branch_id', 
         'product_type_id',
         'user_id', 
@@ -28,10 +29,23 @@ class PurchaseRequest extends Model
         'submitted_at'
     ];
 
-    protected $casts = [
-        'submitted_at' => 'datetime',
-        'customer_nrc_photo' => 'array',
-    ];
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (empty($model->purchase_number)) {
+                $branchCode = 'MAIN';
+                if ($model->branch_id) {
+                    $branch = Branch::find($model->branch_id);
+                    if ($branch?->code) {
+                        $branchCode = $branch->code;
+                    }
+                }
+                $now = now();
+                $seq = static::whereDate('created_at', $now->toDateString())->count() + 1;
+                $model->purchase_number = 'PR-' . $branchCode . '/' . $now->format('ymd') . str_pad($seq, 3, '0', STR_PAD_LEFT);
+            }
+        });
+    }
 
     public function branch()
     {
@@ -85,6 +99,10 @@ class PurchaseRequest extends Model
 
     public function getPurchaseNumberAttribute()
     {
+        if (!empty($this->attributes['purchase_number'])) {
+            return $this->attributes['purchase_number'];
+        }
+
         $branchCode = $this->branch?->code ?: 'MAIN';
 
         if (!$this->created_at) {
@@ -92,11 +110,46 @@ class PurchaseRequest extends Model
         }
         
         $date = $this->created_at;
-        $seq = \App\Modules\Purchase\Models\PurchaseRequest::whereDate('created_at', $date->toDateString())
+        $seq = static::whereDate('created_at', $date->toDateString())
             ->where('id', '<=', $this->id)
             ->count();
             
         return 'PR-' . $branchCode . '/' . $date->format('ymd') . str_pad($seq, 3, '0', STR_PAD_LEFT);
+    }
+
+    public function isPaidOrAfter(): bool
+    {
+        if (!$this->workflow_state_id) {
+            return false;
+        }
+
+        $paidState = WorkflowState::where('name', 'Paid')->first();
+        if (!$paidState) {
+            return false;
+        }
+
+        if ((int) $this->workflow_state_id === (int) $paidState->id) {
+            return true;
+        }
+
+        $afterPaidStateIds = [];
+        $queue = [$paidState->id];
+
+        while (!empty($queue)) {
+            $currentStateId = array_shift($queue);
+            $nextStateIds = \App\Modules\Core\Workflow\Models\WorkflowTransition::where('from_state_id', $currentStateId)
+                ->pluck('to_state_id')
+                ->toArray();
+
+            foreach ($nextStateIds as $nextStateId) {
+                if ($nextStateId !== (int) $paidState->id && !in_array($nextStateId, $afterPaidStateIds, true)) {
+                    $afterPaidStateIds[] = $nextStateId;
+                    $queue[] = $nextStateId;
+                }
+            }
+        }
+
+        return in_array((int) $this->workflow_state_id, $afterPaidStateIds, true);
     }
 
     public function updateTotalAmount(): void

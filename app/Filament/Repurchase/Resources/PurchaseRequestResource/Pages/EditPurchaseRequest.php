@@ -425,6 +425,7 @@ class EditPurchaseRequest extends EditRecord
             ->label('Print Voucher')
             ->icon('heroicon-o-printer')
             ->color('success')
+            ->visible(fn() => $this->record->isPaidOrAfter())
             ->url(fn() => route('purchase-requests.print', ['record' => $this->record]))
             ->openUrlInNewTab();
 
@@ -561,6 +562,7 @@ class EditPurchaseRequest extends EditRecord
 
                             foreach ($histories as $history) {
                                 $inputs = $history->input_snapshot_json ?? [];
+                                $params = $history->parameter_snapshot_json ?? [];
                                 $productName = $inputs['product_name'] ?? '-';
                                 $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
                                 $weight = ($inputs['goldWeightGram'] ?? '0') . ' g';
@@ -571,10 +573,12 @@ class EditPurchaseRequest extends EditRecord
                                 $operator = $history->user?->name ?? 'System';
                                 $price = number_format($history->total_amount) . ' MMK';
                                 $qty = $inputs['quantity'] ?? 1;
-                                $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : 'ဆိုင်ထည် (No)');
+                                $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : (($inputs['reChange'] ?? '0') === '3' ? 'စိန်ထည်ပြန်ဝယ်' : 'ဆိုင်ထည် (No)'));
                                 $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
                                 $deduction = ($inputs['percent'] ?? 0) . '%';
                                 $remark = $inputs['remark'] ?? '-';
+
+                                $stepsHtml = \App\Modules\Core\Calculation\Strategies\JewelryCalculator::renderStepsHtml($inputs, $params);
 
                                 $html .= '<tr class="border-b border-gray-100 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">';
                                 $html .= '<td class="py-3 pr-4 font-medium">' . e($date) . '</td>';
@@ -589,6 +593,9 @@ class EditPurchaseRequest extends EditRecord
                                 $html .= '<td class="py-3 px-4 font-semibold text-success-600">' . e($price) . '</td>';
                                 $html .= '<td class="py-3 px-4 text-gray-500">' . e($remark) . '</td>';
                                 $html .= '</tr>';
+                                $html .= '<tr class="border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40"><td colspan="11" class="px-4 py-2">';
+                                $html .= '<details><summary class="cursor-pointer text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">🧮 View Calculation Steps Breakdown (တွက်ချက်ပုံအဆင့်ဆင့်ကြည့်ရန်)</summary><div class="mt-2.5 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">' . $stepsHtml . '</div></details>';
+                                $html .= '</td></tr>';
                             }
 
                             $html .= '</tbody></table></div>';

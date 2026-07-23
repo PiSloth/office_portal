@@ -270,6 +270,7 @@ class PurchaseRequestResource extends Resource
                                                     '0' => 'ဆိုင်ထည် (No)',
                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                     '2' => 'Percent ထည်ပြန်ဝယ်',
+                                                    '3' => 'စိန်ထည်ပြန်ဝယ်',
                                                 ])
                                                 ->default('0')
                                                 ->live(),
@@ -278,8 +279,8 @@ class PurchaseRequestResource extends Resource
                                     Forms\Components\TextInput::make('original_voucher_price')
                                         ->numeric()
                                         ->label('Original Voucher Price')
-                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
-                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
                                         ->live(onBlur: true)
                                         ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
 
@@ -289,8 +290,8 @@ class PurchaseRequestResource extends Resource
                                         ->disk('public')
                                         ->visibility('public')
                                         ->directory('attachments/purchase_items')
-                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
-                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2'),
+                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3'])),
 
                                     \Filament\Schemas\Components\Grid::make(2)
                                         ->schema([
@@ -347,16 +348,19 @@ class PurchaseRequestResource extends Resource
                                         ->schema([
                                             Forms\Components\TextInput::make('percent')
                                                 ->numeric()
-                                                ->label('Percent Deduction')
+                                                ->label(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3' ? 'Plus Percent Addition' : 'Percent Deduction')
                                                 ->suffix('%')
                                                 ->default(0)
-                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
                                                 ->live(onBlur: true)
-                                                ->helperText(new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>'))
-                                                ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်းလျော့ထည့်ရန်')
+                                                ->helperText(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3'
+                                                    ? new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းပေါင်းထည့်ရန်</span>')
+                                                    : new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>')
+                                                )
+                                                ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်း ပေါင်း/လျော့ ထည့်ရန်')
                                                 ->extraInputAttributes([
                                                     'onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }',
-                                                    'title' => 'ရာခိုင်နှုန်းလျော့ထည့်ရန်',
+                                                    'title' => 'ရာခိုင်နှုန်း ပေါင်း/လျော့ ထည့်ရန်',
                                                 ])
                                                 ->extraAttributes(['class' => 'percent-field']),
 
@@ -829,6 +833,10 @@ class PurchaseRequestResource extends Resource
                                         if ((string)$reChange === '2') {
                                             $origPrice = $get('dynamic_fields_json.original_voucher_price') ?? 0;
                                             $html .= "<br/><span class='text-teal-600 dark:text-teal-400 text-xs font-semibold'>Percent Buyback: " . number_format($origPrice) . " MMK</span>";
+                                        } elseif ((string)$reChange === '3') {
+                                            $origPrice = $get('dynamic_fields_json.original_voucher_price') ?? 0;
+                                            $plusPercent = $get('dynamic_fields_json.percent') ?? 0;
+                                            $html .= "<br/><span class='text-amber-600 dark:text-amber-400 text-xs font-semibold'>Diamond Buyback (စိန်ထည်ပြန်ဝယ်): " . number_format($origPrice) . " MMK (+" . $plusPercent . "%)</span>";
                                         }
                                         if ($remark) {
                                             $html .= "<br/><span class='text-gray-400 text-xs italic'>" . e($remark) . "</span>";
@@ -935,6 +943,7 @@ class PurchaseRequestResource extends Resource
                                                                     '0' => 'ဆိုင်ထည် (No)',
                                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                                     '2' => 'Percent ထည်ပြန်ဝယ်',
+                                                                    '3' => 'စိန်ထည်ပြန်ဝယ်',
                                                                 ] : [
                                                                     '0' => 'ဆိုင်ထည် (No)',
                                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
@@ -946,8 +955,8 @@ class PurchaseRequestResource extends Resource
                                                     Forms\Components\TextInput::make('original_voucher_price')
                                                         ->numeric()
                                                         ->label('Original Voucher Price')
-                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
-                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
                                                         ->live(onBlur: true)
                                                         ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
 
@@ -957,8 +966,8 @@ class PurchaseRequestResource extends Resource
                                                         ->disk('public')
                                                         ->visibility('public')
                                                         ->directory('attachments/purchase_items')
-                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
-                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2'),
+                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3'])),
 
                                                     \Filament\Schemas\Components\Grid::make(1)
                                                         ->schema([
@@ -1015,13 +1024,16 @@ class PurchaseRequestResource extends Resource
                                                         ->schema([
                                                             Forms\Components\TextInput::make('percent')
                                                                 ->numeric()
-                                                                ->label('Percent Deduction')
+                                                                ->label(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3' ? 'Plus Percent Addition' : 'Percent Deduction')
                                                                 ->suffix('%')
                                                                 ->default(0)
-                                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '2')
+                                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
                                                                 ->live(onBlur: true)
-                                                                ->helperText(new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>'))
-                                                                ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်းလျော့ထည့်ရန်')
+                                                                ->helperText(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3'
+                                                                    ? new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းပေါင်းထည့်ရန်</span>')
+                                                                    : new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းလျော့ထည့်ရန်</span>')
+                                                                )
+                                                                ->hintIcon('heroicon-m-question-mark-circle', tooltip: 'ရာခိုင်နှုန်း ပေါင်း/လျော့ ထည့်ရန်')
                                                                 ->extraInputAttributes([
                                                                     'onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }',
                                                                     'title' => 'ရာခိုင်နှုန်းလျော့ထည့်ရန်',
@@ -1139,6 +1151,24 @@ class PurchaseRequestResource extends Resource
                                             }
                                         }),
 
+                                    \Filament\Actions\Action::make('view_calculation_steps')
+                                        ->label('Steps')
+                                        ->tooltip('Calculation Step Breakdown (တွက်ချက်ပုံအဆင့်ဆင့်)')
+                                        ->icon('heroicon-m-calculator')
+                                        ->color('success')
+                                        ->modalHeading(fn($record, \Filament\Schemas\Components\Utilities\Get $get) => 'Calculation Steps - ' . ($record->dynamic_fields_json['product_name'] ?? $get('dynamic_fields_json.product_name') ?? 'Product Item'))
+                                        ->modalWidth('4xl')
+                                        ->modalSubmitAction(false)
+                                        ->modalCancelActionLabel('Close')
+                                        ->modalContent(function ($record, \Filament\Schemas\Components\Utilities\Get $get) {
+                                            $inputs = $record ? ($record->dynamic_fields_json ?? []) : ($get('dynamic_fields_json') ?? []);
+                                            $method = \App\Modules\Core\Calculation\Models\CalculationMethod::where('name', 'Standard Jewelry Calculator')->first();
+                                            $parameters = $method ? $method->parameters->pluck('value', 'key')->toArray() : [];
+
+                                            $html = \App\Modules\Core\Calculation\Strategies\JewelryCalculator::renderStepsHtml($inputs, $parameters);
+                                            return new \Illuminate\Support\HtmlString($html);
+                                        }),
+
                                     \Filament\Actions\Action::make('view_validation_history')
                                         ->label('History')
                                         ->icon('heroicon-m-clock')
@@ -1246,9 +1276,9 @@ class PurchaseRequestResource extends Resource
 
         $rate = self::getConversionRate();
         $totalKyat = $kyat + ($pae / 16) + ($yawe / 128);
-        $gram = $totalKyat * $rate;
+        $grossGram = $totalKyat * $rate;
 
-        $set('goldWeightGram', round($gram, 4));
+        $set('goldWeightGram', round($grossGram, 4));
     }
 
     public static function convertGramToKyat(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set): void
@@ -1463,57 +1493,8 @@ class PurchaseRequestResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('purchase_number')
                     ->label('Purchase No')
-                    ->searchable(query: function (Builder $query, string $search): Builder {
-                        $search = trim($search);
-                        
-                        // 1. Full pattern: PR-BRANCHCODE/YYMMDDNNN
-                        if (preg_match('/^PR-([A-Z0-9]+)\/(\d{6})(\d{3})$/i', $search, $matches)) {
-                            $branchCode = $matches[1];
-                            $dateStr = $matches[2];
-                            $seq = intval($matches[3]);
-                            
-                            try {
-                                $date = \Carbon\Carbon::createFromFormat('ymd', $dateStr)->toDateString();
-                                
-                                $id = \App\Modules\Purchase\Models\PurchaseRequest::whereDate('created_at', $date)
-                                    ->whereHas('branch', fn($q) => $q->where('code', $branchCode))
-                                    ->orderBy('id', 'asc')
-                                    ->skip($seq - 1)
-                                    ->take(1)
-                                    ->value('id');
-                                
-                                if ($id) {
-                                    return $query->where('id', $id);
-                                }
-                            } catch (\Exception $e) {
-                            }
-                        }
-                        
-                        // 2. Date only: YYMMDD
-                        if (preg_match('/^\d{6}$/', $search)) {
-                            try {
-                                $date = \Carbon\Carbon::createFromFormat('ymd', $search)->toDateString();
-                                return $query->whereDate('created_at', $date);
-                            } catch (\Exception $e) {
-                            }
-                        }
-
-                        // 3. Branch only starting with PR-: PR-BRANCHCODE
-                        if (preg_match('/^PR-([A-Z0-9]+)$/i', $search, $matches)) {
-                            $branchCode = $matches[1];
-                            return $query->whereHas('branch', fn($q) => $q->where('code', 'like', "%{$branchCode}%"));
-                        }
-
-                        // 4. Default fallback: search branch code or raw ID
-                        return $query->where(function (Builder $q) use ($search) {
-                            $q->whereHas('branch', fn($sub) => $sub->where('code', 'like', "%{$search}%"))
-                              ->orWhere('id', 'like', "%{$search}%");
-                        });
-                    })
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        return $query->orderBy('created_at', $direction)
-                                     ->orderBy('id', $direction);
-                    }),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('branch.name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('productType.name')
@@ -1646,6 +1627,7 @@ class PurchaseRequestResource extends Resource
                                 fn(Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
+                Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 \Filament\Actions\Action::make('view_history')
@@ -1688,6 +1670,7 @@ class PurchaseRequestResource extends Resource
 
                                     foreach ($histories as $history) {
                                         $inputs = $history->input_snapshot_json ?? [];
+                                        $params = $history->parameter_snapshot_json ?? [];
                                         $productName = $inputs['product_name'] ?? '-';
                                         $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
                                         $weight = ($inputs['goldWeightGram'] ?? '0') . ' g';
@@ -1698,10 +1681,12 @@ class PurchaseRequestResource extends Resource
                                         $operator = $history->user?->name ?? 'System';
                                         $price = number_format($history->total_amount) . ' MMK';
                                         $qty = $inputs['quantity'] ?? 1;
-                                        $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : 'ဆိုင်ထည် (No)');
+                                        $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : (($inputs['reChange'] ?? '0') === '3' ? 'စိန်ထည်ပြန်ဝယ်' : 'ဆိုင်ထည် (No)'));
                                         $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
                                         $deduction = ($inputs['percent'] ?? 0) . '%';
                                         $remark = $inputs['remark'] ?? '-';
+
+                                        $stepsHtml = \App\Modules\Core\Calculation\Strategies\JewelryCalculator::renderStepsHtml($inputs, $params);
 
                                         $html .= '<tr class="border-b border-gray-100 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">';
                                         $html .= '<td class="py-3 pr-4 font-medium">' . e($date) . '</td>';
@@ -1716,6 +1701,9 @@ class PurchaseRequestResource extends Resource
                                         $html .= '<td class="py-3 px-4 font-semibold text-success-600">' . e($price) . '</td>';
                                         $html .= '<td class="py-3 px-4 text-gray-500">' . e($remark) . '</td>';
                                         $html .= '</tr>';
+                                        $html .= '<tr class="border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40"><td colspan="11" class="px-4 py-2">';
+                                        $html .= '<details><summary class="cursor-pointer text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">🧮 View Calculation Steps Breakdown (တွက်ချက်ပုံအဆင့်ဆင့်ကြည့်ရန်)</summary><div class="mt-2.5 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">' . $stepsHtml . '</div></details>';
+                                        $html .= '</td></tr>';
                                     }
 
                                     $html .= '</tbody></table></div>';
@@ -1846,6 +1834,8 @@ class PurchaseRequestResource extends Resource
                             ]);
                         }),
                     \Filament\Actions\DeleteBulkAction::make(),
+                    \Filament\Actions\RestoreBulkAction::make(),
+                    \Filament\Actions\ForceDeleteBulkAction::make(),
                 ]),
             ]);
     }
