@@ -24,205 +24,106 @@ class RolesAndPermissionsSeeder extends Seeder
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $permissions = [
-            'admin.access',
-            'users.view',
-            'users.create',
-            'users.update',
-            'users.delete',
-            'roles.view',
-            'roles.create',
-            'roles.update',
-            'roles.delete',
-            'roles.assign',
-            'permissions.view',
-            'permissions.create',
-            'permissions.update',
-            'permissions.delete',
-            'permissions.manage',
-            'config.view',
-            'config.manage',
-            'roles.assign',
-            'roles.update',
-            'categories.view',
-            'categories.create',
-            'categories.update',
-            'categories.delete',
-            'sub-categories.view',
-            'sub-categories.create',
-            'sub-categories.update',
-            'sub-categories.delete',
-            'locations.view',
-            'locations.create',
-            'locations.update',
-            'locations.delete',
-            'product-types.view',
-            'product-types.create',
-            'product-types.update',
-            'product-types.delete',
-            'scan-configs.view',
-            'scan-configs.create',
-            'scan-configs.update',
-            'scan-configs.delete',
-            'sessions.view',
-            'sessions.create',
-            'sessions.update',
-            'sessions.delete',
-            'decisions.view',
-            'decisions.create',
-            'decisions.update',
-            'decisions.delete',
-            'decisions.assign',
-            'reports.view',
-            'products.view',
-            'products.create',
-            'products.update',
-            'products.delete',
-            'products.import',
-            'products.rollback',
-            'scan-configs.view',
-            'scan-configs.create',
-            'scan-configs.update',
-            'scan-configs.delete',
-            'sessions.view',
-            'sessions.create',
-            'sessions.update',
-            'sessions.delete',
-            'sessions.manage',
-            'checks.view',
-            'checks.create',
-            'checks.update',
-            'checks.delete',
-            'product-checks.view',
-            'product-checks.create',
-            'product-checks.update',
-            'product-checks.delete',
-            'decisions.view',
-            'decisions.create',
-            'decisions.update',
-            'decisions.delete',
-            'decisions.assign',
-            'reports.view',
-        ];
+        $backupPath = database_path('seeders/data/roles_and_permissions_backup.json');
 
-        foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
-        }
+        if (file_exists($backupPath)) {
+            $backup = json_decode(file_get_contents($backupPath), true);
+            $permissions = $backup['permissions'] ?? [];
+            $rolesData = $backup['roles'] ?? [];
+            $users = $backup['users'] ?? [];
 
-        $superAdmin = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
-        $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
-        $manager = Role::firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
-        $checker = Role::firstOrCreate(['name' => 'checker', 'guard_name' => 'web']);
+            foreach ($permissions as $permission) {
+                Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+            }
 
-        $superAdmin->syncPermissions(Permission::all());
-        $admin->syncPermissions([
-            'users.view',
-            'users.create',
-            'users.update',
-            'roles.view',
-            'roles.assign',
-            'permissions.view',
-            'categories.view',
-            'categories.create',
-            'categories.update',
-            'categories.delete',
-            'sub-categories.view',
-            'sub-categories.create',
-            'sub-categories.update',
-            'sub-categories.delete',
-            'locations.view',
-            'locations.create',
-            'locations.update',
-            'locations.delete',
-            'product-types.view',
-            'product-types.create',
-            'product-types.update',
-            'product-types.delete',
-            'scan-configs.view',
-            'scan-configs.create',
-            'scan-configs.update',
-            'scan-configs.delete',
-            'sessions.view',
-            'sessions.create',
-            'sessions.update',
-            'sessions.delete',
-            'decisions.view',
-            'decisions.create',
-            'decisions.update',
-            'decisions.delete',
-            'decisions.assign',
-            'reports.view',
-            'products.view',
-            'products.create',
-            'products.update',
-            'products.import',
-            'scan-configs.view',
-            'scan-configs.create',
-            'scan-configs.update',
-            'sessions.view',
-            'sessions.create',
-            'sessions.update',
-            'sessions.manage',
-            'checks.view',
-            'checks.create',
-            'checks.update',
-            'product-checks.view',
-            'product-checks.create',
-            'product-checks.update',
-            'product-checks.delete',
-            'decisions.view',
-            'decisions.create',
-            'decisions.update',
-            'decisions.assign',
-            'reports.view',
-        ]);
-        $manager->syncPermissions([
-            'roles.assign',
-            'roles.update',
-            'products.view',
-            'products.update',
-            'scan-configs.view',
-            'sessions.view',
-            'sessions.create',
-            'sessions.update',
-            'sessions.manage',
-            'checks.view',
-            'checks.create',
-            'product-checks.view',
-            'product-checks.create',
-            'product-checks.update',
-            'decisions.view',
-            'decisions.create',
-            'decisions.update',
-            'decisions.assign',
-            'reports.view',
-        ]);
-        $checker->syncPermissions([
-            'products.view',
-            'sessions.view',
-            'checks.view',
-            'checks.create',
-            'decisions.view',
-            'reports.view',
-        ]);
+            foreach ($rolesData as $roleName => $roleInfo) {
+                $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => $roleInfo['guard_name'] ?? 'web']);
+                if (isset($roleInfo['permissions'])) {
+                    $role->syncPermissions($roleInfo['permissions']);
+                }
+            }
 
-        $users = [
-            ['name' => 'Super Admin User', 'email' => 'superadmin@mahar.com', 'password' => 'super@Admin', 'status' => 'ACTIVE', 'roles' => ['super-admin']],
-            ['name' => 'Admin User', 'email' => 'admin@mahar.com', 'password' => 'password123', 'status' => 'ACTIVE', 'roles' => ['admin']],
-            ['name' => 'Manager User', 'email' => 'manager@mahar.com', 'password' => 'password123', 'status' => 'ACTIVE', 'roles' => ['manager']],
-            ['name' => 'Checker User', 'email' => 'checker@mahar.com', 'password' => 'password123', 'status' => 'ACTIVE', 'roles' => ['checker']],
-        ];
+            foreach ($users as $data) {
+                $user = User::updateOrCreate(
+                    ['email' => $data['email']],
+                    [
+                        'name' => $data['name'],
+                        'password' => Hash::make($data['password'] ?? 'password123'),
+                        'status' => $data['status'] ?? 'ACTIVE',
+                    ]
+                );
+                if (!empty($data['roles'])) {
+                    $user->syncRoles($data['roles']);
+                }
+            }
+        } else {
+            $permissions = [
+                'admin.access', 'categories.create', 'categories.delete', 'categories.update', 'categories.view',
+                'checks.create', 'checks.delete', 'checks.update', 'checks.view', 'config.manage', 'config.view',
+                'decisions.assign', 'decisions.create', 'decisions.delete', 'decisions.update', 'decisions.view',
+                'locations.create', 'locations.delete', 'locations.update', 'locations.view',
+                'permissions.create', 'permissions.delete', 'permissions.manage', 'permissions.update', 'permissions.view',
+                'product-checks.create', 'product-checks.delete', 'product-checks.update', 'product-checks.view',
+                'product-types.create', 'product-types.delete', 'product-types.update', 'product-types.view',
+                'products.create', 'products.delete', 'products.import', 'products.rollback', 'products.update', 'products.view',
+                'reports.view', 'repurchase.verify', 'roles.assign', 'roles.create', 'roles.delete', 'roles.update', 'roles.view',
+                'scan-configs.create', 'scan-configs.delete', 'scan-configs.update', 'scan-configs.view',
+                'sessions.create', 'sessions.delete', 'sessions.manage', 'sessions.update', 'sessions.view',
+                'sub-categories.create', 'sub-categories.delete', 'sub-categories.update', 'sub-categories.view',
+                'users.create', 'users.delete', 'users.update', 'users.view',
+            ];
 
-        foreach ($users as $data) {
-            $user = User::updateOrCreate(
-                ['email' => $data['email']],
-                [
-                    'name' => $data['name'],
-                    'password' => Hash::make($data['password']),
-                    'status' => $data['status'],
-                ]
-            );
-            $user->syncRoles($data['roles']);
+            foreach ($permissions as $permission) {
+                Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+            }
+
+            $superAdmin = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
+            $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+            $manager = Role::firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
+            $checker = Role::firstOrCreate(['name' => 'checker', 'guard_name' => 'web']);
+
+            $superAdmin->syncPermissions(Permission::all());
+            $admin->syncPermissions([
+                'users.view', 'users.create', 'users.update', 'roles.view', 'roles.assign', 'permissions.view',
+                'categories.view', 'categories.create', 'categories.update', 'categories.delete',
+                'sub-categories.view', 'sub-categories.create', 'sub-categories.update', 'sub-categories.delete',
+                'locations.view', 'locations.create', 'locations.update', 'locations.delete',
+                'product-types.view', 'product-types.create', 'product-types.update', 'product-types.delete',
+                'scan-configs.view', 'scan-configs.create', 'scan-configs.update', 'scan-configs.delete',
+                'sessions.view', 'sessions.create', 'sessions.update', 'sessions.delete',
+                'decisions.view', 'decisions.create', 'decisions.update', 'decisions.delete', 'decisions.assign',
+                'reports.view', 'products.view', 'products.create', 'products.update', 'products.import',
+                'sessions.manage', 'checks.view', 'checks.create', 'checks.update',
+                'product-checks.view', 'product-checks.create', 'product-checks.update', 'product-checks.delete',
+            ]);
+            $manager->syncPermissions([
+                'roles.update', 'roles.assign', 'scan-configs.view', 'sessions.view', 'sessions.create', 'sessions.update',
+                'decisions.view', 'decisions.create', 'decisions.update', 'decisions.assign', 'reports.view',
+                'products.view', 'products.update', 'sessions.manage', 'checks.view', 'checks.create',
+                'product-checks.view', 'product-checks.create', 'product-checks.update',
+            ]);
+            $checker->syncPermissions([
+                'sessions.view', 'decisions.view', 'reports.view', 'products.view', 'checks.view', 'checks.create', 'admin.access',
+            ]);
+
+            $users = [
+                ['name' => 'Super Admin User', 'email' => 'superadmin@mahar.com', 'password' => 'super@Admin', 'status' => 'ACTIVE', 'roles' => ['super-admin']],
+                ['name' => 'Admin User', 'email' => 'admin@mahar.com', 'password' => 'password123', 'status' => 'ACTIVE', 'roles' => ['admin']],
+                ['name' => 'Manager User', 'email' => 'manager@mahar.com', 'password' => 'password123', 'status' => 'ACTIVE', 'roles' => ['manager']],
+                ['name' => 'Checker User', 'email' => 'checker@mahar.com', 'password' => 'password123', 'status' => 'ACTIVE', 'roles' => ['checker']],
+            ];
+
+            foreach ($users as $data) {
+                $user = User::updateOrCreate(
+                    ['email' => $data['email']],
+                    [
+                        'name' => $data['name'],
+                        'password' => Hash::make($data['password']),
+                        'status' => $data['status'],
+                    ]
+                );
+                $user->syncRoles($data['roles']);
+            }
         }
 
         // Existing operational seed data retained

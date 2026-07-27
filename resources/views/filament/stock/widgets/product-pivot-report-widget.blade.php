@@ -360,16 +360,25 @@
                 <tbody>
                     @forelse($reportData as $scId => $scData)
                         @php
+                            $hasBranches = !empty($scData['branches']);
                             $isExpanded = "expanded['{$scId}'] !== false";
                         @endphp
                         <!-- Subcategory Header Row -->
                         <tr class="category-row"
-                            @click="expanded['{{ $scId }}'] = expanded['{{ $scId }}'] === false ? true : false">
+                            @if($hasBranches)
+                                @click="expanded['{{ $scId }}'] = expanded['{{ $scId }}'] === false ? true : false"
+                            @else
+                                style="cursor: default;"
+                            @endif>
                             <td class="pivot-td">
                                 <div class="category-cell">
-                                    <svg class="arrow-icon" :class="expanded['{{ $scId }}'] === false ? '' : 'arrow-rotated'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                    </svg>
+                                    @if($hasBranches)
+                                        <svg class="arrow-icon" :class="expanded['{{ $scId }}'] === false ? '' : 'arrow-rotated'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    @else
+                                        <span style="width: 16px; height: 16px; display: inline-block;"></span>
+                                    @endif
                                     <span>{{ $scData['name'] }}</span>
                                 </div>
                             </td>

@@ -246,10 +246,11 @@ class MobileScanner extends Component
             ->orWhere('qr_code', $code)
             ->first();
 
-        // Check if already checked in this session by this user
+        // Check if already checked in this session by this user at the selected location
         $existingCheck = ProductCheck::where('check_session_id', $this->checkSessionId)
             ->where('barcode', $code)
             ->where('checked_by', auth()->id())
+            ->where('location_id', $this->selectedLocationId)
             ->first();
 
         if ($existingCheck) {
@@ -288,6 +289,7 @@ class MobileScanner extends Component
             
             if ($product) {
                 $newCheck->update(['result_status' => $this->resolveCheckStatus($newCheck, $autoStatus)]);
+                ProductCheck::syncStatusesForProduct($this->checkSessionId, $product->id);
                 $this->flash('Scanned successfully.', 'success');
             } else {
                 $newCheck->update(['result_status' => 'UNMATCHED']);
@@ -334,6 +336,25 @@ class MobileScanner extends Component
         $this->handleScan($code);
     }
 
+    public function pickupProductById(int $productId): void
+    {
+        $product = Product::find($productId);
+        if (! $product) {
+            $this->flash('Selected product not found.', 'warning');
+            return;
+        }
+
+        $code = $product->code ?: $product->barcode ?: $product->qr_code;
+        if (empty($code)) {
+            $code = 'PROD-' . $product->id;
+            if (empty($product->code)) {
+                $product->update(['code' => $code]);
+            }
+        }
+
+        $this->handleScan($code);
+    }
+
     public function deleteCheck(int $checkId): void
     {
         $check = ProductCheck::find($checkId);
@@ -342,8 +363,11 @@ class MobileScanner extends Component
             return;
         }
 
+        $sessionId = $check->check_session_id;
+        $productId = $check->product_id;
         $check->delete();
         $this->deletedCheckIdToRestore = $check->id;
+        ProductCheck::syncStatusesForProduct($sessionId, $productId);
         $this->flash('Check deleted.', 'warning');
     }
 
@@ -357,6 +381,7 @@ class MobileScanner extends Component
 
         $check->restore();
         $this->deletedCheckIdToRestore = null;
+        ProductCheck::syncStatusesForProduct($check->check_session_id, $check->product_id);
         $this->flash('Check restored successfully.', 'success');
     }
 
@@ -375,6 +400,16 @@ class MobileScanner extends Component
         
         $this->updatedCreateProductTypeId();
         $this->showCreateProductModal = true;
+    }
+
+    public function deleteCheckFromModal(): void
+    {
+        if ($this->activeCheckId) {
+            $checkId = $this->activeCheckId;
+            $this->showCreateProductModal = false;
+            $this->activeCheckId = null;
+            $this->deleteCheck($checkId);
+        }
     }
 
     public function updatedCreateProductTypeId()
@@ -878,6 +913,7 @@ class MobileScanner extends Component
         $check->save();
         
         event(new ProductChecked($check));
+        ProductCheck::syncStatusesForProduct($check->check_session_id, $check->product_id);
     }
 
     public function render()
@@ -917,6 +953,20 @@ class MobileScanner extends Component
             ->get()
             ->keyBy('location_name');
 
+        $productsQuery = Product::query()->where('status', 'ACTIVE');
+        if ($this->productTypeId) {
+            $productsQuery->where('product_type_id', $this->productTypeId);
+        }
+        $dropdownProducts = $productsQuery->orderBy('name')
+            ->take(300)
+            ->get(['id', 'name', 'code', 'barcode'])
+            ->map(fn($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'code' => $p->code ?: $p->barcode ?: '',
+            ])
+            ->toArray();
+
         return view('livewire.mobile-scanner', [
             'sessions' => CheckSession::latest('started_at')->get(),
             'locations' => Location::orderBy('name')->get(),
@@ -926,6 +976,7 @@ class MobileScanner extends Component
             'selectedLocationName' => $selectedLocation?->name ?? 'None',
             'selectedSessionName' => $selectedSession?->name ?? 'None',
             'locationStats' => $locationStats,
+            'dropdownProducts' => $dropdownProducts,
             'scanConfigs' => $this->productTypeId
                 ? ScanConfig::where('product_type_id', $this->productTypeId)->where('is_active', true)->orderBy('name')->get()
                 : collect(),

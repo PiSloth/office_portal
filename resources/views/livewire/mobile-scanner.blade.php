@@ -16,6 +16,20 @@
         @foreach ($productTypeDynamicFields as $field)
         '{{ $field['field_name'] }}': {{ $field['show_in_table_by_default'] ? 'true' : 'false' }}, @endforeach
     },
+    statusFilters: [],
+    toggleStatusFilter(status) {
+        if (this.statusFilters.includes(status)) {
+            this.statusFilters = this.statusFilters.filter(s => s !== status);
+        } else {
+            this.statusFilters.push(status);
+        }
+    },
+    clearStatusFilters() {
+        this.statusFilters = [];
+    },
+    isStatusFiltered(status) {
+        return this.statusFilters.includes(status);
+    },
     countdown: 0,
     delaySeconds: parseInt(localStorage.getItem('scannerDelaySeconds')) || 3,
     prefixes: JSON.parse(localStorage.getItem('scannerPrefixes') || '[]'),
@@ -149,6 +163,29 @@
     <style>
         [x-cloak] {
             display: none !important;
+        }
+
+        /* Input & Textarea Placeholders: Exactly matching "Select product name to pickup..." text color */
+        input::placeholder,
+        textarea::placeholder,
+        select::placeholder,
+        [x-ref="scanCodeInput"]::placeholder {
+            color: #334155 !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: #334155 !important;
+        }
+
+        .dark input::placeholder,
+        .dark textarea::placeholder,
+        .dark select::placeholder,
+        .dark [x-ref="scanCodeInput"]::placeholder,
+        html.dark input::placeholder,
+        html.dark textarea::placeholder,
+        html.dark select::placeholder,
+        html.dark [x-ref="scanCodeInput"]::placeholder {
+            color: rgba(255, 255, 255, 0.8) !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: rgba(255, 255, 255, 0.8) !important;
         }
 
         @keyframes scan-line {
@@ -301,12 +338,12 @@
             </div>
         </div>
 
-        <div class="text-xs text-gray-500 dark:text-gray-400">
+        <div class="text-xs text-slate-900 font-bold dark:text-white">
             Product: <span
-                class="font-semibold text-gray-700 dark:text-gray-300">{{ $productTypes->firstWhere('id', $productTypeId)?->name ?? 'None' }}</span>
+                class="font-extrabold text-slate-950 dark:text-white">{{ $productTypes->firstWhere('id', $productTypeId)?->name ?? 'None' }}</span>
             <span class="mx-2">|</span>
             Scan Config: <span
-                class="font-semibold text-gray-700 dark:text-gray-300">{{ $selectedScanConfig?->name ?? 'None' }}</span>
+                class="font-extrabold text-slate-950 dark:text-white">{{ $selectedScanConfig?->name ?? 'None' }}</span>
         </div>
 
         @if ($flashMessage)
@@ -383,7 +420,7 @@
                     <div>
                         <div class="mb-2">
                             <div class="flex items-center justify-between">
-                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Scanned
+                                <label class="text-sm font-medium text-gray-700 dark:text-white">Scanned
                                     code</label>
 
                                 <!-- Prefix Selector Droplet and Dropdown -->
@@ -399,7 +436,7 @@
                                     <div x-cloak x-show="showPrefixMenu" x-transition
                                         class="absolute right-0 top-8 z-50 w-64 origin-top-right rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-gray-700">
                                         <p
-                                            class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                            class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white">
                                             Manage Prefixes (Max 10)</p>
 
                                         <!-- Input with Inline Send Icon -->
@@ -423,7 +460,7 @@
                                             <template x-for="p in prefixes" :key="p">
                                                 <div
                                                     class="flex items-center justify-between rounded-xl px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                    <span class="text-sm font-medium text-gray-700 dark:text-white"
                                                         x-text="p"></span>
                                                     <button type="button" @click="removePrefix(p)"
                                                         class="text-gray-400 hover:text-red-500 p-1">
@@ -437,7 +474,7 @@
                                                 </div>
                                             </template>
                                             <template x-if="prefixes.length === 0">
-                                                <p class="text-xs text-gray-400 text-center py-2">No prefixes saved
+                                                <p class="text-xs text-gray-400 text-center py-2 dark:text-white">No prefixes saved
                                                     yet.</p>
                                             </template>
                                         </div>
@@ -475,7 +512,7 @@
                             <input x-ref="scanCodeInput" @keydown.enter.prevent="submitScan()"
                                 @focus="isInputFocused = true" @blur="setTimeout(() => isInputFocused = false, 200)"
                                 @input="scannedInputText = $event.target.value" type="text"
-                                class="w-full rounded-2xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white pl-14 pr-14 py-3 text-base font-mono"
+                                class="w-full rounded-2xl border-gray-300 bg-white text-slate-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white pl-14 pr-14 py-3 text-base font-mono placeholder:text-slate-700 dark:placeholder:text-white/80"
                                 placeholder="Scan or type a code, then press enter">
 
                             <!-- Rocket Button on Right -->
@@ -489,17 +526,102 @@
                         <!-- Mirror Span and Floating Droplet Button (Moved outside to prevent height stretching) -->
                         <div class="relative w-full h-8 overflow-visible"
                             x-show="isInputFocused && scannedInputText.trim() !== ''">
-                            <!-- Font matching the input field to measure width accurately -->
-                            <span x-ref="textMirror"
-                                class="invisible absolute text-base font-mono pl-14 whitespace-pre"
-                                x-text="scannedInputText"></span>
-
-                            <!-- Floating Droplet Button (pointed corner top-left, rotated to point straight UP) -->
-                             <button type="button" @mousedown.prevent.stop="addPrefixFromInput()"
+                            <button type="button" @mousedown.prevent.stop="addPrefixFromInput()"
                                  class="absolute -top-1.5 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white shadow-md transition-all duration-150 rounded-[0%_50%_50%_50%] rotate-45 w-7 h-7 z-10 hover:scale-110"
                                  :style="`left: ${mirrorWidth + 2}px;`" title="new prefix">
                                  <span class="-rotate-45 font-bold text-sm select-none">+</span>
                              </button>
+                        </div>
+
+                        <!-- Searchable Product Name Dropdown (Under Scanner Code Input) -->
+                        <div class="mt-2 relative w-full z-30" x-data="{
+                            open: false,
+                            search: '',
+                            get products() {
+                                try {
+                                    const el = document.getElementById('dropdown-products-source');
+                                    if (el) {
+                                        return JSON.parse(el.getAttribute('data-list') || '[]');
+                                    }
+                                } catch(e) {}
+                                return [];
+                            },
+                            get filteredProducts() {
+                                if (!this.search.trim()) return this.products;
+                                const q = this.search.toLowerCase().trim();
+                                return this.products.filter(p => 
+                                    p.name.toLowerCase().includes(q) || 
+                                    (p.code && p.code.toLowerCase().includes(q))
+                                );
+                            },
+                            selectProduct(id) {
+                                $wire.pickupProductById(id);
+                                this.open = false;
+                                this.search = '';
+                            }
+                        }" @click.outside="open = false" @keydown.escape.window="open = false">
+                            <!-- Hidden dynamic products source -->
+                            <div class="hidden" id="dropdown-products-source" data-list="{{ json_encode($dropdownProducts) }}"></div>
+
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-bold text-slate-900 dark:text-white">Or pickup by product name:</span>
+                            </div>
+
+                            <!-- Dropdown Trigger Button -->
+                            <button type="button" @click="open = !open; if(open) { $nextTick(() => $refs.productSearchInput.focus()); }"
+                                class="mt-1 flex w-full items-center justify-between gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-left text-sm font-semibold text-slate-900 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700/50">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <svg class="h-4 w-4 text-slate-700 dark:text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <span class="truncate text-slate-700 dark:text-white/80 font-medium">Select product name to pickup...</span>
+                                </div>
+                                <svg class="h-4 w-4 text-slate-700 dark:text-white shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                                    <path d="M7 7l3-3 3 3m0 6l-3 3-3-3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+
+                            <!-- Dropdown Menu -->
+                            <div x-cloak x-show="open"
+                                x-transition:enter="transition ease-out duration-100"
+                                x-transition:enter-start="transform opacity-0 scale-95"
+                                x-transition:enter-end="transform opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-75"
+                                x-transition:leave-start="transform opacity-100 scale-100"
+                                x-transition:leave-end="transform opacity-0 scale-95"
+                                class="absolute left-0 mt-1.5 w-full rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-black/5 dark:bg-gray-900 dark:ring-gray-800 focus:outline-none z-50">
+                                
+                                <!-- Search Input -->
+                                <div class="relative p-1">
+                                    <input type="text" x-model="search" x-ref="productSearchInput" placeholder="Type product name or code..."
+                                        class="w-full rounded-xl border border-gray-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-900 font-semibold focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                                        @keydown.enter.prevent="
+                                            if (filteredProducts.length > 0) {
+                                                selectProduct(filteredProducts[0].id);
+                                            }
+                                        "
+                                    />
+                                </div>
+
+                                <!-- Products List -->
+                                <div class="max-h-60 overflow-y-auto mt-1 space-y-1 custom-scrollbar">
+                                    <template x-for="p in filteredProducts" :key="p.id">
+                                        <button type="button" @click="selectProduct(p.id)"
+                                            class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-slate-900 font-semibold hover:bg-amber-50 dark:text-white dark:hover:bg-amber-950/30 transition">
+                                            <span class="font-semibold truncate pr-2" x-text="p.name"></span>
+                                            <template x-if="p.code">
+                                                <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white font-mono text-[11px] shrink-0 font-bold" x-text="p.code"></span>
+                                            </template>
+                                        </button>
+                                    </template>
+
+                                    <template x-if="filteredProducts.length === 0">
+                                        <div class="px-3 py-3 text-xs text-slate-900 font-semibold text-center dark:text-white">
+                                            No products found matching search
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -507,27 +629,81 @@
 
             <!-- Color Legend -->
             <div
-                class="flex flex-wrap items-center gap-4 bg-white px-4 py-3 rounded-2xl shadow-sm border border-gray-100 text-xs dark:bg-gray-900 dark:border-gray-800">
-                <span class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Legend:</span>
-                <div class="flex items-center gap-2">
+                class="relative flex flex-wrap items-center gap-2 bg-white px-4 py-2.5 rounded-2xl shadow-sm border border-gray-100 text-xs dark:bg-gray-900 dark:border-gray-800 pr-9">
+                <span class="font-bold text-slate-900 uppercase tracking-wider text-[10px] dark:text-white mr-1 select-none">Legend:</span>
+                
+                <!-- Pass Filter -->
+                <button type="button" @click="toggleStatusFilter('PASS')"
+                    class="flex items-center gap-1 cursor-pointer select-none rounded-md px-1 py-0.5 transition hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    :class="isStatusFiltered('PASS') ? 'ring-1 ring-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40' : ''"
+                    title="Filter Pass checks">
                     <span
-                        class="w-4 h-4 rounded-md bg-emerald-100 border border-emerald-300 dark:bg-emerald-500 dark:border-emerald-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Pass</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="w-4 h-4 rounded-md bg-rose-100 border border-rose-200 dark:bg-rose-500 dark:border-rose-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Fail</span>
-                </div>
-                <div class="flex items-center gap-2">
+                        class="w-4 h-4 rounded-md bg-emerald-100 border border-emerald-300 dark:bg-emerald-500 dark:border-emerald-400 shrink-0 flex items-center justify-center transition">
+                        <template x-if="isStatusFiltered('PASS')">
+                            <svg class="w-3.5 h-3.5 text-emerald-900 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </template>
+                    </span>
+                    <span class="font-semibold text-gray-700 dark:text-white">Pass</span>
+                </button>
+
+                <!-- Fail Filter -->
+                <button type="button" @click="toggleStatusFilter('FAIL')"
+                    class="flex items-center gap-1 cursor-pointer select-none rounded-md px-1 py-0.5 transition hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    :class="isStatusFiltered('FAIL') ? 'ring-1 ring-rose-500 bg-rose-50/60 dark:bg-rose-950/40' : ''"
+                    title="Filter Fail checks">
                     <span
-                        class="w-4 h-4 rounded-md bg-amber-100 border border-amber-200 dark:bg-amber-500 dark:border-amber-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Pending</span>
-                </div>
-                <div class="flex items-center gap-2">
+                        class="w-4 h-4 rounded-md bg-rose-100 border border-rose-200 dark:bg-rose-500 dark:border-rose-400 shrink-0 flex items-center justify-center transition">
+                        <template x-if="isStatusFiltered('FAIL')">
+                            <svg class="w-3.5 h-3.5 text-rose-900 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </template>
+                    </span>
+                    <span class="font-semibold text-gray-700 dark:text-white">Fail</span>
+                </button>
+
+                <!-- Pending Filter -->
+                <button type="button" @click="toggleStatusFilter('PENDING')"
+                    class="flex items-center gap-1 cursor-pointer select-none rounded-md px-1 py-0.5 transition hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    :class="isStatusFiltered('PENDING') ? 'ring-1 ring-amber-500 bg-amber-50/60 dark:bg-amber-950/40' : ''"
+                    title="Filter Pending checks">
                     <span
-                        class="w-4 h-4 rounded-md bg-violet-100 border border-violet-200 dark:bg-violet-500 dark:border-violet-400 shrink-0"></span>
-                    <span class="font-medium text-gray-600 dark:text-gray-300">Unmatched</span>
-                </div>
+                        class="w-4 h-4 rounded-md bg-amber-100 border border-amber-200 dark:bg-amber-500 dark:border-amber-400 shrink-0 flex items-center justify-center transition">
+                        <template x-if="isStatusFiltered('PENDING')">
+                            <svg class="w-3.5 h-3.5 text-amber-950 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </template>
+                    </span>
+                    <span class="font-semibold text-gray-700 dark:text-white">Pending</span>
+                </button>
+
+                <!-- Unmatched Filter -->
+                <button type="button" @click="toggleStatusFilter('UNMATCHED')"
+                    class="flex items-center gap-1 cursor-pointer select-none rounded-md px-1 py-0.5 transition hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    :class="isStatusFiltered('UNMATCHED') ? 'ring-1 ring-violet-500 bg-violet-50/60 dark:bg-violet-950/40' : ''"
+                    title="Filter Unmatched checks">
+                    <span
+                        class="w-4 h-4 rounded-md bg-violet-100 border border-violet-200 dark:bg-violet-500 dark:border-violet-400 shrink-0 flex items-center justify-center transition">
+                        <template x-if="isStatusFiltered('UNMATCHED')">
+                            <svg class="w-3.5 h-3.5 text-violet-950 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </template>
+                    </span>
+                    <span class="font-semibold text-gray-700 dark:text-white">Unmatched</span>
+                </button>
+
+                <!-- Reset Filter 'X' Button at Top Right Corner of Legend Container -->
+                <button type="button" @click="clearStatusFilters()"
+                    class="absolute top-2.5 right-2.5 w-4 h-4 rounded-md flex items-center justify-center bg-slate-200 hover:bg-rose-500 hover:text-white text-slate-700 dark:bg-slate-700 dark:hover:bg-rose-600 dark:text-slate-200 transition shadow-sm"
+                    title="Clear status filters">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
 
@@ -553,41 +729,41 @@
                             x-transition:leave-start="transform opacity-100 scale-100"
                             x-transition:leave-end="transform opacity-0 scale-95"
                             class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-2xl bg-white p-3 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-gray-800 dark:ring-gray-700">
-                            <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-2">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white px-2">
                                 Show/Hide Columns</p>
                             <div class="space-y-1">
                                 <label
-                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-white">
                                     <input type="checkbox" x-model="visibleColumns.barcode"
                                         class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
                                     <span>Barcode</span>
                                 </label>
                                 <label
-                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-white">
                                     <input type="checkbox" x-model="visibleColumns.product_name"
                                         class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
                                     <span>Product Name</span>
                                 </label>
                                 <label
-                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-white">
                                     <input type="checkbox" x-model="visibleColumns.pickedup_qty"
                                         class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
                                     <span>Pickedup</span>
                                 </label>
                                 <label
-                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-white">
                                     <input type="checkbox" x-model="visibleColumns.record_qty"
                                         class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
                                     <span>Record Qty</span>
                                 </label>
                                 <label
-                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-white">
                                     <input type="checkbox" x-model="visibleColumns.closing_stock"
                                         class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
                                     <span>Closing Stock</span>
                                 </label>
                                 <label
-                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-white">
                                     <input type="checkbox" x-model="visibleColumns.actions"
                                         class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800">
                                     <span>Actions</span>
@@ -595,7 +771,7 @@
                                 @foreach ($productTypeDynamicFields as $field)
                                     @php $isRequired = collect($scanConfigFields)->where('field', $field['field_name'])->where('required', true)->isNotEmpty(); @endphp
                                     <label
-                                        class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm font-medium text-gray-700 dark:text-white">
                                         <input type="checkbox" x-model="visibleColumns.{{ $field['field_name'] }}"
                                             @if ($isRequired) disabled checked class="rounded border-gray-300 text-amber-500 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800"
                                             @else class="rounded border-gray-300 text-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800" @endif>
@@ -611,7 +787,10 @@
                 </div>
 
                 @forelse($recentChecksGrouped as $locationName => $checks)
-                    <div
+                    @php
+                        $locationStatuses = json_encode(array_values(array_unique(array_map(fn($c) => strtoupper($c->result_status ?? ''), $checks->all()))));
+                    @endphp
+                    <div x-show="statusFilters.length === 0 || {{ $locationStatuses }}.some(s => statusFilters.includes(s))"
                         class="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-gray-900 sm:rounded-3xl">
                         <div
                             class="bg-slate-100 dark:bg-slate-800 px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700">
@@ -625,19 +804,19 @@
                                         <td colspan="100%" class="px-4 py-3">
                                             <div class="flex flex-wrap items-center justify-between gap-4">
                                                 <div class="flex flex-wrap items-center gap-4">
-                                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                    <div class="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
                                                         <span>Session:</span>
                                                         <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 font-bold">
                                                             {{ $selectedSessionName }}
                                                         </span>
                                                     </div>
-                                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                    <div class="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
                                                         <span>Current Location:</span>
                                                         <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-100 dark:border-amber-900/50 font-bold">
                                                             {{ $locationName }}
                                                         </span>
                                                     </div>
-                                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                    <div class="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
                                                         <span>Active Branch:</span>
                                                         <span class="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-100 dark:border-teal-900/50 font-bold">
                                                             {{ auth()->user()->branch?->name ?? 'None' }}
@@ -646,12 +825,12 @@
                                                 </div>
                                                 <div class="flex items-center gap-5 text-xs">
                                                     <div class="flex items-center gap-1.5">
-                                                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Products:</span>
+                                                        <span class="text-slate-900 dark:text-white font-bold">Scanned Products:</span>
                                                         <strong class="text-slate-900 dark:text-white font-extrabold text-sm">{{ $locationStats->get($locationName)?->count ?? 0 }}</strong>
                                                     </div>
                                                     <div class="w-px h-3 bg-slate-200 dark:bg-slate-800"></div>
                                                     <div class="flex items-center gap-1.5">
-                                                        <span class="text-slate-400 dark:text-slate-500 font-medium">Scanned Quantity:</span>
+                                                        <span class="text-slate-900 dark:text-white font-bold">Scanned Quantity:</span>
                                                         <strong class="text-slate-900 dark:text-white font-extrabold text-sm">{{ $locationStats->get($locationName)?->qty ?? 0 }}</strong>
                                                     </div>
                                                 </div>
@@ -659,7 +838,7 @@
                                         </td>
                                     </tr>
                                     <tr
-                                        class="border-b border-gray-200 dark:border-gray-700 uppercase tracking-wider text-xs whitespace-nowrap">
+                                        class="border-b border-gray-200 dark:border-gray-700 uppercase tracking-wider text-xs whitespace-nowrap dark:text-white">
                                         <th x-show="visibleColumns.barcode"
                                             class="px-4 sm:px-6 py-4 font-semibold whitespace-nowrap">Barcode</th>
                                         <th x-show="visibleColumns.product_name"
@@ -699,6 +878,7 @@
                                             $barCodeTextClass = 'font-semibold';
                                         @endphp
                                         <tr wire:key="check-row-{{ $check->id }}"
+                                            x-show="statusFilters.length === 0 || statusFilters.includes('{{ $status }}')"
                                             class="border-b last:border-0 {{ $rowBgClass }}">
                                             <td wire:key="barcode-td-{{ $check->id }}"
                                                 x-show="visibleColumns.barcode"
@@ -1052,7 +1232,7 @@ if ($isCompare) {
                 @empty
                     <div
                         class="rounded-2xl border border-dashed border-gray-300 p-8 text-center dark:border-gray-700 sm:rounded-3xl sm:p-12">
-                        <p class="text-gray-500 dark:text-gray-400">No scanned items yet.</p>
+                        <p class="text-gray-500 dark:text-white">No scanned items yet.</p>
                     </div>
                 @endforelse
             </div>
@@ -1066,11 +1246,11 @@ if ($isCompare) {
                 <div class="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
                     <div>
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Camera Scanner</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Position the QR or Barcode inside the box
+                        <p class="text-xs text-gray-500 dark:text-white">Position the QR or Barcode inside the box
                         </p>
                     </div>
                     <button type="button" @click="showScannerModal = false"
-                        class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+                        class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-white">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                             stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1113,14 +1293,14 @@ if ($isCompare) {
                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Create New Location</h3>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company /
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Company /
                             Location Name</label>
                         <input wire:model="newLocationName" type="text"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                     </div>
                     <div>
                         <label
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                            class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Description</label>
                         <textarea wire:model="newLocationDescription" rows="3"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"></textarea>
                     </div>
@@ -1150,7 +1330,7 @@ if ($isCompare) {
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Code <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Product Code <span class="text-rose-500">*</span></label>
                         <input wire:model="createProductCode" type="text"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                         @error('createProductCode')
@@ -1158,7 +1338,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Product Name <span class="text-rose-500">*</span></label>
                         <input wire:model="createProductName" type="text"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                         @error('createProductName')
@@ -1166,7 +1346,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Type <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Product Type <span class="text-rose-500">*</span></label>
                         <select wire:model.live="createProductTypeId"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                             <option value="">Select Product Type</option>
@@ -1179,7 +1359,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Location <span class="text-rose-500">*</span></label>
                         <select wire:model="createProductLocationId"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                             <option value="">Select Location</option>
@@ -1192,7 +1372,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Category <span class="text-rose-500">*</span></label>
                         <select wire:model.live="createProductCategoryId"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                             <option value="">Select Category</option>
@@ -1205,7 +1385,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sub-Category</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Sub-Category</label>
                         <select wire:model="createProductSubCategoryId"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                             <option value="">Select Sub-Category</option>
@@ -1218,7 +1398,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Barcode</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Barcode</label>
                         <input wire:model="createProductBarcode" type="text"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                         @error('createProductBarcode')
@@ -1226,7 +1406,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">QR Code</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">QR Code</label>
                         <input wire:model="createProductQrCode" type="text"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                         @error('createProductQrCode')
@@ -1234,7 +1414,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Quantity <span class="text-rose-500">*</span></label>
                         <input wire:model="createProductQuantity" type="number"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                         @error('createProductQuantity')
@@ -1242,7 +1422,7 @@ if ($isCompare) {
                         @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Status <span class="text-rose-500">*</span></label>
                         <select wire:model="createProductStatus"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                             <option value="ACTIVE">Active</option>
@@ -1261,7 +1441,7 @@ if ($isCompare) {
                         @else
                             <div class="{{ ($field['field_type'] ?? '') === 'textarea' ? 'md:col-span-2' : '' }}">
                                 <label
-                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $field['field_label'] }}
+                                    class="block text-sm font-medium text-gray-700 dark:text-white mb-1">{{ $field['field_label'] }}
                                     @if (isset($field['required']) && $field['required'])
                                         <span class="text-rose-500">*</span>
                                     @endif
@@ -1311,12 +1491,27 @@ if ($isCompare) {
                         @endif
                     @endforeach
                 </div>
-                <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:justify-end">
-                    <button type="button" @click="showCreateProductModal = false"
-                        class="min-h-11 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-white">Cancel</button>
-                    <button type="button" wire:click="saveCreatedProduct"
-                        class="min-h-11 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400">Save
-                        Product</button>
+                <div class="mt-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-800 pt-4">
+                    @if ($activeCheckId)
+                        <button type="button" wire:click="deleteCheckFromModal" wire:confirm="Are you sure you want to delete this check?"
+                            class="w-full sm:w-auto min-h-11 rounded-full bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition">
+                            <span class="flex items-center justify-center gap-1.5">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Check
+                            </span>
+                        </button>
+                    @else
+                        <div></div>
+                    @endif
+
+                    <div class="flex w-full sm:w-auto items-center justify-end gap-3">
+                        <button type="button" @click="showCreateProductModal = false"
+                            class="min-h-11 flex-1 sm:flex-none rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-white">Cancel</button>
+                        <button type="button" wire:click="saveCreatedProduct"
+                            class="min-h-11 flex-1 sm:flex-none rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400">Save Product</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1329,14 +1524,14 @@ if ($isCompare) {
                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Add Remark & Decision</h3>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Remark /
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Remark /
                             Comment</label>
                         <textarea wire:model="remarkText" rows="3"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                             placeholder="Enter remark..."></textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Decision Type
+                        <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Decision Type
                             (Optional)</label>
                         <select wire:model="decisionTypeId"
                             class="w-full rounded-xl border-gray-300 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
@@ -1366,7 +1561,7 @@ if ($isCompare) {
                     class="shrink-0 flex items-start justify-between border-b border-gray-100 p-4 dark:border-gray-800 sm:p-6">
                     <div>
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Validation (Finding)</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Put actual facts to validate this product
+                        <p class="text-sm text-gray-500 dark:text-white">Put actual facts to validate this product
                             check.</p>
                     </div>
                     <button type="button" @click="showMatchedModal = false"
@@ -1383,11 +1578,11 @@ if ($isCompare) {
                             <div class="space-y-4 rounded-2xl bg-slate-950 p-4 text-white sm:rounded-3xl sm:p-5">
                                 <div class="rounded-2xl bg-white/10 p-4">
                                     <p class="text-sm text-slate-300">Code</p>
-                                    <p class="break-words text-xl font-semibold">{{ $selectedProduct->code }}</p>
+                                    <p class="break-words text-xl font-semibold text-white">{{ $selectedProduct->code }}</p>
                                 </div>
                                 <div class="rounded-2xl bg-white/10 p-4">
                                     <p class="text-sm text-slate-300">Name</p>
-                                    <p class="break-words text-lg font-semibold">{{ $selectedProduct->name }}</p>
+                                    <p class="break-words text-lg font-semibold text-white">{{ $selectedProduct->name }}</p>
                                 </div>
                                 <div class="rounded-2xl bg-white/10 p-4">
                                     <p class="text-sm text-slate-300">Dynamic values</p>
@@ -1397,7 +1592,7 @@ if ($isCompare) {
                                                 class="grid gap-1 sm:flex sm:items-center sm:justify-between sm:gap-3">
                                                 <span class="text-slate-300">{{ $attributeValue->field_name }}</span>
                                                 <span
-                                                    class="break-words font-medium">{{ $attributeValue->value }}</span>
+                                                    class="break-words font-medium text-white">{{ $attributeValue->value }}</span>
                                             </div>
                                         @empty
                                             <p class="text-slate-300">No dynamic values stored.</p>
@@ -1440,16 +1635,16 @@ if ($isCompare) {
                                                 <p class="break-words font-semibold text-gray-900 dark:text-white">
                                                     {{ $fieldLabel }}</p>
                                                 <span
-                                                    class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300">
+                                                    class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-white">
                                                     {{ data_get($fieldConfig, 'compare', false) ? 'Compare' : 'Note' }}
                                                 </span>
                                             </div>
                                             <div class="mt-4 grid gap-3">
                                                 <div
-                                                    class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                                    class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-white">
                                                     <span
-                                                        class="block text-xs uppercase tracking-[0.25em] text-gray-400">Expected</span>
-                                                    <span class="mt-1 block break-words">
+                                                        class="block text-xs uppercase tracking-[0.25em] text-gray-400 dark:text-white">Expected</span>
+                                                    <span class="mt-1 block break-words dark:text-white">
                                                         @if (($fieldConfig['field_type'] ?? '') === 'boolean')
                                                             {{ $expectedValue === '1' || $expectedValue === 1 ? 'Yes' : ($expectedValue === '0' || $expectedValue === 0 ? 'No' : 'N/A') }}
                                                         @else
@@ -1460,7 +1655,7 @@ if ($isCompare) {
                                                 <div>
                                                     <div class="flex items-center justify-between mb-2">
                                                         <label
-                                                            class="text-sm font-medium text-gray-700 dark:text-gray-300">Actual</label>
+                                                            class="text-sm font-medium text-gray-700 dark:text-white">Actual</label>
                                                         @if (filter_var($fieldConfig['is_quickcheck'] ?? false, FILTER_VALIDATE_BOOLEAN) &&
                                                                 blank(data_get($actualValues, $fieldName)))
                                                             <button type="button"
@@ -1552,7 +1747,7 @@ if ($isCompare) {
 
                 <!-- Title -->
                 <div class="text-center mb-6">
-                    <p class="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-1">Scanned Barcode</p>
+                    <p class="text-xs uppercase tracking-widest text-slate-400 dark:text-white font-semibold mb-1">Scanned Barcode</p>
                     <h3 class="text-lg font-bold text-slate-800 dark:text-white break-all"
                         x-text="activeRowCheck.barcode"></h3>
                 </div>
@@ -1562,7 +1757,7 @@ if ($isCompare) {
                     <!-- Validation/Facts -->
                     <button type="button"
                         @click="$wire.openComparison(activeRowCheck.id); showRowActionsModal = false"
-                        class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                        class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-white dark:hover:bg-slate-800 dark:hover:text-white">
                         <div
                             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -1573,14 +1768,14 @@ if ($isCompare) {
                         </div>
                         <div class="text-left">
                             <p class="font-bold text-slate-950 dark:text-white">Validation Facts</p>
-                            <p class="text-xs text-slate-400">Put actual comparison details</p>
+                            <p class="text-xs text-slate-400 dark:text-white">Put actual comparison details</p>
                         </div>
                     </button>
 
                     <!-- Remark/Decision -->
                     <button type="button"
                         @click="$wire.openRemarkModal(activeRowCheck.id); showRowActionsModal = false"
-                        class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                        class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-white dark:hover:bg-slate-800 dark:hover:text-white">
                         <div
                             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -1591,7 +1786,7 @@ if ($isCompare) {
                         </div>
                         <div class="text-left">
                             <p class="font-bold text-slate-950 dark:text-white">Add Remark</p>
-                            <p class="text-xs text-slate-400">Add observation & decision</p>
+                            <p class="text-xs text-slate-400 dark:text-white">Add observation & decision</p>
                         </div>
                     </button>
 
@@ -1599,7 +1794,7 @@ if ($isCompare) {
                     <template x-if="activeRowCheck.status === 'UNMATCHED' && !activeRowCheck.has_product">
                         <button type="button"
                             @click="$wire.openCreateProduct(activeRowCheck.id); showRowActionsModal = false"
-                            class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                            class="flex w-full items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/50 dark:text-white dark:hover:bg-slate-800 dark:hover:text-white">
                             <div
                                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -1609,7 +1804,7 @@ if ($isCompare) {
                             </div>
                             <div class="text-left">
                                 <p class="font-bold text-slate-950 dark:text-white">Create Product</p>
-                                <p class="text-xs text-slate-400">Create new linked product</p>
+                                <p class="text-xs text-slate-400 dark:text-white">Create new linked product</p>
                             </div>
                         </button>
                     </template>

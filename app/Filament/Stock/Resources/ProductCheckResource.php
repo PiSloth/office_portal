@@ -346,8 +346,79 @@ class ProductCheckResource extends Resource
                     ->label('Export XLSX')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
-                    ->action(function ($livewire) {
-                        return app(ProductCheckExportService::class)->downloadAll($livewire->getFilteredTableQuery());
+                    ->form([
+                        Forms\Components\Select::make('product_type_id')
+                            ->label('Product Type Template')
+                            ->options(fn () => \App\Models\ProductType::where('is_active', true)->pluck('name', 'id')->toArray())
+                            ->placeholder('All Product Types (Default)')
+                            ->searchable()
+                            ->reactive()
+                            ->afterStateUpdated(fn ($set) => $set('columns', null)),
+
+                        Forms\Components\CheckboxList::make('columns')
+                            ->label('Select Columns to Export')
+                            ->options(function (callable $get) {
+                                $productTypeId = $get('product_type_id');
+
+                                $options = [
+                                    'id' => 'ID',
+                                    'session' => 'Session',
+                                    'location' => 'Location',
+                                    'category' => 'Category Name',
+                                    'sub_category' => 'Sub Category Name',
+                                    'product_code' => 'Product Code',
+                                    'product_name' => 'Product Name',
+                                    'quantity' => 'Quantity',
+                                    'checker' => 'Checker',
+                                    'status' => 'Status',
+                                    'checked_at' => 'Checked At',
+                                    'remark' => 'Remark',
+                                ];
+
+                                if ($productTypeId) {
+                                    $fields = \App\Models\ProductTypeField::where('product_type_id', $productTypeId)
+                                        ->where('is_active', true)
+                                        ->get();
+                                    foreach ($fields as $field) {
+                                        $options['field_' . $field->field_name] = $field->field_label . ' (' . $field->field_name . ')';
+                                    }
+                                } else {
+                                    $fields = \App\Models\ProductTypeField::where('is_active', true)->get();
+                                    foreach ($fields as $field) {
+                                        $options['field_' . $field->field_name] = $field->field_label . ' (' . $field->field_name . ')';
+                                    }
+                                }
+
+                                $options['decisions'] = 'Decisions';
+                                $options['comments'] = 'Comments';
+
+                                return $options;
+                            })
+                            ->default(function (callable $get) {
+                                $productTypeId = $get('product_type_id');
+                                $defaults = ['id', 'session', 'location', 'category', 'sub_category', 'product_code', 'product_name', 'quantity', 'checker', 'status', 'checked_at', 'remark'];
+                                if ($productTypeId) {
+                                    $fields = \App\Models\ProductTypeField::where('product_type_id', $productTypeId)->where('is_active', true)->pluck('field_name');
+                                    foreach ($fields as $f) {
+                                        $defaults[] = 'field_' . $f;
+                                    }
+                                } else {
+                                    $fields = \App\Models\ProductTypeField::where('is_active', true)->pluck('field_name');
+                                    foreach ($fields as $f) {
+                                        $defaults[] = 'field_' . $f;
+                                    }
+                                }
+                                $defaults[] = 'decisions';
+                                $defaults[] = 'comments';
+                                return $defaults;
+                            })
+                            ->columns(2)
+                            ->bulkToggleable(),
+                    ])
+                    ->action(function ($livewire, array $data) {
+                        $productTypeId = $data['product_type_id'] ?? null;
+                        $selectedColumns = $data['columns'] ?? null;
+                        return app(ProductCheckExportService::class)->downloadAll($livewire->getFilteredTableQuery(), $productTypeId, $selectedColumns);
                     }),
             ])
             ->actions([

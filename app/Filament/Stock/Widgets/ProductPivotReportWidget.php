@@ -131,33 +131,29 @@ class ProductPivotReportWidget extends Widget
                 ];
             }
 
-            $branchKey = trim(mb_strtolower($branchName));
-            if (!isset($reportData[$scKey]['branches'][$branchKey])) {
-                $reportData[$scKey]['branches'][$branchKey] = [
-                    'name' => $branchName,
-                    'imported' => 0,
-                    'during_created' => 0,
-                    'checked' => 0,
-                    'balance' => 0
-                ];
-            }
-
-            $reportData[$scKey]['branches'][$branchKey]['imported'] += $imported;
-            $reportData[$scKey]['branches'][$branchKey]['during_created'] += $duringCreated;
-            $reportData[$scKey]['branches'][$branchKey]['checked'] += $checked;
-            $reportData[$scKey]['branches'][$branchKey]['balance'] += $balance;
-
             // Accumulate parent counts
             $reportData[$scKey]['imported'] += $imported;
             $reportData[$scKey]['during_created'] += $duringCreated;
             $reportData[$scKey]['checked'] += $checked;
             $reportData[$scKey]['balance'] += $balance;
-        }
 
-        // If a subcategory has no branches after filtering, we remove it from the list
-        foreach ($reportData as $id => $data) {
-            if (empty($data['branches'])) {
-                unset($reportData[$id]);
+            // Only add branch details if a valid branch exists (exclude null or "No Branch")
+            if (!empty($branchId) && !empty($branchName) && trim($branchName) !== 'No Branch') {
+                $branchKey = trim(mb_strtolower($branchName));
+                if (!isset($reportData[$scKey]['branches'][$branchKey])) {
+                    $reportData[$scKey]['branches'][$branchKey] = [
+                        'name' => $branchName,
+                        'imported' => 0,
+                        'during_created' => 0,
+                        'checked' => 0,
+                        'balance' => 0
+                    ];
+                }
+
+                $reportData[$scKey]['branches'][$branchKey]['imported'] += $imported;
+                $reportData[$scKey]['branches'][$branchKey]['during_created'] += $duringCreated;
+                $reportData[$scKey]['branches'][$branchKey]['checked'] += $checked;
+                $reportData[$scKey]['branches'][$branchKey]['balance'] += $balance;
             }
         }
 

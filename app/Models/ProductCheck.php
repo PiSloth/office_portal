@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Support\Collection;
+use App\Events\ProductChecked;
 use App\Models\DecisionRule;
 use App\Models\Comment;
 
@@ -13,6 +14,78 @@ use App\Models\Comment;
 class ProductCheck extends Model
 {
     use SoftDeletes;
+
+    public static function syncStatusesForProduct(?int $checkSessionId, ?int $productId): void
+    {
+        if (! $checkSessionId || ! $productId) {
+            return;
+        }
+
+        $product = Product::find($productId);
+        if (! $product) {
+            return;
+        }
+
+        $checks = static::where('check_session_id', $checkSessionId)
+            ->where('product_id', $productId)
+            ->get();
+
+        if ($checks->isEmpty()) {
+            return;
+        }
+
+        $totalQty = $checks->sum('quantity');
+        $closingStock = (int) $product->quantity;
+        $isQuantityMatched = ($totalQty === $closingStock);
+
+        foreach ($checks as $check) {
+            if ($product->created_during_pickup) {
+                if ($check->result_status !== 'UNMATCHED') {
+                    $check->update(['result_status' => 'UNMATCHED']);
+                }
+                continue;
+            }
+
+            $baseStatus = 'PASS';
+
+            // Check if there are any failed values recorded for this check
+            $hasFailedValues = ProductCheckValue::where('product_check_id', $check->id)
+                ->where('status', 'FAIL')
+                ->exists();
+
+            if ($hasFailedValues) {
+                $baseStatus = 'FAIL';
+            } else if ($check->scan_config_id) {
+                $scanConfig = ScanConfig::find($check->scan_config_id);
+                if ($scanConfig) {
+                    $actualValuesMap = ProductCheckValue::where('product_check_id', $check->id)
+                        ->pluck('actual_value', 'field_name')
+                        ->toArray();
+
+                    $hasEmptyCompareFields = false;
+                    foreach (data_get($scanConfig->config_json, 'fields', []) as $fieldConfig) {
+                        if (data_get($fieldConfig, 'compare', false)) {
+                            $fName = $fieldConfig['field'] ?? null;
+                            if ($fName && (!isset($actualValuesMap[$fName]) || $actualValuesMap[$fName] === null || $actualValuesMap[$fName] === '')) {
+                                $hasEmptyCompareFields = true;
+                                break;
+                            }
+                        }
+                    }
+                    if ($hasEmptyCompareFields) {
+                        $baseStatus = 'PENDING';
+                    }
+                }
+            }
+
+            $newStatus = ($baseStatus === 'FAIL') ? 'FAIL' : ($isQuantityMatched ? $baseStatus : 'FAIL');
+
+            if ($check->result_status !== $newStatus) {
+                $check->update(['result_status' => $newStatus]);
+                event(new ProductChecked($check));
+            }
+        }
+    }
 
     protected static function booted(): void
     {
