@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DailyPriceHistory extends Model
 {
-    protected $fillable = ['gold_price', 'tax_rate', 'user_id'];
+    protected $fillable = ['gold_price', 'raw_gold_price', 'tax_rate', 'user_id'];
 
     public function user(): BelongsTo
     {

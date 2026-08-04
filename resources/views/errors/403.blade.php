@@ -26,7 +26,7 @@
                         <div>
                             <h1 class="text-4xl font-black tracking-tight sm:text-5xl">403 Forbidden</h1>
                             <p class="mt-4 max-w-xl text-base leading-7 text-slate-300">
-                                This area is restricted. If you believe you should have access, please contact your administrator.
+                                {{ \App\Services\PermissionErrorFormatter::format($exception?->getMessage(), $exception ?? null) }}
                             </p>
                         </div>
 

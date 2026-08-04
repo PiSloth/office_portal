@@ -12,15 +12,17 @@ class JewelryCalculator implements CalculatorContract
         $reChange = $inputs['reChange'] ?? false; // Is Trade-in?
         $percentDeduction = ((float) ($inputs['percent'] ?? 0)) / 100;
 
-        if ((string)$reChange === '2') {
+        if (in_array((string)$reChange, ['2', '5'])) {
             $originalVoucherPrice = (float) ($inputs['original_voucher_price'] ?? 0);
             $finalPrice = $originalVoucherPrice - ($originalVoucherPrice * $percentDeduction);
             $calculatedResult = floor($finalPrice / 100) * 100;
 
+            $message = (string)$reChange === '5' ? 'အထည်ပြန်လဲ' : 'Percent ထည်ပြန်ဝယ်';
+
             return [
                 'status' => 'success',
                 'result' => max(0, $calculatedResult),
-                'message' => 'Percent ထည်ပြန်ဝယ်',
+                'message' => $message,
                 'details' => [
                     'total_weight' => 0,
                     'price_before_deduction' => $originalVoucherPrice,
@@ -56,11 +58,14 @@ class JewelryCalculator implements CalculatorContract
         $goldWeightGram = (float) ($inputs['goldWeightGram'] ?? 0);
 
         // 2. Extract parameters (multipliers from DB)
-        $goldPrice = (float) ($parameters['base_gold_price'] ?? 0);
+        $rawGoldPrice = (float) ($parameters['show_raw_goldprice'] ?? $parameters['raw_gold_price'] ?? 0);
+        $goldPrice = ((string)$reChange === '4')
+            ? $rawGoldPrice
+            : (float) ($parameters['base_gold_price'] ?? 0);
         $tax = (float) ($parameters['tax_rate'] ?? 0); // e.g. "ခွာဈေး" deduction
 
-        // 3. Trade-in Logic (If not trade-in, deduct tax/charges from base price)
-        if (!$reChange) {
+        // 3. Trade-in Logic (If not trade-in and not raw gold buyback, deduct tax/charges from base price)
+        if (!$reChange && (string)$reChange !== '4') {
             $goldPrice -= $tax;
         }
 
@@ -138,10 +143,14 @@ class JewelryCalculator implements CalculatorContract
 
         $calculatedResult = floor($finalPrice / 100) * 100;
 
+        $message = ((string)$reChange === '4')
+            ? 'အကျစ်ထည်ပြန်ဝယ်'
+            : ($reChange ? 'အလဲအထပ်ထည်' : 'ဆိုင်ထည်');
+
         return [
             'status' => 'success',
             'result' => max(0, $calculatedResult),
-            'message' => $reChange ? 'အလဲအထပ်ထည်' : 'ဆိုင်ထည်',
+            'message' => $message,
             'details' => [
                 'total_weight' => $totalWeight,
                 'price_before_deduction' => $priceBeforeDeduction,
@@ -167,8 +176,9 @@ class JewelryCalculator implements CalculatorContract
         $baseGoldPrice = (float) ($parameters['base_gold_price'] ?? 0);
         $taxRate = (float) ($parameters['tax_rate'] ?? 0);
 
-        if ($reChange === '2') {
-            // Percent Buyback logic
+        if (in_array($reChange, ['2', '5'])) {
+            // Percent Buyback / အထည်ပြန်လဲ logic
+            $titleLabel = $reChange === '5' ? 'အထည်ပြန်လဲ Breakdown' : 'Percent Buyback Breakdown';
             $originalVoucherPrice = (float) ($inputs['original_voucher_price'] ?? 0);
             $deductionAmount = $originalVoucherPrice * $percentDeduction;
             $priceBeforeRounding = $originalVoucherPrice - $deductionAmount;
@@ -179,7 +189,7 @@ class JewelryCalculator implements CalculatorContract
             // Summary Header Card
             $html .= '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">';
             $html .= '<div>';
-            $html .= '<div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #15803d;">Percent Buyback Breakdown</div>';
+            $html .= '<div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #15803d;">' . $titleLabel . '</div>';
             $html .= '<div style="font-size: 1.125rem; font-weight: 800; color: #14532d; margin-top: 2px;">' . $productName . '</div>';
             $html .= '</div>';
             $html .= '<div style="text-align: right;">';
@@ -304,10 +314,23 @@ class JewelryCalculator implements CalculatorContract
         $kyaukWeightYawe = (float) ($inputs['kyaukWeight'] ?? 0);
         $goldWeightGram = (float) ($inputs['goldWeightGram'] ?? 0);
 
+        $rawGoldPrice = (float) ($parameters['show_raw_goldprice'] ?? $parameters['raw_gold_price'] ?? 0);
         $isTradeIn = ($reChange === '1');
-        $reChangeLabel = $isTradeIn ? 'အလဲအထပ် (Yes - No Khwa Zay Deduction)' : 'ဆိုင်ထည် (No - Khwa Zay Deducted)';
-        $khwaZay = $isTradeIn ? 0.0 : $taxRate;
-        $effectiveBasePrice = max(0, $baseGoldPrice - $khwaZay);
+        $isRawGold = ($reChange === '4');
+
+        if ($isRawGold) {
+            $reChangeLabel = 'အကျစ်ထည်ပြန်ဝယ် (Raw Gold Base Price)';
+            $khwaZay = 0.0;
+            $effectiveBasePrice = $rawGoldPrice;
+        } elseif ($isTradeIn) {
+            $reChangeLabel = 'အလဲအထပ် (Yes - No Khwa Zay Deduction)';
+            $khwaZay = 0.0;
+            $effectiveBasePrice = max(0, $baseGoldPrice);
+        } else {
+            $reChangeLabel = 'ဆိုင်ထည် (No - Khwa Zay Deducted)';
+            $khwaZay = $taxRate;
+            $effectiveBasePrice = max(0, $baseGoldPrice - $khwaZay);
+        }
 
         $kyaukWeightGram = ($kyaukWeightYawe / 128) * $gramPerKyat;
 
@@ -411,16 +434,22 @@ class JewelryCalculator implements CalculatorContract
 
         // Step 2
         $html .= '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">';
-        $html .= '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background-color: #dbeafe; color: #1e40af; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px;">Step 2</span> <span style="font-weight: 700; color: #0f172a;">Base Gold Price & Khwa Zay Adjustment (အခြေခံရွှေဈေး နှင့် ခွာဈေး)</span></div>';
+        $html .= '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background-color: #dbeafe; color: #1e40af; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px;">Step 2</span> <span style="font-weight: 700; color: #0f172a;">Base Gold Price & Adjustment (အခြေခံရွှေဈေး / အကျစ်ထည်ဈေး)</span></div>';
         $html .= '<div style="color: #334155; font-size: 0.8125rem; line-height: 1.6;">';
-        $html .= '<div>• Market Base Gold Price: <span style="font-family: monospace; font-weight: 700;">' . number_format($baseGoldPrice) . ' MMK / ကျပ်</span></div>';
-        $html .= '<div>• Mode: <strong>' . $reChangeLabel . '</strong></div>';
-        if ($isTradeIn) {
-            $html .= '<div>• Khwa Zay Deduction (ခွာဈေး): <span style="font-family: monospace; font-weight: 700; color: #059669;">0 MMK (အလဲအထပ်ဖြစ်၍ မနှုတ်ပါ)</span></div>';
+        if ($isRawGold) {
+            $html .= '<div>• Raw Gold Price (အကျစ်ထည်ဈေး): <span style="font-family: monospace; font-weight: 700; color: #7c3aed;">' . number_format($rawGoldPrice) . ' MMK / ကျပ်</span></div>';
+            $html .= '<div>• Mode: <strong>' . $reChangeLabel . '</strong></div>';
+            $html .= '<div>• Effective Base Price: <span style="font-family: monospace; font-weight: 700; color: #0f172a;">' . number_format($effectiveBasePrice) . ' MMK / ကျပ်</span></div>';
         } else {
-            $html .= '<div>• Khwa Zay Deduction (ခွာဈေး): <span style="font-family: monospace; font-weight: 700; color: #dc2626;">-' . number_format($taxRate) . ' MMK / ကျပ်</span></div>';
+            $html .= '<div>• Market Base Gold Price: <span style="font-family: monospace; font-weight: 700;">' . number_format($baseGoldPrice) . ' MMK / ကျပ်</span></div>';
+            $html .= '<div>• Mode: <strong>' . $reChangeLabel . '</strong></div>';
+            if ($isTradeIn) {
+                $html .= '<div>• Khwa Zay Deduction (ခွာဈေး): <span style="font-family: monospace; font-weight: 700; color: #059669;">0 MMK (အလဲအထပ်ဖြစ်၍ မနှုတ်ပါ)</span></div>';
+            } else {
+                $html .= '<div>• Khwa Zay Deduction (ခွာဈေး): <span style="font-family: monospace; font-weight: 700; color: #dc2626;">-' . number_format($taxRate) . ' MMK / ကျပ်</span></div>';
+            }
+            $html .= '<div>• Effective Base Price: ' . number_format($baseGoldPrice) . ' - ' . number_format($khwaZay) . ' = <span style="font-family: monospace; font-weight: 700; color: #0f172a;">' . number_format($effectiveBasePrice) . ' MMK / ကျပ်</span></div>';
         }
-        $html .= '<div>• Effective Base Price: ' . number_format($baseGoldPrice) . ' - ' . number_format($khwaZay) . ' = <span style="font-family: monospace; font-weight: 700; color: #0f172a;">' . number_format($effectiveBasePrice) . ' MMK / ကျပ်</span></div>';
         $html .= '</div>';
         $html .= '</div>';
 

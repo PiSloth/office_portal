@@ -41,7 +41,8 @@ class CreatePurchaseRequest extends CreateRecord
 
     protected function beforeCreate(): void
     {
-        if (!auth()->user()?->branch_id) {
+        $user = auth()->user();
+        if (!$user?->branch_id && !$user?->hasRole(['super-admin', 'Super Admin']) && \App\Models\Branch::count() > 0) {
             \Filament\Notifications\Notification::make()
                 ->title('Unauthorized')
                 ->body("You must belong to a branch to create purchase requests.")

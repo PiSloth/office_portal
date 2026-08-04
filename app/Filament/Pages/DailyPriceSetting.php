@@ -64,6 +64,11 @@ class DailyPriceSetting extends Page implements HasTable
                         ->helperText(new \Illuminate\Support\HtmlString('<span style="color: #dc2626; font-size: 0.875rem;">Price Group မှ အရောင်း ပေါက်ဈေးကို ကူးယူ ထည့်သွင်းပါ။</span>'))
                         ->numeric()
                         ->required(),
+                    TextInput::make('show_raw_goldprice')
+                        ->label('အကျစ်ထည်ဈေး')
+                        ->helperText(new \Illuminate\Support\HtmlString('<span style="color: #dc2626; font-size: 0.875rem;">Price Group မှ အကျစ်ထည်ဈေး ထည့်သွင်းပါ။</span>'))
+                        ->numeric()
+                        ->required(),
                     TextInput::make('tax')
                         ->label('Oth Charges (Tax / ခွာဈေး)')
                         ->helperText(new \Illuminate\Support\HtmlString('<span style="color: #dc2626; font-size: 0.875rem;">Price Group မှ အရောင်းဈေးနှင့် ပြန်ဝယ်ဈေးကို ခြားနား၍ ကွာဟသော ပမာဏကို ထည့်ပေးရန်။</span>'))
@@ -72,19 +77,34 @@ class DailyPriceSetting extends Page implements HasTable
                 ])
                 ->mountUsing(function ($form) {
                     $taxParam = CalculationParameter::where('key', 'tax_rate')->first();
+                    $rawGoldParam = CalculationParameter::where('key', 'show_raw_goldprice')->first()
+                        ?? CalculationParameter::where('key', 'raw_gold_price')->first();
                     $form->fill([
                         'tax' => $taxParam ? $taxParam->value : 0,
+                        'show_raw_goldprice' => $rawGoldParam ? $rawGoldParam->value : 0,
                     ]);
                 })
                 ->action(function (array $data, DailyPriceSetting $livewire) {
                     $newGoldPrice = (float) $data['new_gold_price'];
                     $convertedGoldPrice = (16.606 / 16.3293) * $newGoldPrice;
+                    $showRawGoldPrice = (float) ($data['show_raw_goldprice'] ?? 0);
+                    $convertedRawGoldPrice = (16.606 / 16.3293) * $showRawGoldPrice;
                     $tax = (float) $data['tax'];
 
                     // Update generic engine parameters
                     CalculationParameter::updateOrCreate(
                         ['key' => 'base_gold_price'],
                         ['value' => $convertedGoldPrice, 'type' => 'numeric', 'method_id' => 1]
+                    );
+
+                    CalculationParameter::updateOrCreate(
+                        ['key' => 'show_raw_goldprice'],
+                        ['value' => $convertedRawGoldPrice, 'type' => 'numeric', 'method_id' => 1]
+                    );
+
+                    CalculationParameter::updateOrCreate(
+                        ['key' => 'raw_gold_price'],
+                        ['value' => $convertedRawGoldPrice, 'type' => 'numeric', 'method_id' => 1]
                     );
 
                     CalculationParameter::updateOrCreate(
@@ -95,6 +115,7 @@ class DailyPriceSetting extends Page implements HasTable
                     // Keep historical record
                     \App\Models\DailyPriceHistory::create([
                         'gold_price' => $convertedGoldPrice,
+                        'raw_gold_price' => $convertedRawGoldPrice,
                         'tax_rate' => $tax,
                         'user_id' => auth()->id(),
                     ]);
@@ -114,10 +135,13 @@ class DailyPriceSetting extends Page implements HasTable
     public function mount(): void
     {
         $goldPriceParam = CalculationParameter::where('key', 'base_gold_price')->first();
+        $rawGoldPriceParam = CalculationParameter::where('key', 'show_raw_goldprice')->first()
+            ?? CalculationParameter::where('key', 'raw_gold_price')->first();
         $taxParam = CalculationParameter::where('key', 'tax_rate')->first();
 
         $this->form->fill([
             'gold_price' => $goldPriceParam ? $goldPriceParam->value : 0,
+            'show_raw_goldprice' => $rawGoldPriceParam ? $rawGoldPriceParam->value : 0,
             'tax' => $taxParam ? $taxParam->value : 0,
         ]);
     }
@@ -131,6 +155,12 @@ class DailyPriceSetting extends Page implements HasTable
                     ->schema([
                         TextInput::make('gold_price')
                             ->label('Gold Price')
+                            ->numeric()
+                            ->required()
+                            ->disabled()
+                            ->dehydrated(),
+                        TextInput::make('show_raw_goldprice')
+                            ->label('အကျစ်ထည်ဈေး')
                             ->numeric()
                             ->required()
                             ->disabled()
@@ -165,6 +195,16 @@ class DailyPriceSetting extends Page implements HasTable
         );
 
         CalculationParameter::updateOrCreate(
+            ['key' => 'show_raw_goldprice'],
+            ['value' => $state['show_raw_goldprice'] ?? 0, 'type' => 'numeric', 'method_id' => 1]
+        );
+
+        CalculationParameter::updateOrCreate(
+            ['key' => 'raw_gold_price'],
+            ['value' => $state['show_raw_goldprice'] ?? 0, 'type' => 'numeric', 'method_id' => 1]
+        );
+
+        CalculationParameter::updateOrCreate(
             ['key' => 'tax_rate'],
             ['value' => $state['tax'], 'type' => 'numeric', 'method_id' => 1]
         );
@@ -172,6 +212,7 @@ class DailyPriceSetting extends Page implements HasTable
         // Keep historical record
         \App\Models\DailyPriceHistory::create([
             'gold_price' => $state['gold_price'],
+            'raw_gold_price' => $state['show_raw_goldprice'] ?? 0,
             'tax_rate' => $state['tax'],
             'user_id' => auth()->id(),
         ]);
@@ -201,6 +242,10 @@ class DailyPriceSetting extends Page implements HasTable
                     ->sortable(),
                 TextColumn::make('gold_price')
                     ->label('Gold Price (MMK)')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('raw_gold_price')
+                    ->label('အကျစ်ထည်ဈေး (MMK)')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('tax_rate')

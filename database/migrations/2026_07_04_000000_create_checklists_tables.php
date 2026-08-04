@@ -30,6 +30,7 @@ return new class extends Migration
                 $table->string('label');
                 $table->boolean('is_required')->default(true);
                 $table->boolean('is_active')->default(true);
+                $table->integer('sort_order')->default(0);
                 $table->timestamps();
             });
         }

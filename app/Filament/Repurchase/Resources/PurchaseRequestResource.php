@@ -23,7 +23,17 @@ class PurchaseRequestResource extends Resource
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->branch_id !== null;
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if (! $user->can(static::permissionName('create'))) {
+            return false;
+        }
+
+        return $user->hasRole(['super-admin', 'Super Admin']) || $user->branch_id !== null || \App\Models\Branch::count() === 0;
     }
 
     public static function form(Schema $schema): Schema
@@ -267,10 +277,12 @@ class PurchaseRequestResource extends Resource
                                             Forms\Components\Select::make('reChange')
                                                 ->label('ပြန်ဝယ်အမျိုးအစား?')
                                                 ->options([
-                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                    '0' => 'ဆိုင်ထည်',
                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                     '2' => 'Percent ထည်ပြန်ဝယ်',
                                                     '3' => 'စိန်ထည်ပြန်ဝယ်',
+                                                    '4' => 'အကျစ်ထည်ပြန်ဝယ်',
+                                                    '5' => 'အထည်ပြန်လဲ',
                                                 ])
                                                 ->default('0')
                                                 ->live(),
@@ -279,8 +291,8 @@ class PurchaseRequestResource extends Resource
                                     Forms\Components\TextInput::make('original_voucher_price')
                                         ->numeric()
                                         ->label('Original Voucher Price')
-                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
-                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
                                         ->live(onBlur: true)
                                         ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
 
@@ -290,14 +302,14 @@ class PurchaseRequestResource extends Resource
                                         ->disk('public')
                                         ->visibility('public')
                                         ->directory('attachments/purchase_items')
-                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
-                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3'])),
+                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
+                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5'])),
 
                                     \Filament\Schemas\Components\Grid::make(2)
                                         ->schema([
                                             Forms\Components\TextInput::make('goldWeightGram')
                                                 ->numeric()
-                                                ->label('Gram (g)')
+                                                ->label('gram(ရွှေချိန်+ကျောက်ချိန်)')
                                                 ->default(0)
                                                 ->live(onBlur: true)
                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
@@ -351,7 +363,7 @@ class PurchaseRequestResource extends Resource
                                                 ->label(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3' ? 'Plus Percent Addition' : 'Percent Deduction')
                                                 ->suffix('%')
                                                 ->default(0)
-                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
                                                 ->live(onBlur: true)
                                                 ->helperText(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3'
                                                     ? new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းပေါင်းထည့်ရန်</span>')
@@ -523,7 +535,7 @@ class PurchaseRequestResource extends Resource
                                             Forms\Components\Select::make('reChange')
                                                 ->label('ပြန်ဝယ်အမျိုးအစား')
                                                 ->options([
-                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                    '0' => 'ဆိုင်ထည်',
                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                 ])
                                                 ->default('0')
@@ -560,7 +572,7 @@ class PurchaseRequestResource extends Resource
                                         ->schema([
                                             Forms\Components\TextInput::make('goldWeightGram')
                                                 ->numeric()
-                                                ->label('Gram (g)')
+                                                ->label('gram(ရွှေချိန်+ကျောက်ချိန်)')
                                                 ->default(0)
                                                 ->live(onBlur: true)
                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
@@ -837,6 +849,11 @@ class PurchaseRequestResource extends Resource
                                             $origPrice = $get('dynamic_fields_json.original_voucher_price') ?? 0;
                                             $plusPercent = $get('dynamic_fields_json.percent') ?? 0;
                                             $html .= "<br/><span class='text-amber-600 dark:text-amber-400 text-xs font-semibold'>Diamond Buyback (စိန်ထည်ပြန်ဝယ်): " . number_format($origPrice) . " MMK (+" . $plusPercent . "%)</span>";
+                                        } elseif ((string)$reChange === '4') {
+                                            $html .= "<br/><span class='text-purple-600 dark:text-purple-400 text-xs font-semibold'>အကျစ်ထည်ပြန်ဝယ်</span>";
+                                        } elseif ((string)$reChange === '5') {
+                                            $origPrice = $get('dynamic_fields_json.original_voucher_price') ?? 0;
+                                            $html .= "<br/><span class='text-blue-600 dark:text-blue-400 text-xs font-semibold'>အထည်ပြန်လဲ: " . number_format($origPrice) . " MMK</span>";
                                         }
                                         if ($remark) {
                                             $html .= "<br/><span class='text-gray-400 text-xs italic'>" . e($remark) . "</span>";
@@ -853,7 +870,7 @@ class PurchaseRequestResource extends Resource
                                     }),
 
                                 Forms\Components\Placeholder::make('weight')
-                                    ->label('(g)')
+                                    ->label('gram(ရွှေချိန်+ကျောက်ချိန်)')
                                     ->content(fn(\Filament\Schemas\Components\Utilities\Get $get) => $get('dynamic_fields_json.goldWeightGram') ?? '-'),
 
                                 Forms\Components\Placeholder::make('kyauk_weight')
@@ -926,8 +943,7 @@ class PurchaseRequestResource extends Resource
                                                                 ? new \Illuminate\Support\HtmlString('<span style="color: green; font-weight: bold;">ရ</span>')
                                                                 : new \Illuminate\Support\HtmlString('<span style="color: red; font-weight: bold;">မရ</span>')
                                                         )
-                                                        ->live()
-                                                        ->default(false),
+                                                        ->live(),
 
                                                     \Filament\Schemas\Components\Grid::make(2)
                                                         ->schema([
@@ -940,12 +956,14 @@ class PurchaseRequestResource extends Resource
                                                             Forms\Components\Select::make('reChange')
                                                                 ->label('ပြန်ဝယ်အမျိုးအစား')
                                                                 ->options(fn() => $purchaseType === 'gb_product' ? [
-                                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                                    '0' => 'ဆိုင်ထည်',
                                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                                     '2' => 'Percent ထည်ပြန်ဝယ်',
                                                                     '3' => 'စိန်ထည်ပြန်ဝယ်',
+                                                                    '4' => 'အကျစ်ထည်ပြန်ဝယ်',
+                                                                    '5' => 'အထည်ပြန်လဲ',
                                                                 ] : [
-                                                                    '0' => 'ဆိုင်ထည် (No)',
+                                                                    '0' => 'ဆိုင်ထည်',
                                                                     '1' => 'အလဲအထပ်လုပ်မယ် (Yes)',
                                                                 ])
                                                                 ->default('0')
@@ -955,8 +973,8 @@ class PurchaseRequestResource extends Resource
                                                     Forms\Components\TextInput::make('original_voucher_price')
                                                         ->numeric()
                                                         ->label('Original Voucher Price')
-                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
-                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
+                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
                                                         ->live(onBlur: true)
                                                         ->extraInputAttributes(['onkeydown' => 'if (event.key === "Enter") { event.preventDefault(); }']),
 
@@ -966,14 +984,14 @@ class PurchaseRequestResource extends Resource
                                                         ->disk('public')
                                                         ->visibility('public')
                                                         ->directory('attachments/purchase_items')
-                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
-                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3'])),
+                                                        ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
+                                                        ->visible(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5'])),
 
                                                     \Filament\Schemas\Components\Grid::make(1)
                                                         ->schema([
                                                             Forms\Components\TextInput::make('goldWeightGram')
                                                                 ->numeric()
-                                                                ->label('Gram (g)')
+                                                                ->label('gram(ရွှေချိန်+ကျောက်ချိန်)')
                                                                 ->default(0)
                                                                 ->live(onBlur: true)
                                                                 ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) => self::convertGramToKyat($get, $set))
@@ -1027,7 +1045,7 @@ class PurchaseRequestResource extends Resource
                                                                 ->label(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3' ? 'Plus Percent Addition' : 'Percent Deduction')
                                                                 ->suffix('%')
                                                                 ->default(0)
-                                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3']))
+                                                                ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => in_array((string)$get('reChange'), ['2', '3', '5']))
                                                                 ->live(onBlur: true)
                                                                 ->helperText(fn(\Filament\Schemas\Components\Utilities\Get $get) => (string)$get('reChange') === '3'
                                                                     ? new \Illuminate\Support\HtmlString('<span class="percent-info-text">ရာခိုင်နှုန်းပေါင်းထည့်ရန်</span>')
@@ -1242,7 +1260,7 @@ class PurchaseRequestResource extends Resource
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Product Type'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Product Name'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('Gold Grade'),
-                                \Filament\Forms\Components\Repeater\TableColumn::make('(Gram)'),
+                                \Filament\Forms\Components\Repeater\TableColumn::make('gram(ရွှေချိန်+ကျောက်ချိန်)'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('ကျောက်'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('(%)'),
                                 \Filament\Forms\Components\Repeater\TableColumn::make('ရ/မရ'),
@@ -1681,7 +1699,7 @@ class PurchaseRequestResource extends Resource
                                         $operator = $history->user?->name ?? 'System';
                                         $price = number_format($history->total_amount) . ' MMK';
                                         $qty = $inputs['quantity'] ?? 1;
-                                        $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : (($inputs['reChange'] ?? '0') === '3' ? 'စိန်ထည်ပြန်ဝယ်' : 'ဆိုင်ထည် (No)'));
+                                        $reChange = ($inputs['reChange'] ?? '0') === '1' ? 'အလဲအထပ် (Yes)' : (($inputs['reChange'] ?? '0') === '2' ? 'Percent ထည်ပြန်ဝယ်' : (($inputs['reChange'] ?? '0') === '3' ? 'စိန်ထည်ပြန်ဝယ်' : (($inputs['reChange'] ?? '0') === '4' ? 'အကျစ်ထည်ပြန်ဝယ်' : (($inputs['reChange'] ?? '0') === '5' ? 'အထည်ပြန်လဲ' : 'ဆိုင်ထည်'))));
                                         $isGood = ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ';
                                         $deduction = ($inputs['percent'] ?? 0) . '%';
                                         $remark = $inputs['remark'] ?? '-';

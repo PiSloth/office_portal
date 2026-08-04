@@ -73,4 +73,67 @@ class JewelryCalculatorTest extends TestCase
         $this::assertEquals(0, round($result['details']['total_weight'], 4));
         $this::assertEquals(0, $result['result']);
     }
+
+    public function test_raw_gold_buyback_uses_show_raw_goldprice_as_base()
+    {
+        $calculator = new JewelryCalculator();
+
+        $parameters = [
+            'base_gold_price' => 3000000,
+            'show_raw_goldprice' => 2800000,
+            'tax_rate' => 50000,
+            'gram_per_kyat' => 16.606,
+            'multiplier_gb_16' => 1.0,
+        ];
+
+        // 1 Kyat gross weight (16.606g), no stone weight
+        $inputs = [
+            'goldList' => 16,
+            'purchase_type' => 'gb_product',
+            'kyat' => 1,
+            'pae' => 0,
+            'yawe' => 0,
+            'kyaukWeight' => 0,
+            'goldWeightGram' => 16.606,
+            'percent' => 0,
+            'reChange' => '4', // အကျစ်ထည်ပြန်ဝယ်
+            'quantity' => 1,
+        ];
+
+        $result = $calculator->calculate($inputs, $parameters);
+
+        $this::assertEquals('success', $result['status']);
+        $this::assertEquals('အကျစ်ထည်ပြန်ဝယ်', $result['message']);
+        $this::assertEquals(1.0, round($result['details']['total_weight'], 4));
+        // Base price should be 2800000 (show_raw_goldprice) instead of 3000000 or (3000000 - 50000)
+        $this::assertEquals(2800000, $result['result']);
+    }
+
+    public function test_athae_pyan_lae_option_calculates_based_on_original_voucher_price_and_percent()
+    {
+        $calculator = new JewelryCalculator();
+
+        $parameters = [
+            'base_gold_price' => 3000000,
+            'tax_rate' => 0,
+            'gram_per_kyat' => 16.606,
+        ];
+
+        // Voucher price = 1,000,000 MMK, percent deduction = 10%
+        $inputs = [
+            'goldList' => 16,
+            'purchase_type' => 'gb_product',
+            'original_voucher_price' => 1000000,
+            'percent' => 10,
+            'reChange' => '5', // အထည်ပြန်လဲ
+            'quantity' => 1,
+        ];
+
+        $result = $calculator->calculate($inputs, $parameters);
+
+        $this::assertEquals('success', $result['status']);
+        $this::assertEquals('အထည်ပြန်လဲ', $result['message']);
+        // Final price = 1,000,000 - 100,000 = 900,000
+        $this::assertEquals(900000, $result['result']);
+    }
 }
