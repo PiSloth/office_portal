@@ -2,6 +2,7 @@
 
 namespace App\Filament\Repurchase\Resources;
 
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Repurchase\Resources\PurchaseDecisionResource\Pages;
 use App\Modules\Purchase\Models\PurchaseDecision;
 use Filament\Forms;
@@ -13,6 +14,9 @@ use Illuminate\Database\Eloquent\Builder;
 
 class PurchaseDecisionResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'decisions';
     protected static ?string $model = PurchaseDecision::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-shield-exclamation';
     protected static \UnitEnum|string|null $navigationGroup = 'Purchase';
@@ -23,6 +27,15 @@ class PurchaseDecisionResource extends Resource
     {
         return $schema
             ->components([
+                \Filament\Schemas\Components\Section::make('Product Information')
+                    ->schema([
+                        Forms\Components\Placeholder::make('product_info_view')
+                            ->hiddenLabel()
+                            ->content(fn (?PurchaseDecision $record) => view('filament.repurchase.decision-product-info', ['record' => $record])),
+                    ])
+                    ->visible(fn (?PurchaseDecision $record) => $record !== null && $record->purchaseRequest !== null)
+                    ->columnSpanFull(),
+
                 \Filament\Schemas\Components\Section::make('Original Validation Failure Reference')
                     ->schema([
                         Forms\Components\Placeholder::make('failed_fields')
@@ -194,6 +207,7 @@ class PurchaseDecisionResource extends Resource
                     ]),
             ])
             ->actions([
+                \Filament\Actions\ViewAction::make(),
                 \Filament\Actions\EditAction::make(),
             ])
             ->bulkActions([
@@ -201,6 +215,70 @@ class PurchaseDecisionResource extends Resource
                     \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->schema([
+            \Filament\Schemas\Components\Section::make('Product Information')
+                ->schema([
+                    Forms\Components\Placeholder::make('product_info_view')
+                        ->hiddenLabel()
+                        ->content(fn (?PurchaseDecision $record) => view('filament.repurchase.decision-product-info', ['record' => $record])),
+                ])
+                ->visible(fn (?PurchaseDecision $record) => $record !== null && $record->purchaseRequest !== null)
+                ->columnSpanFull(),
+
+            \Filament\Schemas\Components\Section::make('Original Validation Failure Reference')
+                ->schema([
+                    \Filament\Infolists\Components\TextEntry::make('failed_fields')
+                        ->label('Failed Fields')
+                        ->state(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->pluck('field_name')->unique()->join(', ') ?? '-'),
+                    \Filament\Infolists\Components\TextEntry::make('expected_values')
+                        ->label('Expected Values')
+                        ->state(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->expected_value}")->join(' | ') ?? '-'),
+                    \Filament\Infolists\Components\TextEntry::make('actual_values')
+                        ->label('Actual Values')
+                        ->state(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->actual_value}")->join(' | ') ?? '-'),
+                    \Filament\Infolists\Components\TextEntry::make('checked_by')
+                        ->label('Checked By')
+                        ->state(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => $fc->whoChecked?->name)->filter()->unique()->join(', ') ?? '-'),
+                    \Filament\Infolists\Components\TextEntry::make('check_remarks')
+                        ->label('Check Remarks')
+                        ->state(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->remark}")->join(' | ') ?? '-')
+                        ->columnSpan(2),
+                ])
+                ->columns(3)
+                ->visible(fn (?PurchaseDecision $record) => $record !== null)
+                ->columnSpanFull(),
+
+            \Filament\Schemas\Components\Section::make('Check History Summary on Failed Fields')
+                ->schema([
+                    Forms\Components\Placeholder::make('failed_fields_histories')
+                        ->hiddenLabel()
+                        ->content(fn (?PurchaseDecision $record) => view('filament.repurchase.decision-histories-table', ['record' => $record])),
+                ])
+                ->visible(fn (?PurchaseDecision $record) => $record !== null && $record->purchaseRequest?->failChecks?->isNotEmpty())
+                ->columnSpanFull(),
+
+            \Filament\Schemas\Components\Section::make('Decision Details')
+                ->schema([
+                    \Filament\Infolists\Components\TextEntry::make('purchaseRequest.purchase_number')
+                        ->label('Purchase Request No'),
+                    \Filament\Infolists\Components\TextEntry::make('status')
+                        ->label('Decision Status')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'open' => 'warning',
+                            'closed' => 'success',
+                            default => 'gray',
+                        }),
+                    \Filament\Infolists\Components\TextEntry::make('remark')
+                        ->label('Remarks / Action Taken')
+                        ->columnSpanFull(),
+                ])
+                ->columns(2),
+        ]);
     }
 
     public static function getRelations(): array
@@ -212,6 +290,7 @@ class PurchaseDecisionResource extends Resource
     {
         return [
             'index' => Pages\ListPurchaseDecisions::route('/'),
+            'view' => Pages\ViewPurchaseDecision::route('/{record}'),
             'edit' => Pages\EditPurchaseDecision::route('/{record}/edit'),
         ];
     }

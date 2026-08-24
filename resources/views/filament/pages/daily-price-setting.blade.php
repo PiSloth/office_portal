@@ -2,11 +2,13 @@
     <form wire:submit="save">
         {{ $this->form }}
 
+        @if(auth()->user()?->can('gold-price.update'))
         <div class="mt-4 mb-8">
             <x-filament::button type="submit" color="danger">
                 Update Prices
             </x-filament::button>
         </div>
+        @endif
     </form>
 
     <div class="mt-8">

@@ -61,6 +61,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'admin.access', 'categories.create', 'categories.delete', 'categories.update', 'categories.view',
                 'checks.create', 'checks.delete', 'checks.update', 'checks.view', 'config.manage', 'config.view',
                 'decisions.assign', 'decisions.create', 'decisions.delete', 'decisions.update', 'decisions.view',
+                'gold-price.create', 'gold-price.delete', 'gold-price.update', 'gold-price.view',
                 'locations.create', 'locations.delete', 'locations.update', 'locations.view',
                 'permissions.create', 'permissions.delete', 'permissions.manage', 'permissions.update', 'permissions.view',
                 'product-checks.create', 'product-checks.delete', 'product-checks.update', 'product-checks.view',
@@ -95,6 +96,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'reports.view', 'products.view', 'products.create', 'products.update', 'products.import',
                 'sessions.manage', 'checks.view', 'checks.create', 'checks.update',
                 'product-checks.view', 'product-checks.create', 'product-checks.update', 'product-checks.delete',
+                'gold-price.view', 'gold-price.create', 'gold-price.update', 'gold-price.delete',
             ]);
             $manager->syncPermissions([
                 'roles.update', 'roles.assign', 'scan-configs.view', 'sessions.view', 'sessions.create', 'sessions.update',
