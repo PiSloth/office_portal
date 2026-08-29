@@ -33,7 +33,7 @@ class GoldGradeRepurchaseChartWidget extends ChartWidget
                 ->label('Branch')
                 ->options([
                     'all' => 'All Branches',
-                    ...Branch::pluck('code', 'id')->all(),
+                    ...Branch::query()->get()->mapWithKeys(fn ($branch) => [$branch->id => (string)($branch->name ?: ($branch->code ?: "Branch #{$branch->id}"))])->all(),
                 ])
                 ->default('all')
                 ->searchable(),

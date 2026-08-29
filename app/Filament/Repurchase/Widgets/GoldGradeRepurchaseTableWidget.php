@@ -89,7 +89,7 @@ class GoldGradeRepurchaseTableWidget extends TableWidget
             ->filters([
                 Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Branch')
-                    ->options(Branch::pluck('code', 'id')->all())
+                    ->options(Branch::query()->get()->mapWithKeys(fn ($branch) => [$branch->id => (string)($branch->name ?: ($branch->code ?: "Branch #{$branch->id}"))])->all())
                     ->placeholder('All Branches'),
                 Tables\Filters\Filter::make('date_range')
                     ->form([

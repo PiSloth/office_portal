@@ -33,7 +33,7 @@ class WorkflowRequestsChartWidget extends ChartWidget
                 ->label('Branch')
                 ->options([
                     'all' => 'All Branches',
-                    ...Branch::pluck('code', 'id')->all(),
+                    ...Branch::query()->get()->mapWithKeys(fn ($branch) => [$branch->id => (string)($branch->name ?: ($branch->code ?: "Branch #{$branch->id}"))])->all(),
                 ])
                 ->default('all')
                 ->searchable(),
@@ -41,7 +41,7 @@ class WorkflowRequestsChartWidget extends ChartWidget
                 ->label('Product Type')
                 ->options([
                     'all' => 'All Product Types',
-                    ...ProductType::pluck('name', 'id')->all(),
+                    ...ProductType::query()->get()->mapWithKeys(fn ($pt) => [$pt->id => (string)($pt->name ?: "Product Type #{$pt->id}")])->all(),
                 ])
                 ->default('all')
                 ->searchable(),
