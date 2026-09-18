@@ -9,7 +9,9 @@
         $startDateText = $reportData['formattedStartDate'];
         $endDateText = $reportData['formattedEndDate'];
         $toleranceInfo = $reportData['toleranceInfo'] ?? null;
+        $stateInfo = $reportData['stateInfo'] ?? null;
         $availableFields = $this->getAvailableFailFields();
+        $availableStates = $this->getAvailableStates();
     @endphp
 
     <style>
@@ -691,6 +693,15 @@
                     />
                 </div>
 
+                <div class="date-control">
+                    <label class="control-label">PR Status (အခြေအနေ):</label>
+                    <select wire:model.live="selectedState" class="filter-select">
+                        @foreach($availableStates as $sKey => $sLabel)
+                            <option value="{{ $sKey }}">{{ $sLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="preset-group">
                     <button 
                         type="button" 
@@ -853,6 +864,13 @@
                 <div class="doc-subtitle-badge mm-font">
                     The report at within {{ $startDateText }} and {{ $endDateText }}
                 </div>
+                @if(!empty($stateInfo) && !empty($stateInfo['isFiltered']))
+                    <div style="margin-top: 4px;">
+                        <div class="doc-filter-badge mm-font" style="background-color: #eff6ff; border-color: #bfdbfe; color: #1e40af;">
+                            <strong>PR အခြေအနေ (Status):</strong> {{ $stateInfo['label'] }}
+                        </div>
+                    </div>
+                @endif
                 @if($toleranceInfo)
                     <div>
                         <div class="doc-filter-badge mm-font">

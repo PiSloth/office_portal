@@ -217,8 +217,14 @@
         <div class="doc-subtitle-badge">
             The report at within {{ $zg($startDateText) }} and {{ $zg($endDateText) }}
         </div>
+        @if(!empty($stateInfo) && !empty($stateInfo['isFiltered']))
+            <div style="margin-top: 4px; font-size: 9px; color: #1e40af;">
+                <strong>{{ $zg('PR အခြေအနေ:') }}</strong> 
+                {{ $zg($stateInfo['label']) }}
+            </div>
+        @endif
         @if(!empty($toleranceInfo) && !empty($toleranceInfo['isActive']))
-            <div style="margin-top: 6px; font-size: 9px; color: #4b5563;">
+            <div style="margin-top: 4px; font-size: 9px; color: #4b5563;">
                 <strong>{{ $zg('စစ်ထုတ်မှု:') }}</strong> 
                 {{ $zg($toleranceInfo['fieldLabel']) }} (Tolerance: &plusmn;{{ $toleranceInfo['value'] }}g) &mdash; 
                 <strong>{{ $zg($toleranceInfo['modeLabel']) }}</strong>
