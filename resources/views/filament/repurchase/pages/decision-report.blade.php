@@ -776,8 +776,16 @@
                         <label class="control-label">Fail Field:</label>
                         <select wire:model.live="toleranceField" class="filter-select">
                             <option value="all">စစ်ဆေးချက်အားလုံး (All Fields)</option>
-                            @foreach($availableFields as $fKey => $fLabel)
-                                <option value="{{ $fKey }}">{{ $fLabel }}</option>
+                            @foreach($availableFields as $groupLabel => $groupOptions)
+                                @if(is_array($groupOptions))
+                                    <optgroup label="{{ $groupLabel }}">
+                                        @foreach($groupOptions as $fKey => $fLabel)
+                                            <option value="{{ $fKey }}">{{ $fLabel }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @else
+                                    <option value="{{ $groupLabel }}">{{ $groupOptions }}</option>
+                                @endif
                             @endforeach
                         </select>
                     </div>

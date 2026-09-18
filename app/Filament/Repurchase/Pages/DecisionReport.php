@@ -148,9 +148,37 @@ class DecisionReport extends Page
         }
 
         // Weight synonyms (English & Myanmar)
-        $isWeightSel = str_contains($normSel, 'weight') || str_contains($normSel, 'အလေးချိန်');
-        $isWeightRule = str_contains($normRule, 'weight') || str_contains($normRule, 'အလေးချိန်');
+        $isWeightSel = str_contains($normSel, 'weight') || str_contains($normSel, 'အလေးချိန်') || str_contains($normSel, 'gram');
+        $isWeightRule = str_contains($normRule, 'weight') || str_contains($normRule, 'အလေးချိန်') || str_contains($normRule, 'gram');
         if ($isWeightSel && $isWeightRule) {
+            return true;
+        }
+
+        // Kyat weight
+        if (str_contains($normSel, 'ကျပ်') && str_contains($normRule, 'ကျပ်')) {
+            return true;
+        }
+
+        // Yawe weight
+        if (str_contains($normSel, 'ရွေး') && str_contains($normRule, 'ရွေး') && !str_contains($normSel, 'ကျောက်') && !str_contains($normRule, 'ကျောက်')) {
+            return true;
+        }
+
+        // Stone weight
+        if (str_contains($normSel, 'ကျောက်') && str_contains($normRule, 'ကျောက်')) {
+            return true;
+        }
+
+        // Percent reduction
+        if ((str_contains($normSel, 'ရာခိုင်နှုန်း') || str_contains($normSel, 'percent')) &&
+            (str_contains($normRule, 'ရာခိုင်နှုန်း') || str_contains($normRule, 'percent'))) {
+            return true;
+        }
+
+        // Quantity synonyms
+        $isQtySel = str_contains($normSel, 'quantity') || str_contains($normSel, 'qty') || str_contains($normSel, 'အရေအတွက်');
+        $isQtyRule = str_contains($normRule, 'quantity') || str_contains($normRule, 'qty') || str_contains($normRule, 'အရေအတွက်');
+        if ($isQtySel && $isQtyRule) {
             return true;
         }
 
@@ -161,10 +189,17 @@ class DecisionReport extends Page
             return true;
         }
 
-        // Quantity synonyms
-        $isQtySel = str_contains($normSel, 'quantity') || str_contains($normSel, 'qty') || str_contains($normSel, 'အရေအတွက်');
-        $isQtyRule = str_contains($normRule, 'quantity') || str_contains($normRule, 'qty') || str_contains($normRule, 'အရေအတွက်');
-        if ($isQtySel && $isQtyRule) {
+        // Gold Quality synonyms
+        $isQualitySel = str_contains($normSel, 'quality') || str_contains($normSel, 'အရည်အသွေး');
+        $isQualityRule = str_contains($normRule, 'quality') || str_contains($normRule, 'အရည်အသွေး');
+        if ($isQualitySel && $isQualityRule) {
+            return true;
+        }
+
+        // Pass / Fail (ရ/မရ)
+        $isPassFailSel = str_contains($normSel, 'ရမရ') || str_contains($normSel, 'isgood') || str_contains($normSel, 'pass');
+        $isPassFailRule = str_contains($normRule, 'ရမရ') || str_contains($normRule, 'isgood') || str_contains($normRule, 'pass');
+        if ($isPassFailSel && $isPassFailRule) {
             return true;
         }
 
@@ -208,26 +243,31 @@ class DecisionReport extends Page
 
     public function getAvailableFailFields(): array
     {
-        $fields = [
-            'all' => 'စစ်ဆေးချက်အားလုံး (All Fields)',
+        $numericGroup = [
             'weight_gram' => 'အလေးချိန် (Weight Gram)',
-            'weight_g' => 'အလေးချိန် (Weight)',
+            'ကျပ်-ချိန်' => 'ကျပ်-ချိန် (Kyat Weight)',
+            'ရွေး-ချိန်' => 'ရွေး-ချိန် (Yawe Weight)',
+            'ကျောက်-ချိန်' => 'ကျောက်-ချိန် (Stone Weight)',
+            'ရာခိုင်နှုန်းလျော့' => 'ရာခိုင်နှုန်းလျော့ (Percent Deduction)',
+            'quantity' => 'အရေအတွက် (Quantity)',
+        ];
+
+        $otherGroup = [
             'gold_grade' => 'ရွှေရည် (Gold Grade)',
             'gold_quality' => 'ရွှေအရည်အသွေး (Gold Quality)',
+            'ရ/မရ' => 'ရ/မရ (Pass/Fail)',
             'expiry_date' => 'သက်တမ်းကုန်ဆုံးရက် (Expiry Date)',
             'imei' => 'IMEI နံပါတ်',
         ];
 
+        $dbFields = [];
         try {
             $fcFields = \App\Modules\Purchase\Models\FailCheck::select('field_name')
                 ->whereNotNull('field_name')
                 ->distinct()
-                ->pluck('field_name');
-            foreach ($fcFields as $f) {
-                if (! isset($fields[$f])) {
-                    $fields[$f] = self::formatFieldLabel($f);
-                }
-            }
+                ->pluck('field_name')
+                ->toArray();
+            $dbFields = array_merge($dbFields, $fcFields);
         } catch (\Throwable $e) {
         }
 
@@ -237,15 +277,43 @@ class DecisionReport extends Page
                 ->distinct()
                 ->get();
             foreach ($rules as $r) {
-                $fn = $r->field_name;
-                if (! isset($fields[$fn])) {
-                    $fields[$fn] = self::formatFieldLabel($r->label ?: $fn);
-                }
+                if ($r->label) $dbFields[] = $r->label;
+                if ($r->field_name) $dbFields[] = $r->field_name;
             }
         } catch (\Throwable $e) {
         }
 
-        return $fields;
+        $isCovered = function (string $rawField) {
+            $s = strtolower(str_replace(['_', '-', ' ', '(', ')', '/', '.'], '', $rawField));
+            if (str_contains($s, 'weight') || str_contains($s, 'အလေးချိန်') || str_contains($s, 'gram')) return true;
+            if (str_contains($s, 'ကျပ်')) return true;
+            if (str_contains($s, 'ရွေး')) return true;
+            if (str_contains($s, 'ကျောက်')) return true;
+            if (str_contains($s, 'ရာခိုင်နှုန်း') || str_contains($s, 'percent')) return true;
+            if (str_contains($s, 'quantity') || str_contains($s, 'qty') || str_contains($s, 'အရေအတွက်')) return true;
+            if (str_contains($s, 'grade') || str_contains($s, 'ရွှေရည်')) return true;
+            if (str_contains($s, 'quality') || str_contains($s, 'အရည်အသွေး')) return true;
+            if (str_contains($s, 'ရမရ') || str_contains($s, 'isgood') || str_contains($s, 'pass')) return true;
+            if (str_contains($s, 'expiry') || str_contains($s, 'သက်တမ်း')) return true;
+            if (str_contains($s, 'imei')) return true;
+            return false;
+        };
+
+        $seenLabels = array_flip(array_merge($numericGroup, $otherGroup));
+
+        foreach (array_unique($dbFields) as $f) {
+            if (empty($f) || $f === 'all' || $isCovered($f)) continue;
+            $label = self::formatFieldLabel($f);
+            if (! isset($seenLabels[$label])) {
+                $otherGroup[$f] = $label;
+                $seenLabels[$label] = true;
+            }
+        }
+
+        return [
+            'အလေးချိန်နှင့် ကိန်းဂဏန်းများ (Numeric / Weight Fields)' => $numericGroup,
+            'အခြား စစ်ဆေးချက်များ (Other Specification Fields)' => $otherGroup,
+        ];
     }
 
     public static function formatFieldLabel(string $fieldName): string
@@ -256,8 +324,22 @@ class DecisionReport extends Page
             'weight_g' => 'အလေးချိန် (Weight)',
             'အလေးချိန် (gram)' => 'အလေးချိန် (Weight Gram)',
             'အလေးချိန်' => 'အလေးချိန် (Weight)',
+            'Gram ချိန်' => 'အလေးချိန် (Weight Gram)',
+            'ကျပ်-ချိန်' => 'ကျပ်-ချိန် (Kyat Weight)',
+            'ရွေး-ချိန်' => 'ရွေး-ချိန် (Yawe Weight)',
+            'ကျောက်-ချိန်' => 'ကျောက်-ချိန် (Stone Weight)',
+            'ကျောက်-ချိန် (ရွေး)' => 'ကျောက်-ချိန် (Stone Weight)',
+            'ကျောက်-ချိန်(ရွေး)' => 'ကျောက်-ချိန် (Stone Weight)',
+            'ရာခိုင်နှုန်းလျော့' => 'ရာခိုင်နှုန်းလျော့ (Percent Deduction)',
+            'quantity' => 'အရေအတွက် (Quantity)',
+            'Quantity Check' => 'အရေအတွက် (Quantity)',
+            'အရေအတွက် စစ်ရန်' => 'အရေအတွက် (Quantity)',
+            'အရေအတွက်' => 'အရေအတွက် (Quantity)',
             'gold_grade' => 'ရွှေရည် (Gold Grade)',
+            'ရွှေရည်' => 'ရွှေရည် (Gold Grade)',
             'gold_quality' => 'ရွှေအရည်အသွေး (Gold Quality)',
+            'ရွှေအရည်အသွေး' => 'ရွှေအရည်အသွေး (Gold Quality)',
+            'ရ/မရ' => 'ရ/မရ (Pass/Fail)',
             'expiry_date' => 'သက်တမ်းကုန်ဆုံးရက် (Expiry Date)',
             'imei' => 'IMEI နံပါတ်',
         ];
