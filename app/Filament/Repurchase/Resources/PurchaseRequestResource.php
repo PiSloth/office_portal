@@ -1731,6 +1731,9 @@ class PurchaseRequestResource extends Resource
                         ];
                     }),
                 \Filament\Actions\EditAction::make(),
+                \Filament\Actions\DeleteAction::make(),
+                \Filament\Actions\RestoreAction::make(),
+                \Filament\Actions\ForceDeleteAction::make(),
             ])
             ->defaultSort('id', 'desc')
             ->bulkActions([

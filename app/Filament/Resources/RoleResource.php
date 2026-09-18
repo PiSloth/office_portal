@@ -13,6 +13,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\HtmlString;
+use App\Services\PermissionRegistry;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use UnitEnum;
@@ -62,33 +63,53 @@ class RoleResource extends Resource
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
-                Forms\Components\Select::make('permissions')
-                    ->label('Permissions')
-                    ->multiple()
-                    ->relationship('permissions', 'name')
-                    ->searchable()
-                    ->options(fn(): array => self::permittedPermissionOptions())
-                    ->helperText('Only permissions you already own can be assigned unless you have roles.assign or permissions.manage.'),
-            ])->columns(2),
-
-            Section::make('Role and Permission Manual')->schema([
-                Forms\Components\Placeholder::make('role_permission_manual')
-                    ->label('How Roles and Permissions Work')
-                    ->content(new HtmlString(
-                        '<div class="space-y-4 text-sm text-gray-700 dark:text-gray-200">'
-                            . '<p>Roles are groups of permissions. Assigning a role to a user grants that user all permissions attached to the role.</p>'
-                            . '<p>Permissions are created separately and can be assigned only if the signed-in user already owns them.</p>'
-                            . '<ul class="list-disc list-inside space-y-2">'
-                            . '<li><strong>Role creation:</strong> Enter a unique role name, then select permissions from the list.</li>'
-                            . '<li><strong>Permission limitation:</strong> You can only assign permissions you already have yourself.</li>'
-                            . '<li><strong>Super Admin:</strong> The <code>super-admin</code> role cannot be edited or deleted.</li>'
-                            . '<li><strong>Role name uniqueness:</strong> Role names must be unique across the system.</li>'
-                            . '<li><strong>Managing permissions:</strong> Use the Manage Permissions button on the role edit page to sync permissions.</li>'
-                            . '</ul>'
-                            . '<p class="text-xs text-gray-500 dark:text-gray-400">Note: This interface only shows permissions available to your account; higher-level permissions cannot be assigned unless you already have them.</p>'
-                            . '</div>'
-                    )),
             ]),
+
+            \Filament\Schemas\Components\Tabs::make('Role Configuration')
+                ->tabs([
+                    \Filament\Schemas\Components\Tabs\Tab::make('Resource Permissions')
+                        ->icon('heroicon-o-shield-check')
+                        ->schema(self::getResourceSections()),
+
+                    \Filament\Schemas\Components\Tabs\Tab::make('Custom Permissions')
+                        ->icon('heroicon-o-key')
+                        ->schema([
+                            Section::make('System & Custom Permissions')
+                                ->description('Non-resource permissions such as system config, report views, and special operations.')
+                                ->schema([
+                                    Forms\Components\CheckboxList::make('other_permissions')
+                                        ->hiddenLabel()
+                                        ->bulkToggleable()
+                                        ->columns(4)
+                                        ->options(fn (): array => self::getOtherPermissionOptions())
+                                        ->dehydrated(true),
+                                ]),
+                        ]),
+
+                    \Filament\Schemas\Components\Tabs\Tab::make('Role Manual')
+                        ->icon('heroicon-o-information-circle')
+                        ->schema([
+                            Section::make('How Roles and Permissions Work')->schema([
+                                Forms\Components\Placeholder::make('role_permission_manual')
+                                    ->hiddenLabel()
+                                    ->content(new HtmlString(
+                                        '<div class="space-y-4 text-sm text-gray-700 dark:text-gray-200">'
+                                            . '<p>Roles are groups of permissions. Assigning a role to a user grants that user all permissions attached to the role.</p>'
+                                            . '<p>Permissions are created separately and can be assigned only if the signed-in user already owns them.</p>'
+                                            . '<ul class="list-disc list-inside space-y-2">'
+                                            . '<li><strong>Role creation:</strong> Enter a unique role name, then select permissions from the list.</li>'
+                                            . '<li><strong>Permission limitation:</strong> You can only assign permissions you already have yourself.</li>'
+                                            . '<li><strong>Super Admin:</strong> The <code>super-admin</code> role cannot be edited or deleted.</li>'
+                                            . '<li><strong>Role name uniqueness:</strong> Role names must be unique across the system.</li>'
+                                            . '<li><strong>Managing permissions:</strong> Permissions can be toggled per resource using the Select all option.</li>'
+                                            . '</ul>'
+                                            . '<p class="text-xs text-gray-500 dark:text-gray-400">Note: Higher-level permissions cannot be assigned unless you already have them.</p>'
+                                            . '</div>'
+                                    )),
+                            ]),
+                        ]),
+                ])
+                ->columnSpanFull(),
         ]);
     }
 
@@ -126,6 +147,46 @@ class RoleResource extends Resource
             'create' => Pages\CreateRole::route('/create'),
             'edit' => Pages\EditRole::route('/{record}/edit'),
         ];
+    }
+
+    public static function getResourceSections(): array
+    {
+        $resources = PermissionRegistry::getResources();
+        $actions = PermissionRegistry::getActions();
+        $sections = [];
+
+        foreach ($resources as $key => $res) {
+            $options = [];
+            foreach ($actions as $actionKey => $actionLabel) {
+                $options["{$res['prefix']}.{$actionKey}"] = $actionLabel;
+            }
+
+            $sections[] = Section::make($res['label'])
+                ->description($res['model'])
+                ->collapsible()
+                ->collapsed()
+                ->schema([
+                    Forms\Components\CheckboxList::make('permissions_' . $key)
+                        ->hiddenLabel()
+                        ->bulkToggleable()
+                        ->columns(4)
+                        ->options($options)
+                        ->dehydrated(true),
+                ]);
+        }
+
+        return $sections;
+    }
+
+    public static function getOtherPermissionOptions(): array
+    {
+        $allResourcePerms = PermissionRegistry::getAllResourcePermissionNames();
+
+        return Permission::query()
+            ->whereNotIn('name', $allResourcePerms)
+            ->orderBy('name')
+            ->pluck('name', 'name')
+            ->all();
     }
 
     public static function permittedPermissionOptions(): array

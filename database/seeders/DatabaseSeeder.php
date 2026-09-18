@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolesAndPermissionsSeeder::class,
+            ResourcePermissionsSeeder::class,
             PurchaseModuleSeeder::class,
             // MultiplierSeeder::class,
         ]);

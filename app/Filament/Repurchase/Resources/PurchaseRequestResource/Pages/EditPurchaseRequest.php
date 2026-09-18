@@ -655,6 +655,18 @@ class EditPurchaseRequest extends EditRecord
                 ->icon('heroicon-o-trash')
                 ->color('danger')
                 ->visible(fn (): bool => auth()->user()?->can('purchase-requests.delete') ?? false),
+
+            Actions\RestoreAction::make()
+                ->label('Restore')
+                ->icon('heroicon-o-arrow-path')
+                ->color('success')
+                ->visible(fn (): bool => auth()->user()?->can('purchase-requests.restore') ?? false),
+
+            Actions\ForceDeleteAction::make()
+                ->label('Force Delete')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->visible(fn (): bool => auth()->user()?->can('purchase-requests.force_delete') ?? false),
         ])
         ->icon('heroicon-m-cog-6-tooth')
         ->color('gray')

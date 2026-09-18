@@ -30,4 +30,14 @@ class UserPolicy
     {
         return $user->can('users.delete');
     }
+
+    public function restore(User $user, User $model): bool
+    {
+        return $user->can('users.restore');
+    }
+
+    public function forceDelete(User $user, User $model): bool
+    {
+        return $user->can('users.force_delete');
+    }
 }

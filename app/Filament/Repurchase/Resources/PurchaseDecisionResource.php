@@ -169,6 +169,10 @@ class PurchaseDecisionResource extends Resource
                     ->label('Branch')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('purchaseRequest.customer_name')
+                    ->label('Customer')
+                    ->searchable()
+                    ->placeholder('-'),
                 Tables\Columns\TextColumn::make('failed_fields')
                     ->label('Failed Fields')
                     ->state(fn (PurchaseDecision $record): string => $record->purchaseRequest?->failChecks?->pluck('field_name')->unique()->join(', ') ?? '-'),
@@ -205,7 +209,133 @@ class PurchaseDecisionResource extends Resource
                         'open' => 'Open',
                         'closed' => 'Closed',
                     ]),
+                Tables\Filters\SelectFilter::make('branch_id')
+                    ->label('Branch')
+                    ->options(fn () => \App\Models\Branch::pluck('name', 'id')->all())
+                    ->searchable()
+                    ->default(fn () => auth()->user()?->branch_id)
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            !empty($data['value']),
+                            fn (Builder $q) => $q->whereHas('purchaseRequest', fn ($sq) => $sq->where('branch_id', $data['value']))
+                        );
+                    }),
+                Tables\Filters\Filter::make('request_number')
+                    ->label('Request Number')
+                    ->form([
+                        Forms\Components\TextInput::make('request_number')
+                            ->label('Request Number')
+                            ->placeholder('e.g. PR-MAIN/260711001 or ID'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!empty($data['request_number'])) {
+                            $search = trim($data['request_number']);
+                            return $query->whereHas('purchaseRequest', function ($q) use ($search) {
+                                $q->where(function ($sub) use ($search) {
+                                    $sub->where('purchase_number', 'like', "%{$search}%")
+                                        ->orWhere('id', 'like', "%{$search}%");
+                                });
+                            });
+                        }
+                        return $query;
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (!empty($data['request_number'])) {
+                            return 'Request No: ' . $data['request_number'];
+                        }
+                        return null;
+                    }),
+                Tables\Filters\Filter::make('customer')
+                    ->label('Customer')
+                    ->form([
+                        Forms\Components\TextInput::make('customer_search')
+                            ->label('Customer')
+                            ->placeholder('Name, Phone, or NRC'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!empty($data['customer_search'])) {
+                            $search = trim($data['customer_search']);
+                            return $query->whereHas('purchaseRequest', function ($q) use ($search) {
+                                $q->where(function ($sub) use ($search) {
+                                    $sub->where('customer_name', 'like', "%{$search}%")
+                                        ->orWhere('customer_phone', 'like', "%{$search}%")
+                                        ->orWhere('customer_nrc', 'like', "%{$search}%");
+                                });
+                            });
+                        }
+                        return $query;
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (!empty($data['customer_search'])) {
+                            return 'Customer: ' . $data['customer_search'];
+                        }
+                        return null;
+                    }),
+                Tables\Filters\SelectFilter::make('failed_field_type')
+                    ->label('Failed Field Type')
+                    ->options(function () {
+                        $fromFails = \App\Modules\Purchase\Models\FailCheck::distinct()->pluck('field_name', 'field_name');
+                        $fromRules = \App\Modules\Core\Validation\Models\ValidationRule::distinct()->pluck('field_name', 'field_name');
+                        return $fromFails->merge($fromRules)
+                            ->filter()
+                            ->mapWithKeys(fn ($item) => [$item => ucwords(str_replace('_', ' ', $item))])
+                            ->all();
+                    })
+                    ->searchable()
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            !empty($data['value']),
+                            fn (Builder $q) => $q->whereHas('purchaseRequest.failChecks', fn ($sq) => $sq->where('field_name', $data['value']))
+                        );
+                    }),
+                Tables\Filters\Filter::make('created_at')
+                    ->label('Date Range')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')
+                            ->label('From Date'),
+                        Forms\Components\DatePicker::make('created_until')
+                            ->label('To Date'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $q, $date): Builder => $q->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $q, $date): Builder => $q->whereDate('created_at', '<=', $date),
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if (!empty($data['created_from'])) {
+                            $indicators['created_from'] = 'From: ' . \Carbon\Carbon::parse($data['created_from'])->toFormattedDateString();
+                        }
+                        if (!empty($data['created_until'])) {
+                            $indicators['created_until'] = 'Until: ' . \Carbon\Carbon::parse($data['created_until'])->toFormattedDateString();
+                        }
+                        return $indicators;
+                    }),
             ])
+            ->filtersFormColumns(2)
+            ->groups([
+                Tables\Grouping\Group::make('purchase_request_id')
+                    ->label('Purchase Request')
+                    ->getTitleFromRecordUsing(function ($record) {
+                        $pr = $record->purchaseRequest;
+                        if (!$pr) {
+                            return "Request #{$record->purchase_request_id}";
+                        }
+                        $customer = $pr->customer_name ? " - {$pr->customer_name}" : '';
+                        $branch = $pr->branch?->name ? " ({$pr->branch->name})" : '';
+
+                        return "{$pr->purchase_number}{$customer}{$branch}";
+                    })
+                    ->titlePrefixedWithLabel(false)
+                    ->collapsible(),
+            ])
+            ->defaultGroup('purchase_request_id')
             ->actions([
                 \Filament\Actions\ViewAction::make(),
                 \Filament\Actions\EditAction::make(),

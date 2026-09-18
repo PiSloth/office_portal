@@ -5,6 +5,7 @@ namespace App\Filament\Stock\Resources;
 use App\Filament\Stock\Resources\DeletedProductCheckResource\Pages;
 use App\Models\ProductCheck;
 use BackedEnum;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use Filament\Actions;
 use Filament\Resources\Resource;
 use Filament\Resources\Pages\ListRecords;
@@ -14,6 +15,10 @@ use UnitEnum;
 
 class DeletedProductCheckResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'deleted-product-checks';
+
     protected static ?string $model = ProductCheck::class;
 
     protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-trash';

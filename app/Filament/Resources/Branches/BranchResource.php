@@ -12,12 +12,17 @@ use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use App\Filament\Resources\Concerns\HasPermissionGates;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class BranchResource extends Resource
 {
+    use HasPermissionGates;
+
+    protected static string $permissionPrefix = 'branches';
+
     protected static ?string $model = Branch::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
