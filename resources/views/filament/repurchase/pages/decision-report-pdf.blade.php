@@ -217,6 +217,13 @@
         <div class="doc-subtitle-badge">
             The report at within {{ $zg($startDateText) }} and {{ $zg($endDateText) }}
         </div>
+        @if(!empty($toleranceInfo) && !empty($toleranceInfo['isActive']))
+            <div style="margin-top: 6px; font-size: 9px; color: #4b5563;">
+                <strong>{{ $zg('စစ်ထုတ်မှု:') }}</strong> 
+                {{ $zg($toleranceInfo['fieldLabel']) }} (Tolerance: &plusmn;{{ $toleranceInfo['value'] }}g) &mdash; 
+                <strong>{{ $zg($toleranceInfo['modeLabel']) }}</strong>
+            </div>
+        @endif
 
         <table class="meta-table">
             <tr>
@@ -245,16 +252,13 @@
     <table class="solid-table">
         <thead>
             <tr>
-                <th style="width: 40%;">
+                <th style="width: 50%;">
                     {{ $zg('စစ်ဆေးတွေ့ရှိချက်') }}
                 </th>
-                <th class="text-center" style="width: 20%;">
-                    {{ $zg('မှားယွင်းသည့် ကြိမ်နှုန်း') }}
+                <th class="text-center" style="width: 25%;">
+                    {{ $zg('မှားယွင်းကြိမ်နှုန်း') }}
                 </th>
-                <th class="text-center" style="width: 20%;">
-                    Repurchase ID ({{ $zg('သီးခြား') }})
-                </th>
-                <th class="text-center" style="width: 20%;">
+                <th class="text-center" style="width: 25%;">
                     {{ $zg('မှတ်ချက်(ဖြေရှင်းရန် ကျန်)') }}
                 </th>
             </tr>
@@ -266,9 +270,6 @@
                         {{ $zg($row['label']) }}
                     </td>
                     <td class="text-center" style="font-weight: bold;">
-                        {{ number_format($row['wrong_field_count']) }}
-                    </td>
-                    <td class="text-center" style="font-weight: bold; color: #0369a1;">
                         {{ number_format($row['distinct_repurchase_count']) }}
                     </td>
                     <td class="text-center" style="font-weight: bold; {{ $row['open_count'] > 0 ? 'color: #b45309;' : 'color: #047857;' }}">
@@ -277,7 +278,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="4" class="text-center" style="padding: 18px; color: #6b7280;">
+                    <td colspan="3" class="text-center" style="padding: 18px; color: #6b7280;">
                         {{ $zg('ရွေးချယ်ထားသော ရက်စွဲအတွင်း စစ်ဆေးတွေ့ရှိချက် မှတ်တမ်း မရှိပါ။') }} (No records found for the selected date range)
                     </td>
                 </tr>
@@ -290,9 +291,6 @@
                         {{ $zg('စုစုပေါင်း (Total) :') }}
                     </td>
                     <td class="text-center" style="font-size: 11px;">
-                        {{ number_format($totalWrongFieldCount) }}
-                    </td>
-                    <td class="text-center" style="font-size: 11px; color: #0369a1;">
                         {{ number_format($totalDistinctRepurchases) }}
                     </td>
                     <td class="text-center" style="font-size: 11px; color: #9a3412;">
@@ -318,10 +316,10 @@
     <table class="solid-table">
         <thead>
             <tr>
-                <th style="width: 45%;">
+                <th style="width: 50%;">
                     {{ $zg('စစ်ဆေးတွေ့ရှိချက်') }}
                 </th>
-                <th style="width: 55%;">
+                <th style="width: 50%;">
                     Branch {{ $zg('အလိုက် ကြိမ်နှုန်း') }}
                 </th>
             </tr>
@@ -342,9 +340,8 @@
                                     <div style="font-size: 10.5px; font-weight: bold; color: #111827;">
                                         {{ $zg($group['label']) }}
                                     </div>
-                                    <div style="font-size: 8.5px; font-weight: normal; color: #4b5563; margin-top: 3px;">
-                                        {{ $zg('စုစုပေါင်း မှားယွင်းမှု:') }} <strong style="color: #111827;">{{ number_format($group['total_wrong_count']) }}</strong> {{ $zg('ကြိမ်') }}<br>
-                                        {{ $zg('သီးခြား Repurchase:') }} <strong style="color: #0369a1;">{{ number_format($group['distinct_repurchase_count']) }}</strong> {{ $zg('ခု') }}
+                                    <div style="font-size: 9px; font-weight: normal; color: #6b7280; margin-top: 3px;">
+                                        {{ $zg('စုစုပေါင်း:') }} <strong style="color: #374151;">{{ number_format($group['distinct_repurchase_count']) }}</strong> {{ $zg('ကြိမ်') }}
                                     </div>
                                 </td>
                                 @php $isFirst = false; @endphp
@@ -358,10 +355,7 @@
                                         </td>
                                         <td style="border: none; padding: 0; text-align: right; white-space: nowrap;">
                                             <span class="branch-badge">
-                                                {{ number_format($bData['wrong_count']) }} {{ $zg('ကြိမ်') }}
-                                            </span>
-                                            <span class="branch-badge" style="background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd;">
-                                                {{ number_format($bData['distinct_repurchase_count']) }} Repurchases
+                                                {{ number_format($bData['distinct_repurchase_count']) }} {{ $zg('ကြိမ်') }}
                                             </span>
                                         </td>
                                     </tr>

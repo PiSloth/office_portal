@@ -341,10 +341,12 @@ class PurchaseDecisionResource extends Resource
                         return "{$pr->purchase_number}{$customer}{$branch}";
                     })
                     ->titlePrefixedWithLabel(false)
+                    ->orderQueryUsing(fn ($query, string $direction = 'desc') => $query->orderBy('purchase_request_id', $direction ?: 'desc'))
                     ->collapsible(),
             ])
             ->defaultGroup('purchase_request_id')
             ->collapsedGroupsByDefault()
+            ->defaultSort('created_at', 'desc')
             ->recordAction('view')
             ->actions([
                 Actions\Action::make('quick_close')

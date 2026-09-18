@@ -28,11 +28,19 @@ class DecisionReport extends Page
 
     public ?string $companyTitle = null;
 
+    public ?string $toleranceField = 'weight_gram';
+
+    public $toleranceValue = null;
+
+    public string $toleranceMode = 'excluded';
+
     public function mount(): void
     {
         $this->startDate = now()->startOfMonth()->toDateString();
         $this->endDate = now()->toDateString();
         $this->companyTitle = $this->getCompanyTitle();
+        $this->toleranceField = 'weight_gram';
+        $this->toleranceMode = 'excluded';
     }
 
     public static function canAccess(): bool
@@ -79,6 +87,94 @@ class DecisionReport extends Page
         }
     }
 
+    public function isToleranceFilterActive(): bool
+    {
+        return $this->toleranceValue !== null && $this->toleranceValue !== '' && is_numeric($this->toleranceValue);
+    }
+
+    public function resetTolerance(): void
+    {
+        $this->toleranceField = 'weight_gram';
+        $this->toleranceValue = null;
+        $this->toleranceMode = 'excluded';
+    }
+
+    public function isFieldMatching(?string $ruleField, ?string $selectedField): bool
+    {
+        if (empty($selectedField) || $selectedField === 'all') {
+            return true;
+        }
+        if (empty($ruleField)) {
+            return false;
+        }
+        if (strtolower($ruleField) === strtolower($selectedField)) {
+            return true;
+        }
+        $norm = fn($s) => strtolower(str_replace(['_', '-', ' ', '(', ')'], '', (string)$s));
+        if ($norm($ruleField) === $norm($selectedField)) {
+            return true;
+        }
+        if (str_contains($norm($selectedField), 'weight') && str_contains($norm($ruleField), 'weight')) {
+            return true;
+        }
+        return false;
+    }
+
+    public function isFailureMatchingTolerance(string $fieldName, $expectedValue, $actualValue): bool
+    {
+        if (! $this->isToleranceFilterActive()) {
+            return true;
+        }
+
+        $isTargetField = $this->isFieldMatching($fieldName, $this->toleranceField);
+        $mode = $this->toleranceMode ?? 'excluded';
+        $tolValue = (float) $this->toleranceValue;
+
+        if ($isTargetField) {
+            $cleanExp = preg_replace('/[^0-9.-]/', '', (string)$expectedValue);
+            $cleanAct = preg_replace('/[^0-9.-]/', '', (string)$actualValue);
+
+            if ($cleanExp !== '' && $cleanAct !== '' && is_numeric($cleanExp) && is_numeric($cleanAct)) {
+                $diff = abs((float)$cleanExp - (float)$cleanAct);
+                $isWithin = ($diff <= $tolValue);
+
+                return $mode === 'excluded' ? ! $isWithin : $isWithin;
+            }
+
+            return $mode === 'excluded';
+        }
+
+        return $mode === 'excluded';
+    }
+
+    public function getAvailableFailFields(): array
+    {
+        $fields = [
+            'weight_gram' => 'အလေးချိန် (Weight Gram)',
+            'weight_g' => 'အလေးချိန် (Weight)',
+            'gold_grade' => 'ရွှေရည် (Gold Grade)',
+            'gold_quality' => 'ရွှေအရည်အသွေး (Gold Quality)',
+            'expiry_date' => 'သက်တမ်းကုန်ဆုံးရက် (Expiry Date)',
+            'imei' => 'IMEI နံပါတ်',
+        ];
+
+        try {
+            $rules = \App\Modules\Core\Validation\Models\ValidationRule::select('field_name', 'label')
+                ->whereNotNull('field_name')
+                ->distinct()
+                ->get();
+            foreach ($rules as $r) {
+                $fn = $r->field_name;
+                if (! isset($fields[$fn])) {
+                    $fields[$fn] = self::formatFieldLabel($r->label ?: $fn);
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return $fields;
+    }
+
     public static function formatFieldLabel(string $fieldName): string
     {
         $labels = [
@@ -88,6 +184,7 @@ class DecisionReport extends Page
             'gold_quality' => 'ရွှေအရည်အသွေး (Gold Quality)',
             'expiry_date' => 'သက်တမ်းကုန်ဆုံးရက် (Expiry Date)',
             'imei' => 'IMEI နံပါတ်',
+            'all' => 'စစ်ဆေးချက်အားလုံး (All Fields)',
         ];
 
         return $labels[$fieldName] ?? ucwords(str_replace('_', ' ', $fieldName));
@@ -129,8 +226,6 @@ class DecisionReport extends Page
             }
 
             $repurchaseId = $pr->id;
-            $allDistinctRepurchaseIds[$repurchaseId] = true;
-
             $branchName = $pr->branch?->name ?: ($pr->branch?->code ?: 'သတ်မှတ်မထားသော ဌာနခွဲ (Unassigned Branch)');
             $isOpen = $decision->status === 'open';
 
@@ -141,7 +236,9 @@ class DecisionReport extends Page
             if ($pr->relationLoaded('failChecks')) {
                 foreach ($pr->failChecks as $fc) {
                     if (! empty($fc->field_name)) {
-                        $fieldOccurrences[$fc->field_name] = ($fieldOccurrences[$fc->field_name] ?? 0) + 1;
+                        if ($this->isFailureMatchingTolerance($fc->field_name, $fc->expected_value, $fc->actual_value)) {
+                            $fieldOccurrences[$fc->field_name] = ($fieldOccurrences[$fc->field_name] ?? 0) + 1;
+                        }
                     }
                 }
             }
@@ -163,7 +260,9 @@ class DecisionReport extends Page
             foreach ($valHistories as $vh) {
                 $fName = $vh->rule ? ($vh->rule->label ?: $vh->rule->field_name) : null;
                 if ($fName) {
-                    $valHistoryCounts[$fName] = ($valHistoryCounts[$fName] ?? 0) + 1;
+                    if ($this->isFailureMatchingTolerance($fName, $vh->expected_value, $vh->input_value)) {
+                        $valHistoryCounts[$fName] = ($valHistoryCounts[$fName] ?? 0) + 1;
+                    }
                 }
             }
 
@@ -171,6 +270,9 @@ class DecisionReport extends Page
             $allFields = array_unique(array_merge(array_keys($fieldOccurrences), array_keys($valHistoryCounts)));
 
             if (empty($allFields)) {
+                if ($this->isToleranceFilterActive()) {
+                    continue;
+                }
                 $allFields = ['other_unspecified'];
                 $fieldOccurrences['other_unspecified'] = 1;
             } else {
@@ -180,6 +282,8 @@ class DecisionReport extends Page
                     $fieldOccurrences[$f] = max($fcCount, $vhCount, 1);
                 }
             }
+
+            $allDistinctRepurchaseIds[$repurchaseId] = true;
 
             foreach ($allFields as $fieldName) {
                 $occCount = $fieldOccurrences[$fieldName];
@@ -237,8 +341,8 @@ class DecisionReport extends Page
             $totalOpenDecisionsCount += $item['open_count'];
         }
 
-        // Sort Table 1 by wrong field count descending, then distinct repurchase count
-        uasort($table1Data, fn ($a, $b) => ($b['wrong_field_count'] <=> $a['wrong_field_count']) ?: ($b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']));
+        // Sort Table 1 by distinct repurchase count descending
+        uasort($table1Data, fn ($a, $b) => $b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']);
 
         // Finalize Table 2 distinct counts and sorting
         foreach ($table2Data as $fieldName => $group) {
@@ -250,16 +354,30 @@ class DecisionReport extends Page
 
             uasort(
                 $table2Data[$fieldName]['branches'],
-                fn ($a, $b) => ($b['wrong_count'] <=> $a['wrong_count']) ?: ($b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count'])
+                fn ($a, $b) => $b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']
             );
         }
 
-        // Sort Table 2 fields by total wrong count descending, then distinct repurchase count
-        uasort($table2Data, fn ($a, $b) => ($b['total_wrong_count'] <=> $a['total_wrong_count']) ?: ($b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']));
+        // Sort Table 2 fields by distinct repurchase count descending
+        uasort($table2Data, fn ($a, $b) => $b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']);
 
         // Formatted dates for display
         $formattedStartDate = $this->startDate ? Carbon::parse($this->startDate)->format('d M Y') : 'အစအဦးမှ (Beginning)';
         $formattedEndDate = $this->endDate ? Carbon::parse($this->endDate)->format('d M Y') : 'ယနေ့အထိ (Present)';
+
+        $toleranceInfo = null;
+        if ($this->isToleranceFilterActive()) {
+            $toleranceInfo = [
+                'isActive' => true,
+                'field' => $this->toleranceField,
+                'fieldLabel' => self::formatFieldLabel($this->toleranceField ?? 'weight_gram'),
+                'value' => (float) $this->toleranceValue,
+                'mode' => $this->toleranceMode,
+                'modeLabel' => $this->toleranceMode === 'excluded'
+                    ? 'ကင်းလွတ်ခွင့်ပြုထားသည် (Excluded within tolerance)'
+                    : 'ရွေးထုတ်ထားသည် (Retrieved within tolerance)',
+            ];
+        }
 
         return [
             'companyTitle' => $this->getCompanyTitle(),
@@ -272,6 +390,7 @@ class DecisionReport extends Page
             'totalOpenDecisionsCount' => $totalOpenDecisionsCount,
             'formattedStartDate' => $formattedStartDate,
             'formattedEndDate' => $formattedEndDate,
+            'toleranceInfo' => $toleranceInfo,
         ];
     }
 
@@ -312,6 +431,7 @@ class DecisionReport extends Page
             'startDateText' => $reportData['formattedStartDate'],
             'endDateText' => $reportData['formattedEndDate'],
             'companyTitle' => $reportData['companyTitle'],
+            'toleranceInfo' => $reportData['toleranceInfo'],
         ])
         ->setPaper('a4', 'portrait')
         ->setOption('isHtml5ParserEnabled', true)

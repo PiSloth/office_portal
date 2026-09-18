@@ -8,6 +8,8 @@
         $totalOpen = $reportData['totalOpenDecisionsCount'];
         $startDateText = $reportData['formattedStartDate'];
         $endDateText = $reportData['formattedEndDate'];
+        $toleranceInfo = $reportData['toleranceInfo'] ?? null;
+        $availableFields = $this->getAvailableFailFields();
     @endphp
 
     <style>
@@ -171,6 +173,187 @@
 
         .animate-spin {
             animation: spin 1s linear infinite;
+        }
+
+        /* Tolerance Filter Bar & Controls */
+        .toolbar-divider {
+            width: 100%;
+            height: 1px;
+            background: #e5e7eb;
+            margin: 4px 0;
+        }
+
+        .dark .toolbar-divider {
+            background: #27272a;
+        }
+
+        .tolerance-toolbar-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            width: 100%;
+            padding-top: 4px;
+        }
+
+        .filter-select {
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #111827;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+
+        .dark .filter-select {
+            background: #27272a;
+            border-color: #3f3f46;
+            color: #f4f4f5;
+        }
+
+        .filter-select:focus {
+            border-color: #d97706;
+        }
+
+        .tolerance-input-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .tolerance-input {
+            font-size: 13px;
+            width: 110px;
+            padding: 6px 30px 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #111827;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .dark .tolerance-input {
+            background: #27272a;
+            border-color: #3f3f46;
+            color: #f4f4f5;
+        }
+
+        .tolerance-input:focus {
+            border-color: #d97706;
+        }
+
+        .input-suffix {
+            position: absolute;
+            right: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #6b7280;
+            pointer-events: none;
+        }
+
+        .dark .input-suffix {
+            color: #9ca3af;
+        }
+
+        .mode-toggle-pill {
+            display: inline-flex;
+            align-items: center;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .dark .mode-toggle-pill {
+            background: #27272a;
+            border-color: #3f3f46;
+        }
+
+        .toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: #4b5563;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .dark .toggle-btn {
+            color: #9ca3af;
+        }
+
+        .toggle-btn:hover {
+            color: #111827;
+        }
+
+        .dark .toggle-btn:hover {
+            color: #f4f4f5;
+        }
+
+        .toggle-active-excluded {
+            background: #d97706 !important;
+            color: #ffffff !important;
+            box-shadow: 0 1px 2px rgba(217, 119, 6, 0.3);
+        }
+
+        .toggle-active-retrieved {
+            background: #059669 !important;
+            color: #ffffff !important;
+            box-shadow: 0 1px 2px rgba(5, 150, 105, 0.3);
+        }
+
+        .reset-tolerance-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            color: #dc2626;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .dark .reset-tolerance-btn {
+            background: #27272a;
+            border-color: #3f3f46;
+            color: #f87171;
+        }
+
+        .reset-tolerance-btn:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+
+        .dark .reset-tolerance-btn:hover {
+            background: #450a0a;
+            border-color: #7f1d1d;
+        }
+
+        .doc-filter-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 12px;
+            background-color: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #92400e;
         }
 
         /* Document Paper Canvas (A4 Look) */
@@ -564,6 +747,96 @@
                     </span>
                 </button>
             </div>
+
+            <div class="toolbar-divider"></div>
+
+            {{-- Row 2: Tolerance Filter Controls --}}
+            <div class="tolerance-toolbar-row">
+                <div class="toolbar-group">
+                    <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px; color: #374151;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 16px; height: 16px; color: #d97706;">
+                            <path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 0 1 .628.74v2.288a2.25 2.25 0 0 1-.659 1.59l-4.682 4.683a2.25 2.25 0 0 0-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 0 1 8 18.25v-5.757a2.25 2.25 0 0 0-.659-1.591L2.659 6.22A2.25 2.25 0 0 1 2 4.629V2.34a.75.75 0 0 1 .628-.74Z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Tolerance Filter:</span>
+                    </div>
+
+                    {{-- 1. Fail Field --}}
+                    <div class="date-control">
+                        <label class="control-label">Fail Field:</label>
+                        <select wire:model.live="toleranceField" class="filter-select">
+                            <option value="all">စစ်ဆေးချက်အားလုံး (All Fields)</option>
+                            @foreach($availableFields as $fKey => $fLabel)
+                                <option value="{{ $fKey }}">{{ $fLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- 2. Tolerance Gram / Value --}}
+                    <div class="date-control">
+                        <label class="control-label">Tolerance (Gram):</label>
+                        <div class="tolerance-input-wrapper">
+                            <input 
+                                type="number" 
+                                step="any" 
+                                min="0" 
+                                wire:model.live.debounce.400ms="toleranceValue" 
+                                placeholder="e.g. 0.05" 
+                                class="tolerance-input" 
+                            />
+                            <span class="input-suffix">g</span>
+                        </div>
+                    </div>
+
+                    {{-- 3. Toggle Mode (Excluded vs Retrieved) --}}
+                    <div class="date-control">
+                        <label class="control-label">Mode:</label>
+                        <div class="mode-toggle-pill">
+                            <button 
+                                type="button" 
+                                wire:click="$set('toleranceMode', 'excluded')" 
+                                class="toggle-btn {{ $toleranceMode === 'excluded' ? 'toggle-active-excluded' : '' }}"
+                                title="ကွာဟချက်အတွင်းရှိပါက မပါဝင်စေရန် နှုတ်ပယ်မည် (Exclude mismatches within tolerance)"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 14px; height: 14px;">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM6.75 9.25a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Z" clip-rule="evenodd" />
+                                </svg>
+                                <span>Excluded (မပါဝင်စေရန်)</span>
+                            </button>
+                            <button 
+                                type="button" 
+                                wire:click="$set('toleranceMode', 'retrieved')" 
+                                class="toggle-btn {{ $toleranceMode === 'retrieved' ? 'toggle-active-retrieved' : '' }}"
+                                title="ကွာဟချက်အတွင်းရှိသည်များကိုသာ ရွေးထုတ်မည် (Retrieve mismatches within tolerance)"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 14px; height: 14px;">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+                                </svg>
+                                <span>Retrieved (ရွေးထုတ်ရန်)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    @if($toleranceInfo)
+                        <button 
+                            type="button" 
+                            wire:click="resetTolerance" 
+                            class="reset-tolerance-btn"
+                            title="Reset Tolerance Filter"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 14px; height: 14px;">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clip-rule="evenodd" />
+                            </svg>
+                            <span>Clear</span>
+                        </button>
+                    @endif
+                </div>
+
+                @if($toleranceInfo)
+                    <div style="font-size: 11px; color: #6b7280; font-weight: 500;">
+                        Active: <strong style="color: #111827;">{{ $toleranceInfo['fieldLabel'] }} &plusmn;{{ $toleranceInfo['value'] }}g</strong> ({{ $toleranceMode === 'excluded' ? 'Excluded' : 'Retrieved' }})
+                    </div>
+                @endif
+            </div>
         </div>
 
         {{-- Formatted Document Canvas (A4 Document Style) --}}
@@ -580,6 +853,17 @@
                 <div class="doc-subtitle-badge mm-font">
                     The report at within {{ $startDateText }} and {{ $endDateText }}
                 </div>
+                @if($toleranceInfo)
+                    <div>
+                        <div class="doc-filter-badge mm-font">
+                            <strong>စစ်ထုတ်မှု (Tolerance Filter):</strong> 
+                            {{ $toleranceInfo['fieldLabel'] }} (&plusmn;{{ $toleranceInfo['value'] }}g) &mdash; 
+                            <span style="font-weight: 700; color: {{ $toleranceInfo['mode'] === 'excluded' ? '#b45309' : '#047857' }};">
+                                {{ $toleranceInfo['modeLabel'] }}
+                            </span>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="doc-meta mm-font">
                     <div>
@@ -609,16 +893,13 @@
                     <table class="solid-table mm-font">
                         <thead>
                             <tr>
-                                <th style="width: 40%;">
+                                <th style="width: 50%;">
                                     စစ်ဆေးတွေ့ရှိချက်
                                 </th>
-                                <th class="text-center" style="width: 20%;">
-                                    မှားယွင်းသည့် ကြိမ်နှုန်း
+                                <th class="text-center" style="width: 25%;">
+                                    မှားယွင်းကြိမ်နှုန်း
                                 </th>
-                                <th class="text-center" style="width: 20%;">
-                                    Repurchase ID (သီးခြား)
-                                </th>
-                                <th class="text-center" style="width: 20%;">
+                                <th class="text-center" style="width: 25%;">
                                     မှတ်ချက်(ဖြေရှင်းရန် ကျန်)
                                 </th>
                             </tr>
@@ -630,9 +911,6 @@
                                         {{ $row['label'] }}
                                     </td>
                                     <td class="text-center" style="font-weight: 700;">
-                                        {{ number_format($row['wrong_field_count']) }}
-                                    </td>
-                                    <td class="text-center" style="font-weight: 700; color: #0369a1;">
                                         {{ number_format($row['distinct_repurchase_count']) }}
                                     </td>
                                     <td class="text-center" style="font-weight: 700; {{ $row['open_count'] > 0 ? 'color: #b45309; background-color: #fffbeb;' : 'color: #047857;' }}">
@@ -641,7 +919,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="text-center" style="padding: 28px; font-style: italic; color: #6b7280;">
+                                    <td colspan="3" class="text-center" style="padding: 28px; font-style: italic; color: #6b7280;">
                                         ရွေးချယ်ထားသော ရက်စွဲအတွင်း စစ်ဆေးတွေ့ရှိချက် မှတ်တမ်း မရှိပါ။ (No records found for the selected date range)
                                     </td>
                                 </tr>
@@ -654,13 +932,10 @@
                                         စုစုပေါင်း (Total) :
                                     </td>
                                     <td class="text-center" style="font-size: 15px;">
-                                        {{ number_format($reportData['totalWrongFieldCount']) }}
-                                    </td>
-                                    <td class="text-center" style="font-size: 15px; color: #0369a1;">
-                                        {{ number_format($reportData['totalDistinctRepurchases']) }}
+                                        {{ number_format($totalDistinctRepurchases) }}
                                     </td>
                                     <td class="text-center" style="font-size: 15px; color: #9a3412;">
-                                        {{ number_format($reportData['totalOpenDecisionsCount']) }}
+                                        {{ number_format($totalOpen) }}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -685,10 +960,10 @@
                     <table class="solid-table mm-font">
                         <thead>
                             <tr>
-                                <th style="width: 45%;">
+                                <th style="width: 50%;">
                                     စစ်ဆေးတွေ့ရှိချက်
                                 </th>
-                                <th style="width: 55%;">
+                                <th style="width: 50%;">
                                     Branch အလိုက် ကြိမ်နှုန်း
                                 </th>
                             </tr>
@@ -712,9 +987,8 @@
                                                     <div style="font-size: 14px; font-weight: 700; color: #111827;">
                                                         {{ $group['label'] }}
                                                     </div>
-                                                    <div style="font-size: 12px; font-weight: normal; color: #4b5563; margin-top: 5px; line-height: 1.6;">
-                                                        စုစုပေါင်း မှားယွင်းမှု: <strong style="color: #111827;">{{ number_format($group['total_wrong_count']) }}</strong> ကြိမ်<br>
-                                                        သီးခြား Repurchase: <strong style="color: #0369a1;">{{ number_format($group['distinct_repurchase_count']) }}</strong> ခု
+                                                    <div style="font-size: 12px; font-weight: normal; color: #6b7280; margin-top: 4px;">
+                                                        စုစုပေါင်း: <strong style="color: #374151;">{{ number_format($group['distinct_repurchase_count']) }}</strong> ကြိမ်
                                                     </div>
                                                 </td>
                                                 @php $isFirst = false; @endphp
@@ -722,15 +996,10 @@
 
                                             <td>
                                                 <div class="branch-item">
-                                                    <span style="font-weight: 600; color: #374151;">{{ $branchName }}</span>
-                                                    <div style="display: inline-flex; align-items: center; gap: 6px;">
-                                                        <span class="branch-badge" title="Wrong Field Occurrences">
-                                                            {{ number_format($bData['wrong_count']) }} ကြိမ်
-                                                        </span>
-                                                        <span class="branch-badge" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;" title="Distinct Repurchases">
-                                                            {{ number_format($bData['distinct_repurchase_count']) }} Repurchases
-                                                        </span>
-                                                    </div>
+                                                    <span style="font-weight: 500; color: #374151;">{{ $branchName }}</span>
+                                                    <span class="branch-badge">
+                                                        {{ number_format($bData['distinct_repurchase_count']) }} ကြိမ်
+                                                    </span>
                                                 </div>
                                             </td>
                                         </tr>
