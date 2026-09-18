@@ -358,7 +358,9 @@ class DecisionReport extends Page
             $allDistinctRepurchaseIds[$repurchaseId] = true;
 
             foreach ($allFields as $fieldName) {
-                $occCount = $fieldOccurrences[$fieldName];
+                $fcCount = $fieldOccurrences[$fieldName] ?? 0;
+                $vhCount = $valHistoryCounts[$fieldName] ?? 0;
+                $occCount = max($fcCount, $vhCount, 1);
 
                 // Table 1 data accumulation
                 if (! isset($table1Data[$fieldName])) {
