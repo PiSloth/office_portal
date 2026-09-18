@@ -208,7 +208,8 @@ class PurchaseDecisionResource extends Resource
                     ->options([
                         'open' => 'Open',
                         'closed' => 'Closed',
-                    ]),
+                    ])
+                    ->default('open'),
                 Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Branch')
                     ->options(fn () => \App\Models\Branch::pluck('name', 'id')->all())
@@ -336,15 +337,12 @@ class PurchaseDecisionResource extends Resource
                     ->collapsible(),
             ])
             ->defaultGroup('purchase_request_id')
+            ->collapsedGroupsByDefault()
             ->actions([
                 \Filament\Actions\ViewAction::make(),
                 \Filament\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                \Filament\Actions\BulkActionGroup::make([
-                    \Filament\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 
     public static function infolist(Schema $schema): Schema
