@@ -34,7 +34,7 @@ class ValidationHistory extends Model
 
                 if ($purchaseRequestId) {
                     $rule = $history->rule;
-                    $fieldName = $rule ? ($rule->label ?: $rule->field_name) : 'unknown_field';
+                    $fieldName = $rule ? ($rule->field_name ?: $rule->label) : 'unknown_field';
                     
                     \App\Modules\Purchase\Models\FailCheck::updateOrCreate([
                         'purchase_request_id' => $purchaseRequestId,
@@ -66,10 +66,19 @@ class ValidationHistory extends Model
 
                 if ($purchaseRequestId) {
                     $rule = $history->rule;
-                    $fieldName = $rule ? ($rule->label ?: $rule->field_name) : 'unknown_field';
+                    $fieldName = $rule ? ($rule->field_name ?: $rule->label) : 'unknown_field';
 
+                    // For this specific purchase request only, clear the active fail check
                     \App\Modules\Purchase\Models\FailCheck::where('purchase_request_id', $purchaseRequestId)
-                        ->where('field_name', $fieldName)
+                        ->where(function ($q) use ($rule, $fieldName) {
+                            $q->where('field_name', $fieldName);
+                            if ($rule && $rule->label) {
+                                $q->orWhere('field_name', $rule->label);
+                            }
+                            if ($rule && $rule->field_name) {
+                                $q->orWhere('field_name', $rule->field_name);
+                            }
+                        })
                         ->delete();
 
                     $remainingFails = \App\Modules\Purchase\Models\FailCheck::where('purchase_request_id', $purchaseRequestId)->count();

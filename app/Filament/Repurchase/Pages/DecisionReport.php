@@ -127,6 +127,119 @@ class DecisionReport extends Page
         return $available[$this->selectedState] ?? 'All Statuses';
     }
 
+    public static function getCanonicalFieldInfo(?string $rawField): array
+    {
+        if (empty($rawField)) {
+            return [
+                'key' => 'unknown',
+                'label' => 'Unknown',
+            ];
+        }
+
+        $raw = trim($rawField);
+        if ($raw === 'all') {
+            return [
+                'key' => 'all',
+                'label' => 'စစ်ဆေးချက်အားလုံး (All Fields)',
+            ];
+        }
+
+        $norm = strtolower(str_replace(['_', '-', ' ', '(', ')', '/', '.'], '', $raw));
+
+        // 1. Stone weight (Must check before weight and yawe)
+        if (str_contains($norm, 'ကျောက်') || str_contains($norm, 'kyauk') || str_contains($norm, 'stone')) {
+            return [
+                'key' => 'ကျောက်-ချိန်',
+                'label' => 'ကျောက်-ချိန် (Stone Weight)',
+            ];
+        }
+
+        // 2. Weight Gram
+        if (str_contains($norm, 'weight') || str_contains($norm, 'အလေးချိန်') || str_contains($norm, 'gram')) {
+            return [
+                'key' => 'weight_gram',
+                'label' => 'အလေးချိန် (Weight Gram)',
+            ];
+        }
+
+        // 3. Kyat weight
+        if (str_contains($norm, 'ကျပ်') || str_contains($norm, 'kyat')) {
+            return [
+                'key' => 'ကျပ်-ချိန်',
+                'label' => 'ကျပ်-ချိန် (Kyat Weight)',
+            ];
+        }
+
+        // 4. Yawe weight
+        if (str_contains($norm, 'ရွေး') || str_contains($norm, 'yawe')) {
+            return [
+                'key' => 'ရွေး-ချိန်',
+                'label' => 'ရွေး-ချိန် (Yawe Weight)',
+            ];
+        }
+
+        // 5. Percent Deduction
+        if (str_contains($norm, 'ရာခိုင်နှုန်း') || str_contains($norm, 'percent')) {
+            return [
+                'key' => 'ရာခိုင်နှုန်းလျော့',
+                'label' => 'ရာခိုင်နှုန်းလျော့ (Percent Deduction)',
+            ];
+        }
+
+        // 6. Quantity
+        if (str_contains($norm, 'quantity') || str_contains($norm, 'qty') || str_contains($norm, 'အရေအတွက်')) {
+            return [
+                'key' => 'quantity',
+                'label' => 'အရေအတွက် (Quantity)',
+            ];
+        }
+
+        // 7. Gold Grade
+        if (str_contains($norm, 'grade') || str_contains($norm, 'ရွှေရည်') || str_contains($norm, 'goldlist')) {
+            return [
+                'key' => 'gold_grade',
+                'label' => 'ရွှေရည် (Gold Grade)',
+            ];
+        }
+
+        // 8. Gold Quality
+        if (str_contains($norm, 'quality') || str_contains($norm, 'အရည်အသွေး')) {
+            return [
+                'key' => 'gold_quality',
+                'label' => 'ရွှေအရည်အသွေး (Gold Quality)',
+            ];
+        }
+
+        // 9. Pass / Fail (ရ/မရ)
+        if (str_contains($norm, 'ရမရ') || str_contains($norm, 'isgood') || str_contains($norm, 'pass')) {
+            return [
+                'key' => 'ရ/မရ',
+                'label' => 'ရ/မရ (Pass/Fail)',
+            ];
+        }
+
+        // 10. Expiry Date
+        if (str_contains($norm, 'expiry') || str_contains($norm, 'သက်တမ်း')) {
+            return [
+                'key' => 'expiry_date',
+                'label' => 'သက်တမ်းကုန်ဆုံးရက် (Expiry Date)',
+            ];
+        }
+
+        // 11. IMEI
+        if (str_contains($norm, 'imei')) {
+            return [
+                'key' => 'imei',
+                'label' => 'IMEI နံပါတ်',
+            ];
+        }
+
+        return [
+            'key' => $raw,
+            'label' => ucwords(str_replace('_', ' ', $raw)),
+        ];
+    }
+
     public function isFieldMatching(?string $ruleField, ?string $selectedField): bool
     {
         if (empty($selectedField) || $selectedField === 'all') {
@@ -139,71 +252,10 @@ class DecisionReport extends Page
             return true;
         }
 
-        $norm = fn($s) => strtolower(str_replace(['_', '-', ' ', '(', ')', '/', '.'], '', (string)$s));
-        $normRule = $norm($ruleField);
-        $normSel = $norm($selectedField);
+        $ruleCanon = self::getCanonicalFieldInfo($ruleField)['key'];
+        $selCanon = self::getCanonicalFieldInfo($selectedField)['key'];
 
-        if ($normRule === $normSel) {
-            return true;
-        }
-
-        // Weight synonyms (English & Myanmar)
-        $isWeightSel = str_contains($normSel, 'weight') || str_contains($normSel, 'အလေးချိန်') || str_contains($normSel, 'gram');
-        $isWeightRule = str_contains($normRule, 'weight') || str_contains($normRule, 'အလေးချိန်') || str_contains($normRule, 'gram');
-        if ($isWeightSel && $isWeightRule) {
-            return true;
-        }
-
-        // Kyat weight
-        if (str_contains($normSel, 'ကျပ်') && str_contains($normRule, 'ကျပ်')) {
-            return true;
-        }
-
-        // Yawe weight
-        if (str_contains($normSel, 'ရွေး') && str_contains($normRule, 'ရွေး') && !str_contains($normSel, 'ကျောက်') && !str_contains($normRule, 'ကျောက်')) {
-            return true;
-        }
-
-        // Stone weight
-        if (str_contains($normSel, 'ကျောက်') && str_contains($normRule, 'ကျောက်')) {
-            return true;
-        }
-
-        // Percent reduction
-        if ((str_contains($normSel, 'ရာခိုင်နှုန်း') || str_contains($normSel, 'percent')) &&
-            (str_contains($normRule, 'ရာခိုင်နှုန်း') || str_contains($normRule, 'percent'))) {
-            return true;
-        }
-
-        // Quantity synonyms
-        $isQtySel = str_contains($normSel, 'quantity') || str_contains($normSel, 'qty') || str_contains($normSel, 'အရေအတွက်');
-        $isQtyRule = str_contains($normRule, 'quantity') || str_contains($normRule, 'qty') || str_contains($normRule, 'အရေအတွက်');
-        if ($isQtySel && $isQtyRule) {
-            return true;
-        }
-
-        // Gold Grade synonyms
-        $isGoldSel = str_contains($normSel, 'grade') || str_contains($normSel, 'ရွှေရည်');
-        $isGoldRule = str_contains($normRule, 'grade') || str_contains($normRule, 'ရွှေရည်');
-        if ($isGoldSel && $isGoldRule) {
-            return true;
-        }
-
-        // Gold Quality synonyms
-        $isQualitySel = str_contains($normSel, 'quality') || str_contains($normSel, 'အရည်အသွေး');
-        $isQualityRule = str_contains($normRule, 'quality') || str_contains($normRule, 'အရည်အသွေး');
-        if ($isQualitySel && $isQualityRule) {
-            return true;
-        }
-
-        // Pass / Fail (ရ/မရ)
-        $isPassFailSel = str_contains($normSel, 'ရမရ') || str_contains($normSel, 'isgood') || str_contains($normSel, 'pass');
-        $isPassFailRule = str_contains($normRule, 'ရမရ') || str_contains($normRule, 'isgood') || str_contains($normRule, 'pass');
-        if ($isPassFailSel && $isPassFailRule) {
-            return true;
-        }
-
-        return false;
+        return $ruleCanon === $selCanon;
     }
 
     public function isFailureMatchingTolerance(string $fieldName, $expectedValue, $actualValue): bool
@@ -318,33 +370,7 @@ class DecisionReport extends Page
 
     public static function formatFieldLabel(string $fieldName): string
     {
-        $labels = [
-            'all' => 'စစ်ဆေးချက်အားလုံး (All Fields)',
-            'weight_gram' => 'အလေးချိန် (Weight Gram)',
-            'weight_g' => 'အလေးချိန် (Weight)',
-            'အလေးချိန် (gram)' => 'အလေးချိန် (Weight Gram)',
-            'အလေးချိန်' => 'အလေးချိန် (Weight)',
-            'Gram ချိန်' => 'အလေးချိန် (Weight Gram)',
-            'ကျပ်-ချိန်' => 'ကျပ်-ချိန် (Kyat Weight)',
-            'ရွေး-ချိန်' => 'ရွေး-ချိန် (Yawe Weight)',
-            'ကျောက်-ချိန်' => 'ကျောက်-ချိန် (Stone Weight)',
-            'ကျောက်-ချိန် (ရွေး)' => 'ကျောက်-ချိန် (Stone Weight)',
-            'ကျောက်-ချိန်(ရွေး)' => 'ကျောက်-ချိန် (Stone Weight)',
-            'ရာခိုင်နှုန်းလျော့' => 'ရာခိုင်နှုန်းလျော့ (Percent Deduction)',
-            'quantity' => 'အရေအတွက် (Quantity)',
-            'Quantity Check' => 'အရေအတွက် (Quantity)',
-            'အရေအတွက် စစ်ရန်' => 'အရေအတွက် (Quantity)',
-            'အရေအတွက်' => 'အရေအတွက် (Quantity)',
-            'gold_grade' => 'ရွှေရည် (Gold Grade)',
-            'ရွှေရည်' => 'ရွှေရည် (Gold Grade)',
-            'gold_quality' => 'ရွှေအရည်အသွေး (Gold Quality)',
-            'ရွှေအရည်အသွေး' => 'ရွှေအရည်အသွေး (Gold Quality)',
-            'ရ/မရ' => 'ရ/မရ (Pass/Fail)',
-            'expiry_date' => 'သက်တမ်းကုန်ဆုံးရက် (Expiry Date)',
-            'imei' => 'IMEI နံပါတ်',
-        ];
-
-        return $labels[$fieldName] ?? ucwords(str_replace('_', ' ', $fieldName));
+        return self::getCanonicalFieldInfo($fieldName)['label'];
     }
 
     public function getReportData(): array
@@ -430,25 +456,41 @@ class DecisionReport extends Page
                 }
             }
 
-            // Combine both sources, taking the maximum count per field to ensure all triggers are captured
-            $allFields = array_unique(array_merge(array_keys($fieldOccurrences), array_keys($valHistoryCounts)));
+            // Canonicalize occurrences for this specific purchase request
+            $canonicalFieldOccurrences = [];
+            foreach ($fieldOccurrences as $f => $cnt) {
+                $cKey = self::getCanonicalFieldInfo($f)['key'];
+                $canonicalFieldOccurrences[$cKey] = max($canonicalFieldOccurrences[$cKey] ?? 0, $cnt);
+            }
 
-            if (empty($allFields)) {
+            $canonicalValHistoryCounts = [];
+            foreach ($valHistoryCounts as $f => $cnt) {
+                $cKey = self::getCanonicalFieldInfo($f)['key'];
+                $canonicalValHistoryCounts[$cKey] = max($canonicalValHistoryCounts[$cKey] ?? 0, $cnt);
+            }
+
+            $allCanonKeys = array_unique(array_merge(
+                array_keys($canonicalFieldOccurrences),
+                array_keys($canonicalValHistoryCounts)
+            ));
+
+            if (empty($allCanonKeys)) {
                 continue;
             }
 
             $allDistinctRepurchaseIds[$repurchaseId] = true;
 
-            foreach ($allFields as $fieldName) {
-                $fcCount = $fieldOccurrences[$fieldName] ?? 0;
-                $vhCount = $valHistoryCounts[$fieldName] ?? 0;
+            foreach ($allCanonKeys as $canonKey) {
+                $fcCount = $canonicalFieldOccurrences[$canonKey] ?? 0;
+                $vhCount = $canonicalValHistoryCounts[$canonKey] ?? 0;
                 $occCount = max($fcCount, $vhCount, 1);
+                $canonLabel = self::formatFieldLabel($canonKey);
 
                 // Table 1 data accumulation
-                if (! isset($table1Data[$fieldName])) {
-                    $table1Data[$fieldName] = [
-                        'field_name' => $fieldName,
-                        'label' => self::formatFieldLabel($fieldName),
+                if (! isset($table1Data[$canonKey])) {
+                    $table1Data[$canonKey] = [
+                        'field_name' => $canonKey,
+                        'label' => $canonLabel,
                         'wrong_field_count' => 0,
                         'distinct_repurchase_ids' => [],
                         'distinct_repurchase_count' => 0,
@@ -456,17 +498,17 @@ class DecisionReport extends Page
                     ];
                 }
 
-                $table1Data[$fieldName]['wrong_field_count'] += $occCount;
-                $table1Data[$fieldName]['distinct_repurchase_ids'][$repurchaseId] = true;
+                $table1Data[$canonKey]['wrong_field_count'] += $occCount;
+                $table1Data[$canonKey]['distinct_repurchase_ids'][$repurchaseId] = true;
                 if ($isOpen) {
-                    $table1Data[$fieldName]['open_count']++;
+                    $table1Data[$canonKey]['open_count']++;
                 }
 
-                // Table 2 data accumulation (grouped by field, then branch)
-                if (! isset($table2Data[$fieldName])) {
-                    $table2Data[$fieldName] = [
-                        'field_name' => $fieldName,
-                        'label' => self::formatFieldLabel($fieldName),
+                // Table 2 data accumulation (grouped by canonical field, then branch)
+                if (! isset($table2Data[$canonKey])) {
+                    $table2Data[$canonKey] = [
+                        'field_name' => $canonKey,
+                        'label' => $canonLabel,
                         'total_wrong_count' => 0,
                         'distinct_repurchase_ids' => [],
                         'distinct_repurchase_count' => 0,
@@ -474,19 +516,19 @@ class DecisionReport extends Page
                     ];
                 }
 
-                $table2Data[$fieldName]['total_wrong_count'] += $occCount;
-                $table2Data[$fieldName]['distinct_repurchase_ids'][$repurchaseId] = true;
+                $table2Data[$canonKey]['total_wrong_count'] += $occCount;
+                $table2Data[$canonKey]['distinct_repurchase_ids'][$repurchaseId] = true;
 
-                if (! isset($table2Data[$fieldName]['branches'][$branchName])) {
-                    $table2Data[$fieldName]['branches'][$branchName] = [
+                if (! isset($table2Data[$canonKey]['branches'][$branchName])) {
+                    $table2Data[$canonKey]['branches'][$branchName] = [
                         'wrong_count' => 0,
                         'distinct_repurchase_ids' => [],
                         'distinct_repurchase_count' => 0,
                     ];
                 }
 
-                $table2Data[$fieldName]['branches'][$branchName]['wrong_count'] += $occCount;
-                $table2Data[$fieldName]['branches'][$branchName]['distinct_repurchase_ids'][$repurchaseId] = true;
+                $table2Data[$canonKey]['branches'][$branchName]['wrong_count'] += $occCount;
+                $table2Data[$canonKey]['branches'][$branchName]['distinct_repurchase_ids'][$repurchaseId] = true;
             }
         }
 
