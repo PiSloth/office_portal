@@ -14,20 +14,38 @@
 
         @font-face {
             font-family: 'Zawgyi-One';
-            src: url('{{ storage_path("fonts/Zawgyi-One.ttf") }}') format('truetype');
+            src: url('{{ str_replace('\\', '/', storage_path("fonts/Zawgyi-One.ttf")) }}') format('truetype');
             font-weight: normal;
             font-style: normal;
         }
 
         @font-face {
             font-family: 'Zawgyi-One';
-            src: url('{{ storage_path("fonts/Zawgyi-One.ttf") }}') format('truetype');
+            src: url('{{ str_replace('\\', '/', storage_path("fonts/Zawgyi-One.ttf")) }}') format('truetype');
             font-weight: bold;
             font-style: normal;
         }
 
+        @font-face {
+            font-family: 'Zawgyi-One';
+            src: url('{{ str_replace('\\', '/', storage_path("fonts/Zawgyi-One.ttf")) }}') format('truetype');
+            font-weight: normal;
+            font-style: italic;
+        }
+
+        @font-face {
+            font-family: 'Zawgyi-One';
+            src: url('{{ str_replace('\\', '/', storage_path("fonts/Zawgyi-One.ttf")) }}') format('truetype');
+            font-weight: bold;
+            font-style: italic;
+        }
+
+        * {
+            font-family: 'Zawgyi-One' !important;
+        }
+
         body {
-            font-family: 'Zawgyi-One', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Zawgyi-One', sans-serif;
             font-size: 11px;
             color: #111827;
             line-height: 1.6;
@@ -227,13 +245,16 @@
     <table class="solid-table">
         <thead>
             <tr>
-                <th style="width: 50%;">
+                <th style="width: 40%;">
                     {{ $zg('စစ်ဆေးတွေ့ရှိချက်') }}
                 </th>
-                <th class="text-center" style="width: 25%;">
-                    {{ $zg('ကြိမ်နှုန်း') }}
+                <th class="text-center" style="width: 20%;">
+                    {{ $zg('မှားယွင်းသည့် ကြိမ်နှုန်း') }}
                 </th>
-                <th class="text-center" style="width: 25%;">
+                <th class="text-center" style="width: 20%;">
+                    Repurchase ID ({{ $zg('သီးခြား') }})
+                </th>
+                <th class="text-center" style="width: 20%;">
                     {{ $zg('မှတ်ချက်(ဖြေရှင်းရန် ကျန်)') }}
                 </th>
             </tr>
@@ -245,7 +266,10 @@
                         {{ $zg($row['label']) }}
                     </td>
                     <td class="text-center" style="font-weight: bold;">
-                        {{ number_format($row['decision_count']) }}
+                        {{ number_format($row['wrong_field_count']) }}
+                    </td>
+                    <td class="text-center" style="font-weight: bold; color: #0369a1;">
+                        {{ number_format($row['distinct_repurchase_count']) }}
                     </td>
                     <td class="text-center" style="font-weight: bold; {{ $row['open_count'] > 0 ? 'color: #b45309;' : 'color: #047857;' }}">
                         {{ number_format($row['open_count']) }}
@@ -253,7 +277,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="3" class="text-center" style="padding: 18px; font-style: italic; color: #6b7280;">
+                    <td colspan="4" class="text-center" style="padding: 18px; color: #6b7280;">
                         {{ $zg('ရွေးချယ်ထားသော ရက်စွဲအတွင်း စစ်ဆေးတွေ့ရှိချက် မှတ်တမ်း မရှိပါ။') }} (No records found for the selected date range)
                     </td>
                 </tr>
@@ -266,7 +290,10 @@
                         {{ $zg('စုစုပေါင်း (Total) :') }}
                     </td>
                     <td class="text-center" style="font-size: 11px;">
-                        {{ number_format($totalDecisions) }}
+                        {{ number_format($totalWrongFieldCount) }}
+                    </td>
+                    <td class="text-center" style="font-size: 11px; color: #0369a1;">
+                        {{ number_format($totalDistinctRepurchases) }}
                     </td>
                     <td class="text-center" style="font-size: 11px; color: #9a3412;">
                         {{ number_format($totalOpen) }}
@@ -282,7 +309,7 @@
             <td class="section-title">
                 ၂။ {{ $zg('စစ်ဆေးတွေ့ရှိချက် နှင့် ဌာနခွဲအလိုက် ကြိမ်နှုန်း အသေးစိတ်') }} (Breakdown by Branch)
             </td>
-            <td class="section-info" style="font-style: italic;">
+            <td class="section-info">
                 *{{ $zg('အများဆုံး ကြိမ်နှုန်းမှ အနည်းဆုံးသို့ အစီအစဉ်တကျ ပြသထားပါသည်') }}
             </td>
         </tr>
@@ -291,10 +318,10 @@
     <table class="solid-table">
         <thead>
             <tr>
-                <th style="width: 50%;">
+                <th style="width: 45%;">
                     {{ $zg('စစ်ဆေးတွေ့ရှိချက်') }}
                 </th>
-                <th style="width: 50%;">
+                <th style="width: 55%;">
                     Branch {{ $zg('အလိုက် ကြိမ်နှုန်း') }}
                 </th>
             </tr>
@@ -308,15 +335,16 @@
                 @endphp
 
                 @if($branchCount > 0)
-                    @foreach($branches as $branchName => $count)
+                    @foreach($branches as $branchName => $bData)
                         <tr>
                             @if($isFirst)
                                 <td rowspan="{{ $branchCount }}" style="vertical-align: top; background-color: #f9fafb; font-weight: bold; padding: 6px 8px;">
                                     <div style="font-size: 10.5px; font-weight: bold; color: #111827;">
                                         {{ $zg($group['label']) }}
                                     </div>
-                                    <div style="font-size: 9px; font-weight: normal; color: #6b7280; margin-top: 3px;">
-                                        {{ $zg('စုစုပေါင်း:') }} <strong style="color: #374151;">{{ number_format($group['total_count']) }}</strong> {{ $zg('ကြိမ်') }}
+                                    <div style="font-size: 8.5px; font-weight: normal; color: #4b5563; margin-top: 3px;">
+                                        {{ $zg('စုစုပေါင်း မှားယွင်းမှု:') }} <strong style="color: #111827;">{{ number_format($group['total_wrong_count']) }}</strong> {{ $zg('ကြိမ်') }}<br>
+                                        {{ $zg('သီးခြား Repurchase:') }} <strong style="color: #0369a1;">{{ number_format($group['distinct_repurchase_count']) }}</strong> {{ $zg('ခု') }}
                                     </div>
                                 </td>
                                 @php $isFirst = false; @endphp
@@ -328,9 +356,12 @@
                                         <td style="border: none; padding: 0; font-weight: bold; color: #374151;">
                                             {{ $zg($branchName) }}
                                         </td>
-                                        <td style="border: none; padding: 0; text-align: right;">
+                                        <td style="border: none; padding: 0; text-align: right; white-space: nowrap;">
                                             <span class="branch-badge">
-                                                {{ number_format($count) }} {{ $zg('ကြိမ်') }}
+                                                {{ number_format($bData['wrong_count']) }} {{ $zg('ကြိမ်') }}
+                                            </span>
+                                            <span class="branch-badge" style="background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd;">
+                                                {{ number_format($bData['distinct_repurchase_count']) }} Repurchases
                                             </span>
                                         </td>
                                     </tr>
@@ -343,14 +374,14 @@
                         <td style="font-weight: bold;">
                             {{ $zg($group['label']) }}
                         </td>
-                        <td style="font-style: italic; color: #6b7280;">
+                        <td style="color: #6b7280;">
                             {{ $zg('မှတ်တမ်း မရှိပါ') }}
                         </td>
                     </tr>
                 @endif
             @empty
                 <tr>
-                    <td colspan="2" class="text-center" style="padding: 18px; font-style: italic; color: #6b7280;">
+                    <td colspan="2" class="text-center" style="padding: 18px; color: #6b7280;">
                         {{ $zg('ရွေးချယ်ထားသော ရက်စွဲအတွင်း ဌာနခွဲအလိုက် စစ်ဆေးတွေ့ရှိချက် မှတ်တမ်း မရှိပါ။') }} (No branch breakdown records found)
                     </td>
                 </tr>

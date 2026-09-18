@@ -98,6 +98,8 @@ class DecisionReport extends Page
         $query = PurchaseDecision::with([
             'purchaseRequest.branch',
             'purchaseRequest.failChecks',
+            'purchaseRequest.items.validationHistories.rule',
+            'purchaseRequest.validationHistories.rule',
         ])
             ->whereHas('purchaseRequest', function ($q) {
                 $q->whereNull('deleted_at');
@@ -116,35 +118,86 @@ class DecisionReport extends Page
         $table1Data = [];
         $table2Data = [];
 
-        $totalDecisionsCount = 0;
+        $allDistinctRepurchaseIds = [];
+        $totalWrongFieldCount = 0;
         $totalOpenDecisionsCount = 0;
 
         foreach ($decisions as $decision) {
             $pr = $decision->purchaseRequest;
-            $failChecks = $pr?->failChecks ?? collect();
-            $isOpen = $decision->status === 'open';
-
-            $branchName = $pr?->branch?->name ?: ($pr?->branch?->code ?: 'သတ်မှတ်မထားသော ဌာနခွဲ (Unassigned Branch)');
-
-            // Get unique field names for this decision to avoid double counting same field on multiple items of same decision
-            $failedFields = $failChecks->pluck('field_name')->filter()->unique();
-
-            if ($failedFields->isEmpty()) {
-                $failedFields = collect(['other_unspecified']);
+            if (! $pr) {
+                continue;
             }
 
-            foreach ($failedFields as $fieldName) {
+            $repurchaseId = $pr->id;
+            $allDistinctRepurchaseIds[$repurchaseId] = true;
+
+            $branchName = $pr->branch?->name ?: ($pr->branch?->code ?: 'သတ်မှတ်မထားသော ဌာနခွဲ (Unassigned Branch)');
+            $isOpen = $decision->status === 'open';
+
+            // Collect all wrong field occurrences on this specific purchase request
+            $fieldOccurrences = [];
+
+            // 1. From failChecks
+            if ($pr->relationLoaded('failChecks')) {
+                foreach ($pr->failChecks as $fc) {
+                    if (! empty($fc->field_name)) {
+                        $fieldOccurrences[$fc->field_name] = ($fieldOccurrences[$fc->field_name] ?? 0) + 1;
+                    }
+                }
+            }
+
+            // 2. From ValidationHistory on items and purchaseRequest
+            $valHistories = collect();
+            if ($pr->relationLoaded('items')) {
+                foreach ($pr->items as $item) {
+                    if ($item->relationLoaded('validationHistories')) {
+                        $valHistories = $valHistories->concat($item->validationHistories->where('status', 'FAIL'));
+                    }
+                }
+            }
+            if ($pr->relationLoaded('validationHistories')) {
+                $valHistories = $valHistories->concat($pr->validationHistories->where('status', 'FAIL'));
+            }
+
+            $valHistoryCounts = [];
+            foreach ($valHistories as $vh) {
+                $fName = $vh->rule ? ($vh->rule->label ?: $vh->rule->field_name) : null;
+                if ($fName) {
+                    $valHistoryCounts[$fName] = ($valHistoryCounts[$fName] ?? 0) + 1;
+                }
+            }
+
+            // Combine both sources, taking the maximum count per field to ensure all triggers are captured
+            $allFields = array_unique(array_merge(array_keys($fieldOccurrences), array_keys($valHistoryCounts)));
+
+            if (empty($allFields)) {
+                $allFields = ['other_unspecified'];
+                $fieldOccurrences['other_unspecified'] = 1;
+            } else {
+                foreach ($allFields as $f) {
+                    $fcCount = $fieldOccurrences[$f] ?? 0;
+                    $vhCount = $valHistoryCounts[$f] ?? 0;
+                    $fieldOccurrences[$f] = max($fcCount, $vhCount, 1);
+                }
+            }
+
+            foreach ($allFields as $fieldName) {
+                $occCount = $fieldOccurrences[$fieldName];
+
                 // Table 1 data accumulation
                 if (! isset($table1Data[$fieldName])) {
                     $table1Data[$fieldName] = [
                         'field_name' => $fieldName,
                         'label' => self::formatFieldLabel($fieldName),
-                        'decision_count' => 0,
+                        'wrong_field_count' => 0,
+                        'distinct_repurchase_ids' => [],
+                        'distinct_repurchase_count' => 0,
                         'open_count' => 0,
                     ];
                 }
 
-                $table1Data[$fieldName]['decision_count']++;
+                $table1Data[$fieldName]['wrong_field_count'] += $occCount;
+                $table1Data[$fieldName]['distinct_repurchase_ids'][$repurchaseId] = true;
                 if ($isOpen) {
                     $table1Data[$fieldName]['open_count']++;
                 }
@@ -154,32 +207,55 @@ class DecisionReport extends Page
                     $table2Data[$fieldName] = [
                         'field_name' => $fieldName,
                         'label' => self::formatFieldLabel($fieldName),
-                        'total_count' => 0,
+                        'total_wrong_count' => 0,
+                        'distinct_repurchase_ids' => [],
+                        'distinct_repurchase_count' => 0,
                         'branches' => [],
                     ];
                 }
 
-                $table2Data[$fieldName]['total_count']++;
-                $table2Data[$fieldName]['branches'][$branchName] = ($table2Data[$fieldName]['branches'][$branchName] ?? 0) + 1;
+                $table2Data[$fieldName]['total_wrong_count'] += $occCount;
+                $table2Data[$fieldName]['distinct_repurchase_ids'][$repurchaseId] = true;
+
+                if (! isset($table2Data[$fieldName]['branches'][$branchName])) {
+                    $table2Data[$fieldName]['branches'][$branchName] = [
+                        'wrong_count' => 0,
+                        'distinct_repurchase_ids' => [],
+                        'distinct_repurchase_count' => 0,
+                    ];
+                }
+
+                $table2Data[$fieldName]['branches'][$branchName]['wrong_count'] += $occCount;
+                $table2Data[$fieldName]['branches'][$branchName]['distinct_repurchase_ids'][$repurchaseId] = true;
             }
         }
 
-        // Sort Table 1 by decision count descending
-        uasort($table1Data, fn ($a, $b) => $b['decision_count'] <=> $a['decision_count']);
-
-        // Calculate totals for Table 1
-        foreach ($table1Data as $item) {
-            $totalDecisionsCount += $item['decision_count'];
+        // Finalize Table 1 distinct counts and totals
+        foreach ($table1Data as $fieldName => $item) {
+            $table1Data[$fieldName]['distinct_repurchase_count'] = count($item['distinct_repurchase_ids']);
+            $totalWrongFieldCount += $item['wrong_field_count'];
             $totalOpenDecisionsCount += $item['open_count'];
         }
 
-        // Sort Table 2 fields by total count descending, and their branches by count descending
-        uasort($table2Data, fn ($a, $b) => $b['total_count'] <=> $a['total_count']);
+        // Sort Table 1 by wrong field count descending, then distinct repurchase count
+        uasort($table1Data, fn ($a, $b) => ($b['wrong_field_count'] <=> $a['wrong_field_count']) ?: ($b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']));
 
-        foreach ($table2Data as $fieldName => $data) {
-            arsort($data['branches']);
-            $table2Data[$fieldName]['branches'] = $data['branches'];
+        // Finalize Table 2 distinct counts and sorting
+        foreach ($table2Data as $fieldName => $group) {
+            $table2Data[$fieldName]['distinct_repurchase_count'] = count($group['distinct_repurchase_ids']);
+
+            foreach ($group['branches'] as $branchName => $bData) {
+                $table2Data[$fieldName]['branches'][$branchName]['distinct_repurchase_count'] = count($bData['distinct_repurchase_ids']);
+            }
+
+            uasort(
+                $table2Data[$fieldName]['branches'],
+                fn ($a, $b) => ($b['wrong_count'] <=> $a['wrong_count']) ?: ($b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count'])
+            );
         }
+
+        // Sort Table 2 fields by total wrong count descending, then distinct repurchase count
+        uasort($table2Data, fn ($a, $b) => ($b['total_wrong_count'] <=> $a['total_wrong_count']) ?: ($b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']));
 
         // Formatted dates for display
         $formattedStartDate = $this->startDate ? Carbon::parse($this->startDate)->format('d M Y') : 'အစအဦးမှ (Beginning)';
@@ -190,7 +266,9 @@ class DecisionReport extends Page
             'decisionsCount' => $decisions->count(),
             'table1' => array_values($table1Data),
             'table2' => array_values($table2Data),
-            'totalDecisionsCount' => $totalDecisionsCount,
+            'totalDecisionsCount' => $totalWrongFieldCount,
+            'totalWrongFieldCount' => $totalWrongFieldCount,
+            'totalDistinctRepurchases' => count($allDistinctRepurchaseIds),
             'totalOpenDecisionsCount' => $totalOpenDecisionsCount,
             'formattedStartDate' => $formattedStartDate,
             'formattedEndDate' => $formattedEndDate,
@@ -228,7 +306,8 @@ class DecisionReport extends Page
             'reportData' => $reportData,
             'table1' => $reportData['table1'],
             'table2' => $reportData['table2'],
-            'totalDecisions' => $reportData['totalDecisionsCount'],
+            'totalWrongFieldCount' => $reportData['totalWrongFieldCount'],
+            'totalDistinctRepurchases' => $reportData['totalDistinctRepurchases'],
             'totalOpen' => $reportData['totalOpenDecisionsCount'],
             'startDateText' => $reportData['formattedStartDate'],
             'endDateText' => $reportData['formattedEndDate'],

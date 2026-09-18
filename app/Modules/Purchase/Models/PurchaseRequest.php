@@ -97,6 +97,11 @@ class PurchaseRequest extends Model
         return $this->morphMany(DiscussionThread::class, 'threadable');
     }
 
+    public function validationHistories()
+    {
+        return $this->morphMany(\App\Modules\Core\Validation\Models\ValidationHistory::class, 'validatable');
+    }
+
     public function getPurchaseNumberAttribute()
     {
         if (!empty($this->attributes['purchase_number'])) {

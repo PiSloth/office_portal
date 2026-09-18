@@ -5,7 +5,9 @@
     },
     "zawgyi-one": {
         "normal": "C:\\Users\\NewFolder\\mahar_nexgen\\storage\\fonts\/zawgyi_one_normal_c37b9f7a65319d03e90eb594952f84a8",
-        "bold": "zawgyi_one_bold_c37b9f7a65319d03e90eb594952f84a8"
+        "bold": "C:\\Users\\NewFolder\\mahar_nexgen\\storage\\fonts\/zawgyi_one_bold_c37b9f7a65319d03e90eb594952f84a8",
+        "italic": "C:\\Users\\NewFolder\\mahar_nexgen\\storage\\fonts\/zawgyi_one_italic_c37b9f7a65319d03e90eb594952f84a8",
+        "bold_italic": "zawgyi_one_bold_italic_c37b9f7a65319d03e90eb594952f84a8"
     },
     "pyidaungsu": {
         "normal": "pyidaungsu_normal_907c66e867a921697a262df3824c55b9"

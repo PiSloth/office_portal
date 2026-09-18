@@ -5,9 +5,12 @@ namespace App\Filament\Repurchase\Resources;
 use App\Filament\Resources\Concerns\HasPermissionGates;
 use App\Filament\Repurchase\Resources\PurchaseDecisionResource\Pages;
 use App\Modules\Purchase\Models\PurchaseDecision;
+use Filament\Actions;
 use Filament\Forms;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Resources\Resource;
+use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -320,6 +323,10 @@ class PurchaseDecisionResource extends Resource
                     }),
             ])
             ->filtersFormColumns(2)
+            ->persistFiltersInSession()
+            ->persistSearchInSession()
+            ->persistColumnSearchesInSession()
+            ->persistSortInSession()
             ->groups([
                 Tables\Grouping\Group::make('purchase_request_id')
                     ->label('Purchase Request')
@@ -338,9 +345,144 @@ class PurchaseDecisionResource extends Resource
             ])
             ->defaultGroup('purchase_request_id')
             ->collapsedGroupsByDefault()
+            ->recordAction('view')
             ->actions([
-                \Filament\Actions\ViewAction::make(),
-                \Filament\Actions\EditAction::make(),
+                Actions\Action::make('quick_close')
+                    ->label('Quick Close')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->button()
+                    ->visible(fn (PurchaseDecision $record): bool => $record->status === 'open')
+                    ->modalHeading(fn (PurchaseDecision $record): string => "Quick Close Decision #{$record->id} - {$record->purchaseRequest?->purchase_number}")
+                    ->modalDescription('Review the requirement details below and provide resolution remarks to quickly close this decision.')
+                    ->modalWidth('5xl')
+                    ->modalSubmitActionLabel('Confirm & Close')
+                    ->form([
+                        Section::make('Purchase Requirement Details')
+                            ->schema([
+                                Forms\Components\Placeholder::make('quick_close_product_info')
+                                    ->hiddenLabel()
+                                    ->content(fn (?PurchaseDecision $record) => view('filament.repurchase.decision-product-info', ['record' => $record])),
+                            ])
+                            ->collapsible(),
+
+                        Section::make('Original Validation Failure Reference')
+                            ->schema([
+                                Forms\Components\Placeholder::make('quick_close_failed_fields')
+                                    ->label('Failed Fields')
+                                    ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->pluck('field_name')->unique()->join(', ') ?? '-'),
+                                Forms\Components\Placeholder::make('quick_close_expected_values')
+                                    ->label('Expected Values')
+                                    ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->expected_value}")->join(' | ') ?? '-'),
+                                Forms\Components\Placeholder::make('quick_close_actual_values')
+                                    ->label('Actual Values')
+                                    ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->actual_value}")->join(' | ') ?? '-'),
+                                Forms\Components\Placeholder::make('quick_close_checked_by')
+                                    ->label('Checked By')
+                                    ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => $fc->whoChecked?->name)->filter()->unique()->join(', ') ?? '-'),
+                                Forms\Components\Placeholder::make('quick_close_check_remarks')
+                                    ->label('Check Remarks')
+                                    ->content(fn (?PurchaseDecision $record): string => $record?->purchaseRequest?->failChecks?->map(fn($fc) => "{$fc->field_name}: {$fc->remark}")->join(' | ') ?? '-')
+                                    ->columnSpan(2),
+                            ])
+                            ->columns(3)
+                            ->collapsible(),
+
+                        Section::make('Resolution')
+                            ->schema([
+                                Forms\Components\Textarea::make('remark')
+                                    ->label('Remarks / Action Taken')
+                                    ->placeholder('e.g. Discrepancy verified, price adjusted, approved by supervisor...')
+                                    ->required()
+                                    ->rows(3)
+                                    ->columnSpanFull(),
+
+                                Forms\Components\FileUpload::make('uploaded_files')
+                                    ->label('Proof of Resolution (Optional Images)')
+                                    ->multiple()
+                                    ->image()
+                                    ->disk('public')
+                                    ->visibility('public')
+                                    ->directory('attachments/purchase_decisions')
+                                    ->columnSpanFull(),
+                            ]),
+                    ])
+                    ->action(function (PurchaseDecision $record, array $data): void {
+                        $record->update([
+                            'status' => 'closed',
+                            'remark' => $data['remark'],
+                        ]);
+
+                        $uploadedFiles = $data['uploaded_files'] ?? [];
+                        foreach ($uploadedFiles as $path) {
+                            if ($path) {
+                                \App\Models\Attachment::create([
+                                    'attachable_type' => get_class($record),
+                                    'attachable_id' => $record->id,
+                                    'file_path' => $path,
+                                ]);
+                            }
+                        }
+
+                        Notification::make()
+                            ->title('Decision Closed')
+                            ->body("Decision #{$record->id} for {$record->purchaseRequest?->purchase_number} has been closed successfully.")
+                            ->success()
+                            ->send();
+                    }),
+                Actions\ViewAction::make()
+                    ->url(null)
+                    ->modalWidth('5xl')
+                    ->slideOver()
+                    ->extraModalFooterActions([
+                        Actions\Action::make('modal_quick_close')
+                            ->label('Quick Close')
+                            ->icon('heroicon-o-check-circle')
+                            ->color('success')
+                            ->visible(fn (PurchaseDecision $record): bool => $record->status === 'open')
+                            ->modalHeading(fn (PurchaseDecision $record): string => "Quick Close Decision #{$record->id}")
+                            ->modalDescription('Enter resolution remarks to close this decision.')
+                            ->modalWidth('lg')
+                            ->modalSubmitActionLabel('Confirm & Close')
+                            ->form([
+                                Forms\Components\Textarea::make('remark')
+                                    ->label('Remarks / Action Taken')
+                                    ->placeholder('Enter resolution details...')
+                                    ->required()
+                                    ->rows(3),
+                                Forms\Components\FileUpload::make('uploaded_files')
+                                    ->label('Proof of Resolution (Optional Images)')
+                                    ->multiple()
+                                    ->image()
+                                    ->disk('public')
+                                    ->visibility('public')
+                                    ->directory('attachments/purchase_decisions'),
+                            ])
+                            ->action(function (PurchaseDecision $record, array $data): void {
+                                $record->update([
+                                    'status' => 'closed',
+                                    'remark' => $data['remark'],
+                                ]);
+
+                                $uploadedFiles = $data['uploaded_files'] ?? [];
+                                foreach ($uploadedFiles as $path) {
+                                    if ($path) {
+                                        \App\Models\Attachment::create([
+                                            'attachable_type' => get_class($record),
+                                            'attachable_id' => $record->id,
+                                            'file_path' => $path,
+                                        ]);
+                                    }
+                                }
+
+                                Notification::make()
+                                    ->title('Decision Closed')
+                                    ->body("Decision #{$record->id} has been marked as closed.")
+                                    ->success()
+                                    ->send();
+                            }),
+                    ]),
+                Actions\EditAction::make(),
             ])
             ->bulkActions([]);
     }

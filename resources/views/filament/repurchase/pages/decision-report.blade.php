@@ -3,7 +3,8 @@
         $reportData = $this->getReportData();
         $table1 = $reportData['table1'];
         $table2 = $reportData['table2'];
-        $totalDecisions = $reportData['totalDecisionsCount'];
+        $totalWrongFieldCount = $reportData['totalWrongFieldCount'];
+        $totalDistinctRepurchases = $reportData['totalDistinctRepurchases'];
         $totalOpen = $reportData['totalOpenDecisionsCount'];
         $startDateText = $reportData['formattedStartDate'];
         $endDateText = $reportData['formattedEndDate'];
@@ -30,9 +31,8 @@
             min-height: 18px !important;
             max-width: 18px !important;
             max-height: 18px !important;
-            display: inline-block !important;
-            vertical-align: middle !important;
-            flex-shrink: 0 !important;
+            vertical-align: middle;
+            flex-shrink: 0;
         }
 
         /* Toolbar Controls Bar */
@@ -547,16 +547,21 @@
                     wire:loading.attr="disabled"
                     class="export-btn"
                 >
-                    <svg wire:loading.remove wire:target="exportPdf" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="report-icon">
-                        <path d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625Z" />
-                        <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
-                    </svg>
-                    <svg wire:loading wire:target="exportPdf" class="report-icon animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity: 0.25;"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" style="opacity: 0.75;"></path>
-                    </svg>
-                    <span wire:loading.remove wire:target="exportPdf">Export PDF</span>
-                    <span wire:loading wire:target="exportPdf">Generating PDF...</span>
+                    <span wire:loading.remove wire:target="exportPdf" style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="report-icon">
+                            <path d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625Z" />
+                            <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
+                        </svg>
+                        <span>Export PDF</span>
+                    </span>
+
+                    <span wire:loading wire:target="exportPdf" style="display: none; align-items: center; gap: 8px;">
+                        <svg class="report-icon animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity: 0.25;"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" style="opacity: 0.75;"></path>
+                        </svg>
+                        <span>Generating PDF...</span>
+                    </span>
                 </button>
             </div>
         </div>
@@ -604,13 +609,16 @@
                     <table class="solid-table mm-font">
                         <thead>
                             <tr>
-                                <th style="width: 50%;">
+                                <th style="width: 40%;">
                                     စစ်ဆေးတွေ့ရှိချက်
                                 </th>
-                                <th class="text-center" style="width: 25%;">
-                                    ကြိမ်နှုန်း
+                                <th class="text-center" style="width: 20%;">
+                                    မှားယွင်းသည့် ကြိမ်နှုန်း
                                 </th>
-                                <th class="text-center" style="width: 25%;">
+                                <th class="text-center" style="width: 20%;">
+                                    Repurchase ID (သီးခြား)
+                                </th>
+                                <th class="text-center" style="width: 20%;">
                                     မှတ်ချက်(ဖြေရှင်းရန် ကျန်)
                                 </th>
                             </tr>
@@ -622,7 +630,10 @@
                                         {{ $row['label'] }}
                                     </td>
                                     <td class="text-center" style="font-weight: 700;">
-                                        {{ number_format($row['decision_count']) }}
+                                        {{ number_format($row['wrong_field_count']) }}
+                                    </td>
+                                    <td class="text-center" style="font-weight: 700; color: #0369a1;">
+                                        {{ number_format($row['distinct_repurchase_count']) }}
                                     </td>
                                     <td class="text-center" style="font-weight: 700; {{ $row['open_count'] > 0 ? 'color: #b45309; background-color: #fffbeb;' : 'color: #047857;' }}">
                                         {{ number_format($row['open_count']) }}
@@ -630,7 +641,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="text-center" style="padding: 28px; font-style: italic; color: #6b7280;">
+                                    <td colspan="4" class="text-center" style="padding: 28px; font-style: italic; color: #6b7280;">
                                         ရွေးချယ်ထားသော ရက်စွဲအတွင်း စစ်ဆေးတွေ့ရှိချက် မှတ်တမ်း မရှိပါ။ (No records found for the selected date range)
                                     </td>
                                 </tr>
@@ -643,10 +654,13 @@
                                         စုစုပေါင်း (Total) :
                                     </td>
                                     <td class="text-center" style="font-size: 15px;">
-                                        {{ number_format($totalDecisions) }}
+                                        {{ number_format($reportData['totalWrongFieldCount']) }}
+                                    </td>
+                                    <td class="text-center" style="font-size: 15px; color: #0369a1;">
+                                        {{ number_format($reportData['totalDistinctRepurchases']) }}
                                     </td>
                                     <td class="text-center" style="font-size: 15px; color: #9a3412;">
-                                        {{ number_format($totalOpen) }}
+                                        {{ number_format($reportData['totalOpenDecisionsCount']) }}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -671,10 +685,10 @@
                     <table class="solid-table mm-font">
                         <thead>
                             <tr>
-                                <th style="width: 50%;">
+                                <th style="width: 45%;">
                                     စစ်ဆေးတွေ့ရှိချက်
                                 </th>
-                                <th style="width: 50%;">
+                                <th style="width: 55%;">
                                     Branch အလိုက် ကြိမ်နှုန်း
                                 </th>
                             </tr>
@@ -688,7 +702,7 @@
                                 @endphp
 
                                 @if($branchCount > 0)
-                                    @foreach($branches as $branchName => $count)
+                                    @foreach($branches as $branchName => $bData)
                                         <tr>
                                             @if($isFirst)
                                                 <td 
@@ -698,8 +712,9 @@
                                                     <div style="font-size: 14px; font-weight: 700; color: #111827;">
                                                         {{ $group['label'] }}
                                                     </div>
-                                                    <div style="font-size: 12px; font-weight: normal; color: #6b7280; margin-top: 4px;">
-                                                        စုစုပေါင်း: <strong style="color: #374151;">{{ number_format($group['total_count']) }}</strong> ကြိမ်
+                                                    <div style="font-size: 12px; font-weight: normal; color: #4b5563; margin-top: 5px; line-height: 1.6;">
+                                                        စုစုပေါင်း မှားယွင်းမှု: <strong style="color: #111827;">{{ number_format($group['total_wrong_count']) }}</strong> ကြိမ်<br>
+                                                        သီးခြား Repurchase: <strong style="color: #0369a1;">{{ number_format($group['distinct_repurchase_count']) }}</strong> ခု
                                                     </div>
                                                 </td>
                                                 @php $isFirst = false; @endphp
@@ -707,10 +722,15 @@
 
                                             <td>
                                                 <div class="branch-item">
-                                                    <span style="font-weight: 500; color: #374151;">{{ $branchName }}</span>
-                                                    <span class="branch-badge">
-                                                        {{ number_format($count) }} ကြိမ်
-                                                    </span>
+                                                    <span style="font-weight: 600; color: #374151;">{{ $branchName }}</span>
+                                                    <div style="display: inline-flex; align-items: center; gap: 6px;">
+                                                        <span class="branch-badge" title="Wrong Field Occurrences">
+                                                            {{ number_format($bData['wrong_count']) }} ကြိမ်
+                                                        </span>
+                                                        <span class="branch-badge" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;" title="Distinct Repurchases">
+                                                            {{ number_format($bData['distinct_repurchase_count']) }} Repurchases
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
