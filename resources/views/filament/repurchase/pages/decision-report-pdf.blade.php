@@ -389,6 +389,136 @@
         </tbody>
     </table>
 
+    {{-- 3. Weight & Numeric Variance Analysis Table --}}
+    <table class="section-header-table" style="page-break-before: auto; margin-top: 25px;">
+        <tr>
+            <td class="section-title">
+                ၃။ {{ $zg('အလေးချိန်နှင့် ကိန်းဂဏန်း ကွာဟချက် အနှစ်ချုပ်') }} (Weight & Numeric Variance Analysis)
+            </td>
+            <td class="section-info">
+                {{ $zg('*Expected Value နှင့် Checked Value နှိုင်းယှဉ်ချက်') }}
+            </td>
+        </tr>
+    </table>
+
+    <table class="solid-table">
+        <thead>
+            <tr>
+                <th style="width: 34%;">
+                    {{ $zg('စစ်ဆေးချက်') }}
+                </th>
+                <th style="width: 22%; text-align: right;">
+                    Expected {{ $zg('ထက် ပိုသော ပမာဏ') }} (+)
+                </th>
+                <th style="width: 22%; text-align: right;">
+                    Expected {{ $zg('ထက် လျော့သော ပမာဏ') }} (-)
+                </th>
+                <th style="width: 22%; text-align: right;">
+                    {{ $zg('အသားတင် ကွာဟချက်') }} (Balance)
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($table3 ?? [] as $row)
+                @php
+                    $unit = $row['unit'] ? ' ' . $zg($row['unit']) : '';
+                    $isWeight = in_array($row['field_name'], ['weight_gram', 'ကျပ်-ချိန်', 'ရွေး-ချိန်', 'ကျောက်-ချိန်']);
+                    $fmt = function($num) use ($isWeight, $unit) {
+                        if ($num == 0) return '0' . $unit;
+                        $val = $isWeight ? number_format($num, 4) : number_format($num, 2);
+                        $trimmed = rtrim(rtrim($val, '0'), '.');
+                        return $trimmed . $unit;
+                    };
+                    $overText = $fmt($row['over_amount']);
+                    $shortText = $fmt($row['short_amount']);
+                    $balance = $row['net_balance'];
+                @endphp
+                <tr>
+                    <td style="font-weight: bold; vertical-align: top;">
+                        {{ $zg($row['label']) }}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #047857; vertical-align: top;">
+                        @if($row['over_amount'] > 0)
+                            +{{ $overText }}
+                        @else
+                            <span style="color: #9ca3af;">-</span>
+                        @endif
+                        @if(!empty($showVarianceDetail) && !empty($row['branches']))
+                            @php
+                                $overBranches = array_filter($row['branches'], fn($b) => $b['over_amount'] > 0);
+                            @endphp
+                            @if(!empty($overBranches))
+                                <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #d1fae5; font-size: 8px; text-align: left; font-weight: normal;">
+                                    @foreach($overBranches as $bName => $bData)
+                                        <div style="margin-bottom: 2px;">
+                                            <span style="color: #4b5563;">{{ $zg($bName) }}:</span>
+                                            <span style="color: #047857; font-weight: bold;">+{{ $fmt($bData['over_amount']) }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @endif
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #b45309; vertical-align: top;">
+                        @if($row['short_amount'] > 0)
+                            -{{ $shortText }}
+                        @else
+                            <span style="color: #9ca3af;">-</span>
+                        @endif
+                        @if(!empty($showVarianceDetail) && !empty($row['branches']))
+                            @php
+                                $shortBranches = array_filter($row['branches'], fn($b) => $b['short_amount'] > 0);
+                            @endphp
+                            @if(!empty($shortBranches))
+                                <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #fef3c7; font-size: 8px; text-align: left; font-weight: normal;">
+                                    @foreach($shortBranches as $bName => $bData)
+                                        <div style="margin-bottom: 2px;">
+                                            <span style="color: #4b5563;">{{ $zg($bName) }}:</span>
+                                            <span style="color: #b45309; font-weight: bold;">-{{ $fmt($bData['short_amount']) }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @endif
+                    </td>
+                    <td style="text-align: right; font-weight: bold; vertical-align: top;">
+                        @if($balance > 0)
+                            <span style="color: #047857;">+{{ $fmt($balance) }}</span>
+                        @elseif($balance < 0)
+                            <span style="color: #b91c1c;">-{{ $fmt(abs($balance)) }}</span>
+                        @else
+                            <span style="color: #4b5563;">0{{ $unit }}</span>
+                        @endif
+                        @if(!empty($showVarianceDetail) && !empty($row['branches']))
+                            @php
+                                $activeBranches = array_filter($row['branches'], fn($b) => $b['over_amount'] > 0 || $b['short_amount'] > 0);
+                            @endphp
+                            @if(!empty($activeBranches))
+                                <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e5e7eb; font-size: 8px; text-align: left; font-weight: normal;">
+                                    @foreach($activeBranches as $bName => $bData)
+                                        @php $bBal = $bData['net_balance']; @endphp
+                                        <div style="margin-bottom: 2px;">
+                                            <span style="color: #4b5563;">{{ $zg($bName) }}:</span>
+                                            <span style="font-weight: bold; color: {{ $bBal > 0 ? '#047857' : ($bBal < 0 ? '#b91c1c' : '#4b5563') }};">
+                                                {{ $bBal > 0 ? '+' : ($bBal < 0 ? '-' : '') }}{{ $fmt(abs($bBal)) }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @endif
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="4" class="text-center" style="padding: 14px; color: #6b7280;">
+                        {{ $zg('ရွေးချယ်ထားသော ရက်စွဲအတွင်း ကိန်းဂဏန်း/အလေးချိန် ကွာဟချက် မှတ်တမ်း မရှိပါ။') }}
+                    </td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+
     {{-- Document Sign-off Section --}}
     <table class="sign-table">
         <tr>

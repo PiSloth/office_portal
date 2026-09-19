@@ -36,6 +36,8 @@ class DecisionReport extends Page
 
     public string $toleranceMode = 'excluded';
 
+    public bool $showVarianceDetail = false;
+
     public function mount(): void
     {
         $this->startDate = now()->startOfMonth()->toDateString();
@@ -240,6 +242,31 @@ class DecisionReport extends Page
         ];
     }
 
+    public static function isNumericField(string $canonKey): bool
+    {
+        return in_array($canonKey, [
+            'weight_gram',
+            'ကျပ်-ချိန်',
+            'ရွေး-ချိန်',
+            'ကျောက်-ချိန်',
+            'ရာခိုင်နှုန်းလျော့',
+            'quantity',
+        ]);
+    }
+
+    public static function getFieldUnit(string $canonKey): string
+    {
+        return match ($canonKey) {
+            'weight_gram' => 'g',
+            'ကျပ်-ချိန်' => 'ကျပ်',
+            'ရွေး-ချိန်' => 'ရွေး',
+            'ကျောက်-ချိန်' => 'ရွေး',
+            'ရာခိုင်နှုန်းလျော့' => '%',
+            'quantity' => 'ခု',
+            default => '',
+        };
+    }
+
     public function isFieldMatching(?string $ruleField, ?string $selectedField): bool
     {
         if (empty($selectedField) || $selectedField === 'all') {
@@ -404,6 +431,7 @@ class DecisionReport extends Page
 
         $table1Data = [];
         $table2Data = [];
+        $table3Data = [];
 
         $allDistinctRepurchaseIds = [];
         $totalWrongFieldCount = 0;
@@ -530,6 +558,87 @@ class DecisionReport extends Page
                 $table2Data[$canonKey]['branches'][$branchName]['wrong_count'] += $occCount;
                 $table2Data[$canonKey]['branches'][$branchName]['distinct_repurchase_ids'][$repurchaseId] = true;
             }
+
+            // Table 3: Variance data collection (numeric fields only)
+            $numericFailures = [];
+            if ($valHistories->isNotEmpty()) {
+                foreach ($valHistories as $vh) {
+                    $fName = $vh->rule ? ($vh->rule->field_name ?: $vh->rule->label) : null;
+                    if ($fName && $this->isFailureMatchingTolerance($fName, $vh->expected_value, $vh->input_value)) {
+                        $numericFailures[] = [
+                            'field' => $fName,
+                            'expected' => $vh->expected_value,
+                            'actual' => $vh->input_value,
+                        ];
+                    }
+                }
+            } elseif ($pr->relationLoaded('failChecks')) {
+                foreach ($pr->failChecks as $fc) {
+                    if (! empty($fc->field_name) && $this->isFailureMatchingTolerance($fc->field_name, $fc->expected_value, $fc->actual_value)) {
+                        $numericFailures[] = [
+                            'field' => $fc->field_name,
+                            'expected' => $fc->expected_value,
+                            'actual' => $fc->actual_value,
+                        ];
+                    }
+                }
+            }
+
+            foreach ($numericFailures as $nf) {
+                $canon = self::getCanonicalFieldInfo($nf['field']);
+                $canonKey = $canon['key'];
+
+                if (! self::isNumericField($canonKey)) {
+                    continue;
+                }
+
+                $cleanExp = preg_replace('/[^0-9.-]/', '', (string)$nf['expected']);
+                $cleanAct = preg_replace('/[^0-9.-]/', '', (string)$nf['actual']);
+
+                if ($cleanExp === '' || $cleanAct === '' || ! is_numeric($cleanExp) || ! is_numeric($cleanAct)) {
+                    continue;
+                }
+
+                $expVal = (float) $cleanExp;
+                $actVal = (float) $cleanAct;
+                $diff = $actVal - $expVal;
+
+                if (! isset($table3Data[$canonKey])) {
+                    $table3Data[$canonKey] = [
+                        'field_name' => $canonKey,
+                        'label' => $canon['label'],
+                        'unit' => self::getFieldUnit($canonKey),
+                        'over_amount' => 0.0,
+                        'short_amount' => 0.0,
+                        'net_balance' => 0.0,
+                        'distinct_repurchase_ids' => [],
+                        'distinct_repurchase_count' => 0,
+                        'occurrences_count' => 0,
+                        'branches' => [],
+                    ];
+                }
+
+                if (! isset($table3Data[$canonKey]['branches'][$branchName])) {
+                    $table3Data[$canonKey]['branches'][$branchName] = [
+                        'over_amount' => 0.0,
+                        'short_amount' => 0.0,
+                        'net_balance' => 0.0,
+                        'count' => 0,
+                    ];
+                }
+
+                if ($diff > 0) {
+                    $table3Data[$canonKey]['over_amount'] += $diff;
+                    $table3Data[$canonKey]['branches'][$branchName]['over_amount'] += $diff;
+                } elseif ($diff < 0) {
+                    $table3Data[$canonKey]['short_amount'] += abs($diff);
+                    $table3Data[$canonKey]['branches'][$branchName]['short_amount'] += abs($diff);
+                }
+
+                $table3Data[$canonKey]['distinct_repurchase_ids'][$repurchaseId] = true;
+                $table3Data[$canonKey]['occurrences_count']++;
+                $table3Data[$canonKey]['branches'][$branchName]['count']++;
+            }
         }
 
         // Finalize Table 1 distinct counts and totals
@@ -558,6 +667,25 @@ class DecisionReport extends Page
 
         // Sort Table 2 fields by distinct repurchase count descending
         uasort($table2Data, fn ($a, $b) => $b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']);
+
+        // Finalize Table 3 net balance and distinct counts
+        foreach ($table3Data as $canonKey => $item) {
+            $table3Data[$canonKey]['net_balance'] = $item['over_amount'] - $item['short_amount'];
+            $table3Data[$canonKey]['distinct_repurchase_count'] = count($item['distinct_repurchase_ids']);
+
+            foreach ($item['branches'] as $bName => $bItem) {
+                $table3Data[$canonKey]['branches'][$bName]['net_balance'] = $bItem['over_amount'] - $bItem['short_amount'];
+            }
+
+            uasort($table3Data[$canonKey]['branches'], function ($a, $b) {
+                $totA = $a['over_amount'] + $a['short_amount'];
+                $totB = $b['over_amount'] + $b['short_amount'];
+                return $totB <=> $totA;
+            });
+        }
+
+        // Sort Table 3 by distinct repurchase count descending
+        uasort($table3Data, fn ($a, $b) => $b['distinct_repurchase_count'] <=> $a['distinct_repurchase_count']);
 
         // Formatted dates for display
         $formattedStartDate = $this->startDate ? Carbon::parse($this->startDate)->format('d M Y') : 'အစအဦးမှ (Beginning)';
@@ -588,6 +716,7 @@ class DecisionReport extends Page
             'decisionsCount' => $decisions->count(),
             'table1' => array_values($table1Data),
             'table2' => array_values($table2Data),
+            'table3' => array_values($table3Data),
             'totalDecisionsCount' => $totalWrongFieldCount,
             'totalWrongFieldCount' => $totalWrongFieldCount,
             'totalDistinctRepurchases' => count($allDistinctRepurchaseIds),
@@ -596,6 +725,7 @@ class DecisionReport extends Page
             'formattedEndDate' => $formattedEndDate,
             'toleranceInfo' => $toleranceInfo,
             'stateInfo' => $stateInfo,
+            'showVarianceDetail' => $this->showVarianceDetail,
         ];
     }
 
@@ -630,6 +760,8 @@ class DecisionReport extends Page
             'reportData' => $reportData,
             'table1' => $reportData['table1'],
             'table2' => $reportData['table2'],
+            'table3' => $reportData['table3'],
+            'showVarianceDetail' => $this->showVarianceDetail,
             'totalWrongFieldCount' => $reportData['totalWrongFieldCount'],
             'totalDistinctRepurchases' => $reportData['totalDistinctRepurchases'],
             'totalOpen' => $reportData['totalOpenDecisionsCount'],
