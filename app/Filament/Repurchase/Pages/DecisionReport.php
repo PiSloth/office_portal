@@ -32,7 +32,7 @@ class DecisionReport extends Page
 
     public ?string $toleranceField = 'all';
 
-    public $toleranceValue = 0.05;
+    public $toleranceValue = 0.01;
 
     public string $toleranceMode = 'excluded';
 
@@ -57,7 +57,7 @@ class DecisionReport extends Page
         $this->companyTitle = $this->getCompanyTitle();
         $this->selectedState = 'all';
         $this->toleranceField = 'all';
-        $this->toleranceValue = 0.05;
+        $this->toleranceValue = 0.01;
         $this->toleranceMode = 'excluded';
     }
 
@@ -113,7 +113,7 @@ class DecisionReport extends Page
     public function resetTolerance(): void
     {
         $this->toleranceField = 'all';
-        $this->toleranceValue = 0.05;
+        $this->toleranceValue = 0.01;
         $this->toleranceMode = 'excluded';
     }
 
@@ -322,8 +322,8 @@ class DecisionReport extends Page
         $cleanAct = preg_replace('/[^0-9.-]/', '', (string)$actualValue);
 
         if ($cleanExp !== '' && $cleanAct !== '' && is_numeric($cleanExp) && is_numeric($cleanAct)) {
-            $diff = abs((float)$cleanExp - (float)$cleanAct);
-            $tolValue = (float) $this->toleranceValue;
+            $diff = round(abs((float)$cleanExp - (float)$cleanAct), 6);
+            $tolValue = round((float) $this->toleranceValue, 6);
             $isWithin = ($diff <= $tolValue);
 
             return $this->toleranceMode === 'excluded' ? ! $isWithin : $isWithin;
@@ -585,7 +585,7 @@ class DecisionReport extends Page
                                 $cleanAct = preg_replace('/[^0-9.-]/', '', (string)$vh->input_value);
                                 $diff = null;
                                 if ($cleanExp !== '' && $cleanAct !== '' && is_numeric($cleanExp) && is_numeric($cleanAct)) {
-                                    $diff = (float)$cleanAct - (float)$cleanExp;
+                                    $diff = round((float)$cleanAct - (float)$cleanExp, 6);
                                 }
                                 $itemFailures[] = [
                                     'field_name' => $canonKey,
@@ -610,7 +610,7 @@ class DecisionReport extends Page
                                 $cleanAct = preg_replace('/[^0-9.-]/', '', (string)$fc->actual_value);
                                 $diff = null;
                                 if ($cleanExp !== '' && $cleanAct !== '' && is_numeric($cleanExp) && is_numeric($cleanAct)) {
-                                    $diff = (float)$cleanAct - (float)$cleanExp;
+                                    $diff = round((float)$cleanAct - (float)$cleanExp, 6);
                                 }
                                 $itemFailures[] = [
                                     'field_name' => $canonKey,
@@ -694,7 +694,7 @@ class DecisionReport extends Page
 
                 $expVal = (float) $cleanExp;
                 $actVal = (float) $cleanAct;
-                $diff = $actVal - $expVal;
+                $diff = round($actVal - $expVal, 6);
 
                 if (! isset($table3Data[$canonKey])) {
                     $table3Data[$canonKey] = [

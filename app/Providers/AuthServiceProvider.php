@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Modules\Purchase\Models\PurchaseRequest;
 use App\Policies\PermissionPolicy;
+use App\Policies\PurchaseRequestPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -16,5 +18,6 @@ class AuthServiceProvider extends ServiceProvider
         User::class => UserPolicy::class,
         Role::class => RolePolicy::class,
         Permission::class => PermissionPolicy::class,
+        PurchaseRequest::class => PurchaseRequestPolicy::class,
     ];
 }

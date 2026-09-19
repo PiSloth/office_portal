@@ -1730,10 +1730,14 @@ class PurchaseRequestResource extends Resource
                                 })
                         ];
                     }),
-                \Filament\Actions\EditAction::make(),
-                \Filament\Actions\DeleteAction::make(),
-                \Filament\Actions\RestoreAction::make(),
-                \Filament\Actions\ForceDeleteAction::make(),
+                \Filament\Actions\EditAction::make()
+                    ->visible(fn ($record) => static::canEdit($record)),
+                \Filament\Actions\DeleteAction::make()
+                    ->visible(fn ($record) => static::canDelete($record)),
+                \Filament\Actions\RestoreAction::make()
+                    ->visible(fn ($record) => static::canRestore($record)),
+                \Filament\Actions\ForceDeleteAction::make()
+                    ->visible(fn ($record) => static::canForceDelete($record)),
             ])
             ->defaultSort('id', 'desc')
             ->bulkActions([
@@ -1854,9 +1858,12 @@ class PurchaseRequestResource extends Resource
                                 'Content-Disposition' => 'attachment; filename="purchase_items_export_' . now()->format('Y-m-d_H-i-s') . '.csv"',
                             ]);
                         }),
-                    \Filament\Actions\DeleteBulkAction::make(),
-                    \Filament\Actions\RestoreBulkAction::make(),
-                    \Filament\Actions\ForceDeleteBulkAction::make(),
+                    \Filament\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => static::canDeleteAny()),
+                    \Filament\Actions\RestoreBulkAction::make()
+                        ->visible(fn () => static::canRestoreAny()),
+                    \Filament\Actions\ForceDeleteBulkAction::make()
+                        ->visible(fn () => static::canForceDeleteAny()),
                 ]),
             ]);
     }

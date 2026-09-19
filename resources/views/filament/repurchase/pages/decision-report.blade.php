@@ -955,7 +955,7 @@
                                 step="any" 
                                 min="0" 
                                 wire:model.live.debounce.400ms="toleranceValue" 
-                                placeholder="e.g. 0.05" 
+                                placeholder="e.g. 0.01" 
                                 class="tolerance-input" 
                             />
                             <span class="input-suffix">g</span>
