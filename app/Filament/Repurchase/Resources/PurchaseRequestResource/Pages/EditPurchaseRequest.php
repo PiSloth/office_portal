@@ -69,10 +69,11 @@ class EditPurchaseRequest extends EditRecord
                             $activeRulesCount++;
                             $hasRules = true;
 
-                            // Check if this user already has a validation history for this item and this rule
+                            // Check if this user already has a validation history for this item, rule and workflow state
                             $hasHistory = \App\Modules\Core\Validation\Models\ValidationHistory::where('validatable_type', get_class($item))
                                 ->where('validatable_id', $item->id)
                                 ->where('rule_id', $rule->id)
+                                ->where('workflow_state_id', $record->workflow_state_id)
                                 ->where('user_id', auth()->id())
                                 ->exists();
 
@@ -84,6 +85,7 @@ class EditPurchaseRequest extends EditRecord
                             $existingHistory = \App\Modules\Core\Validation\Models\ValidationHistory::where('validatable_type', get_class($item))
                                 ->where('validatable_id', $item->id)
                                 ->where('rule_id', $rule->id)
+                                ->where('workflow_state_id', $record->workflow_state_id)
                                 ->where('user_id', auth()->id())
                                 ->latest()
                                 ->first();
@@ -214,8 +216,10 @@ class EditPurchaseRequest extends EditRecord
                                             'validatable_type' => get_class($item),
                                             'validatable_id' => $item->id,
                                             'rule_id' => $rule->id,
+                                            'workflow_state_id' => $record->workflow_state_id,
                                             'user_id' => auth()->id(),
                                         ], [
+                                            'validation_rule_set_id' => $rule->rule_set_id ?? $transition->validation_rule_set_id,
                                             'status' => $status,
                                             'input_value' => $inputValue,
                                             'expected_value' => $expectedValue,
@@ -296,8 +300,10 @@ class EditPurchaseRequest extends EditRecord
                                     'validatable_type' => get_class($item),
                                     'validatable_id' => $item->id,
                                     'rule_id' => $rule->id,
+                                    'workflow_state_id' => $record->workflow_state_id,
                                     'user_id' => auth()->id(),
                                 ], [
+                                    'validation_rule_set_id' => $rule->rule_set_id ?? $transition->validation_rule_set_id,
                                     'status' => $status,
                                     'input_value' => $inputValue,
                                     'expected_value' => $expectedValue,

@@ -28,7 +28,7 @@ class ValidationManager
                         // If it's required but no items of this type exist, fail
                         if ($rule->is_required) {
                             $allPassed = false;
-                            $this->logHistory($validatable, $rule, null, null, 'FAIL', $userId);
+                            $this->logHistory($validatable, $rule, null, null, 'FAIL', $userId, $ruleSet);
                         }
                     } else {
                         foreach ($items as $item) {
@@ -45,7 +45,7 @@ class ValidationManager
                                 $allPassed = false;
                             }
 
-                            $this->logHistory($item, $rule, $inputValue, $expectedValue, $status, $userId);
+                            $this->logHistory($item, $rule, $inputValue, $expectedValue, $status, $userId, $ruleSet);
                         }
                     }
                 }
@@ -64,19 +64,32 @@ class ValidationManager
                     $allPassed = false;
                 }
 
-                $this->logHistory($validatable, $rule, $inputValue, $expectedValue, $status, $userId);
+                $this->logHistory($validatable, $rule, $inputValue, $expectedValue, $status, $userId, $ruleSet);
             }
         }
 
         return $allPassed;
     }
 
-    protected function logHistory(Model $validatable, $rule, $inputValue, $expectedValue, $status, $userId)
+    protected function logHistory(Model $validatable, $rule, $inputValue, $expectedValue, $status, $userId, $ruleSet = null)
     {
+        $stateId = null;
+        if ($validatable instanceof \App\Modules\Purchase\Models\PurchaseRequest) {
+            $stateId = $validatable->workflow_state_id;
+        } elseif ($validatable instanceof \App\Modules\Purchase\Models\PurchaseItem) {
+            $stateId = $validatable->purchaseRequest?->workflow_state_id;
+        } elseif (isset($validatable->purchase_request_id)) {
+            $stateId = \App\Modules\Purchase\Models\PurchaseRequest::where('id', $validatable->purchase_request_id)->value('workflow_state_id');
+        } elseif (isset($validatable->workflow_state_id)) {
+            $stateId = $validatable->workflow_state_id;
+        }
+
         ValidationHistory::create([
             'validatable_type' => get_class($validatable),
             'validatable_id' => $validatable->getKey(),
             'rule_id' => $rule->id,
+            'workflow_state_id' => $stateId,
+            'validation_rule_set_id' => $rule->rule_set_id ?? ($ruleSet?->id ?? null),
             'status' => $status,
             'input_value' => is_scalar($inputValue) ? $inputValue : json_encode($inputValue),
             'expected_value' => is_scalar($expectedValue) ? $expectedValue : json_encode($expectedValue),

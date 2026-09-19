@@ -1464,6 +1464,8 @@
                                         <th style="width: 36px; text-align: center;">စဉ်</th>
                                         <th>PR နံပါတ်</th>
                                         <th>Customer အမည် / ဖုန်း</th>
+                                        <th>စစ်ဆေးသည့် အဆင့် (State)</th>
+                                        <th>Rule Set (စည်းမျဉ်း)</th>
                                         <th>စစ်ဆေးသူ</th>
                                         <th style="text-align: right;">Customer ပေးရွှေ</th>
                                         <th style="text-align: right;">စစ်ဆေးချက်</th>
@@ -1476,80 +1478,99 @@
                                 <tbody>
                                     @foreach($modalRecords as $idx => $record)
                                         @php
-                                            $firstFail = $record['failures'][0] ?? null;
-                                            $unit = $firstFail['unit'] ?? '';
-                                            $unitStr = $unit ? ' ' . $unit : '';
-                                            $diff = $firstFail['diff'] ?? null;
+                                            $failures = !empty($record['failures']) ? $record['failures'] : [null];
+                                            $fCount = count($failures);
                                         @endphp
-                                        <tr>
-                                            <td style="text-align: center; color: #6b7280; font-size: 12px;">
-                                                {{ $idx + 1 }}
-                                            </td>
-                                            <td style="font-weight: 600; white-space: nowrap; color: #1e40af;">
-                                                {{ $record['purchase_number'] }}
-                                            </td>
-                                            <td>
-                                                <div style="font-weight: 600; color: #111827;">{{ $record['customer_name'] }}</div>
-                                                <div style="font-size: 11px; color: #6b7280;">{{ $record['customer_phone'] }}</div>
-                                            </td>
-                                            <td style="color: #374151; font-weight: 500;">
-                                                {{ $firstFail['checked_by'] ?? '-' }}
-                                            </td>
-                                            <td style="text-align: right; font-weight: 500;">
-                                                {{ $firstFail ? $firstFail['expected_value'] . $unitStr : '-' }}
-                                            </td>
-                                            <td style="text-align: right; font-weight: 500;">
-                                                {{ $firstFail ? $firstFail['actual_value'] . $unitStr : '-' }}
-                                            </td>
-                                            <td style="text-align: right; font-weight: 700;">
-                                                @if($diff !== null)
-                                                    @if($diff > 0)
-                                                        <span style="color: #059669;">+{{ rtrim(rtrim(number_format($diff, 4), '0'), '.') }}{{ $unitStr }}</span>
-                                                    @elseif($diff < 0)
-                                                        <span style="color: #dc2626;">-{{ rtrim(rtrim(number_format(abs($diff), 4), '0'), '.') }}{{ $unitStr }}</span>
+                                        @foreach($failures as $fIdx => $fail)
+                                            @php
+                                                $unit = $fail['unit'] ?? '';
+                                                $unitStr = $unit ? ' ' . $unit : '';
+                                                $diff = $fail['diff'] ?? null;
+                                                $stateName = $fail['state_name'] ?? '-';
+                                                $ruleSetName = $fail['rule_set_name'] ?? '-';
+                                            @endphp
+                                            <tr>
+                                                @if($fIdx === 0)
+                                                    <td rowspan="{{ $fCount }}" style="text-align: center; color: #6b7280; font-size: 12px; vertical-align: top;">
+                                                        {{ $idx + 1 }}
+                                                    </td>
+                                                    <td rowspan="{{ $fCount }}" style="font-weight: 600; white-space: nowrap; color: #1e40af; vertical-align: top;">
+                                                        {{ $record['purchase_number'] }}
+                                                    </td>
+                                                    <td rowspan="{{ $fCount }}" style="vertical-align: top;">
+                                                        <div style="font-weight: 600; color: #111827;">{{ $record['customer_name'] }}</div>
+                                                        <div style="font-size: 11px; color: #6b7280;">{{ $record['customer_phone'] }}</div>
+                                                    </td>
+                                                @endif
+                                                <td style="vertical-align: top;">
+                                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; white-space: nowrap;">
+                                                        {{ $stateName }}
+                                                    </span>
+                                                </td>
+                                                <td style="font-size: 11px; color: #4b5563; vertical-align: top;">
+                                                    {{ $ruleSetName }}
+                                                </td>
+                                                <td style="color: #374151; font-weight: 500; vertical-align: top;">
+                                                    {{ $fail['checked_by'] ?? '-' }}
+                                                </td>
+                                                <td style="text-align: right; font-weight: 500; vertical-align: top;">
+                                                    {{ $fail ? $fail['expected_value'] . $unitStr : '-' }}
+                                                </td>
+                                                <td style="text-align: right; font-weight: 500; vertical-align: top;">
+                                                    {{ $fail ? $fail['actual_value'] . $unitStr : '-' }}
+                                                </td>
+                                                <td style="text-align: right; font-weight: 700; vertical-align: top;">
+                                                    @if($diff !== null)
+                                                        @if($diff > 0)
+                                                            <span style="color: #059669;">+{{ rtrim(rtrim(number_format($diff, 4), '0'), '.') }}{{ $unitStr }}</span>
+                                                        @elseif($diff < 0)
+                                                            <span style="color: #dc2626;">-{{ rtrim(rtrim(number_format(abs($diff), 4), '0'), '.') }}{{ $unitStr }}</span>
+                                                        @else
+                                                            <span style="color: #6b7280;">0{{ $unitStr }}</span>
+                                                        @endif
                                                     @else
-                                                        <span style="color: #6b7280;">0{{ $unitStr }}</span>
+                                                        <span style="color: #dc2626; font-size: 11px;">မကိုက်ညီပါ</span>
                                                     @endif
-                                                @else
-                                                    <span style="color: #dc2626; font-size: 11px;">မကိုက်ညီပါ</span>
+                                                </td>
+                                                <td style="font-size: 11px; color: #6b7280; white-space: nowrap; vertical-align: top;">
+                                                    {{ $fail['checked_at'] ?? '-' }}
+                                                </td>
+                                                @if($fIdx === 0)
+                                                    <td rowspan="{{ $fCount }}" style="vertical-align: top;">
+                                                        @if($record['decision_status'] === 'open')
+                                                            <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #fef3c7; color: #92400e;">Open</span>
+                                                        @else
+                                                            <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #d1fae5; color: #065f46;">Closed</span>
+                                                        @endif
+                                                    </td>
+                                                    <td rowspan="{{ $fCount }}" style="text-align: center; white-space: nowrap; vertical-align: top;">
+                                                        @if(!empty($record['view_url']))
+                                                            <a 
+                                                                href="{{ $record['view_url'] }}" 
+                                                                target="_blank"
+                                                                style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none;"
+                                                                onmouseover="this.style.background='#dbeafe'"
+                                                                onmouseout="this.style.background='#eff6ff'"
+                                                                title="Decision စာမျက်နှာကို Window အသစ်ဖြင့် ဖွင့်မည်"
+                                                            >
+                                                                အသေးစိတ် ↗
+                                                            </a>
+                                                        @elseif(!empty($record['pr_url']))
+                                                            <a 
+                                                                href="{{ $record['pr_url'] }}" 
+                                                                target="_blank"
+                                                                style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none;"
+                                                                title="PR စာမျက်နှာကို Window အသစ်ဖြင့် ဖွင့်မည်"
+                                                            >
+                                                                PR ကြည့်မည် ↗
+                                                            </a>
+                                                        @else
+                                                            <span style="color: #9ca3af;">-</span>
+                                                        @endif
+                                                    </td>
                                                 @endif
-                                            </td>
-                                            <td style="font-size: 11px; color: #6b7280; white-space: nowrap;">
-                                                {{ $firstFail['checked_at'] ?? '-' }}
-                                            </td>
-                                            <td>
-                                                @if($record['decision_status'] === 'open')
-                                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #fef3c7; color: #92400e;">Open</span>
-                                                @else
-                                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #d1fae5; color: #065f46;">Closed</span>
-                                                @endif
-                                            </td>
-                                            <td style="text-align: center; white-space: nowrap;">
-                                                @if(!empty($record['view_url']))
-                                                    <a 
-                                                        href="{{ $record['view_url'] }}" 
-                                                        target="_blank"
-                                                        style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none;"
-                                                        onmouseover="this.style.background='#dbeafe'"
-                                                        onmouseout="this.style.background='#eff6ff'"
-                                                        title="Decision စာမျက်နှာကို Window အသစ်ဖြင့် ဖွင့်မည်"
-                                                    >
-                                                        အသေးစိတ် ↗
-                                                    </a>
-                                                @elseif(!empty($record['pr_url']))
-                                                    <a 
-                                                        href="{{ $record['pr_url'] }}" 
-                                                        target="_blank"
-                                                        style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none;"
-                                                        title="PR စာမျက်နှာကို Window အသစ်ဖြင့် ဖွင့်မည်"
-                                                    >
-                                                        PR ကြည့်မည် ↗
-                                                    </a>
-                                                @else
-                                                    <span style="color: #9ca3af;">-</span>
-                                                @endif
-                                            </td>
-                                        </tr>
+                                            </tr>
+                                        @endforeach
                                     @endforeach
                                 </tbody>
                             </table>

@@ -9,6 +9,7 @@ class FailCheck extends Model
 {
     protected $fillable = [
         'purchase_request_id',
+        'workflow_state_id',
         'field_name',
         'expected_value',
         'actual_value',
@@ -19,6 +20,11 @@ class FailCheck extends Model
     public function purchaseRequest()
     {
         return $this->belongsTo(PurchaseRequest::class);
+    }
+
+    public function workflowState()
+    {
+        return $this->belongsTo(\App\Modules\Core\Workflow\Models\WorkflowState::class, 'workflow_state_id');
     }
 
     public function whoChecked()

@@ -417,20 +417,36 @@ class DecisionReport extends Page
         $query = PurchaseDecision::with([
             'purchaseRequest.branch',
             'purchaseRequest.workflowState',
+            'purchaseRequest.failChecks.workflowState',
             'purchaseRequest.failChecks.whoChecked',
             'purchaseRequest.failChecks.user',
-            'purchaseRequest.items.validationHistories.rule',
+            'purchaseRequest.items.validationHistories.rule.ruleSet',
+            'purchaseRequest.items.validationHistories.ruleSet',
+            'purchaseRequest.items.validationHistories.workflowState',
             'purchaseRequest.items.validationHistories.user',
-            'purchaseRequest.validationHistories.rule',
+            'purchaseRequest.validationHistories.rule.ruleSet',
+            'purchaseRequest.validationHistories.ruleSet',
+            'purchaseRequest.validationHistories.workflowState',
             'purchaseRequest.validationHistories.user',
         ])
             ->whereHas('purchaseRequest', function ($q) {
                 $q->whereNull('deleted_at');
 
                 if ($this->selectedState === 'end_states') {
-                    $q->whereHas('workflowState', fn ($sq) => $sq->where('is_end', true));
+                    $q->where(function ($sq) {
+                        $sq->whereHas('workflowState', fn ($wsq) => $wsq->where('is_end', true))
+                           ->orWhereHas('failChecks.workflowState', fn ($wsq) => $wsq->where('is_end', true))
+                           ->orWhereHas('validationHistories.workflowState', fn ($wsq) => $wsq->where('is_end', true))
+                           ->orWhereHas('items.validationHistories.workflowState', fn ($wsq) => $wsq->where('is_end', true));
+                    });
                 } elseif (! empty($this->selectedState) && $this->selectedState !== 'all') {
-                    $q->where('workflow_state_id', $this->selectedState);
+                    $stateId = $this->selectedState;
+                    $q->where(function ($sq) use ($stateId) {
+                        $sq->where('workflow_state_id', $stateId)
+                           ->orWhereHas('failChecks', fn ($wsq) => $wsq->where('workflow_state_id', $stateId))
+                           ->orWhereHas('validationHistories', fn ($wsq) => $wsq->where('workflow_state_id', $stateId))
+                           ->orWhereHas('items.validationHistories', fn ($wsq) => $wsq->where('workflow_state_id', $stateId));
+                    });
                 }
             });
 
@@ -468,6 +484,18 @@ class DecisionReport extends Page
             // 1. From failChecks
             if ($pr->relationLoaded('failChecks')) {
                 foreach ($pr->failChecks as $fc) {
+                    if ($this->selectedState !== 'all') {
+                        if ($this->selectedState === 'end_states') {
+                            $isStateMatch = $fc->workflowState?->is_end || ($fc->workflow_state_id === null && $pr->workflowState?->is_end);
+                        } else {
+                            $isStateMatch = ((string)$fc->workflow_state_id === (string)$this->selectedState)
+                                || ($fc->workflow_state_id === null && (string)$pr->workflow_state_id === (string)$this->selectedState);
+                        }
+                        if (! $isStateMatch) {
+                            continue;
+                        }
+                    }
+
                     if (! empty($fc->field_name)) {
                         if ($this->isFailureMatchingTolerance($fc->field_name, $fc->expected_value, $fc->actual_value)) {
                             $fieldOccurrences[$fc->field_name] = ($fieldOccurrences[$fc->field_name] ?? 0) + 1;
@@ -487,6 +515,20 @@ class DecisionReport extends Page
             }
             if ($pr->relationLoaded('validationHistories')) {
                 $valHistories = $valHistories->concat($pr->validationHistories->where('status', 'FAIL'));
+            }
+
+            if ($this->selectedState !== 'all') {
+                if ($this->selectedState === 'end_states') {
+                    $valHistories = $valHistories->filter(function ($vh) use ($pr) {
+                        return $vh->workflowState?->is_end || ($vh->workflow_state_id === null && $pr->workflowState?->is_end);
+                    });
+                } else {
+                    $selState = (string)$this->selectedState;
+                    $valHistories = $valHistories->filter(function ($vh) use ($selState, $pr) {
+                        return ((string)$vh->workflow_state_id === $selState)
+                            || ($vh->workflow_state_id === null && (string)$pr->workflow_state_id === $selState);
+                    });
+                }
             }
 
             $valHistoryCounts = [];
@@ -593,6 +635,8 @@ class DecisionReport extends Page
                                     'actual_value' => $vh->input_value,
                                     'diff' => $diff,
                                     'unit' => self::getFieldUnit($canonKey),
+                                    'state_name' => $vh->workflowState?->name ?: ($pr->workflowState?->name ?: '-'),
+                                    'rule_set_name' => $vh->ruleSet?->name ?: ($vh->rule?->ruleSet?->name ?: '-'),
                                     'checked_by' => $vh->user?->name ?: '-',
                                     'checked_at' => $vh->created_at ? $vh->created_at->format('d/m/Y h:i A') : '-',
                                     'remark' => $vh->remarks ?: '-',
@@ -618,6 +662,8 @@ class DecisionReport extends Page
                                     'actual_value' => $fc->actual_value,
                                     'diff' => $diff,
                                     'unit' => self::getFieldUnit($canonKey),
+                                    'state_name' => $fc->workflowState?->name ?: ($pr->workflowState?->name ?: '-'),
+                                    'rule_set_name' => '-',
                                     'checked_by' => $fc->whoChecked?->name ?: ($fc->user?->name ?: '-'),
                                     'checked_at' => $fc->created_at ? $fc->created_at->format('d/m/Y h:i A') : '-',
                                     'remark' => $fc->remark ?: '-',
