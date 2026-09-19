@@ -38,6 +38,18 @@ class DecisionReport extends Page
 
     public bool $showVarianceDetail = false;
 
+    public bool $isDetailModalOpen = false;
+
+    public ?string $modalFieldKey = null;
+
+    public ?string $modalFieldLabel = null;
+
+    public ?string $modalBranchName = null;
+
+    public string $modalVarianceType = 'all';
+
+    public array $modalRecords = [];
+
     public function mount(): void
     {
         $this->startDate = now()->startOfMonth()->toDateString();
@@ -405,9 +417,12 @@ class DecisionReport extends Page
         $query = PurchaseDecision::with([
             'purchaseRequest.branch',
             'purchaseRequest.workflowState',
-            'purchaseRequest.failChecks',
+            'purchaseRequest.failChecks.whoChecked',
+            'purchaseRequest.failChecks.user',
             'purchaseRequest.items.validationHistories.rule',
+            'purchaseRequest.items.validationHistories.user',
             'purchaseRequest.validationHistories.rule',
+            'purchaseRequest.validationHistories.user',
         ])
             ->whereHas('purchaseRequest', function ($q) {
                 $q->whereNull('deleted_at');
@@ -552,11 +567,89 @@ class DecisionReport extends Page
                         'wrong_count' => 0,
                         'distinct_repurchase_ids' => [],
                         'distinct_repurchase_count' => 0,
+                        'records' => [],
                     ];
                 }
 
                 $table2Data[$canonKey]['branches'][$branchName]['wrong_count'] += $occCount;
                 $table2Data[$canonKey]['branches'][$branchName]['distinct_repurchase_ids'][$repurchaseId] = true;
+
+                // Collect failure item details for this specific PR and canonical field
+                $itemFailures = [];
+                if ($valHistories->isNotEmpty()) {
+                    foreach ($valHistories as $vh) {
+                        $fName = $vh->rule ? ($vh->rule->label ?: $vh->rule->field_name) : null;
+                        if ($fName && self::getCanonicalFieldInfo($fName)['key'] === $canonKey) {
+                            if ($this->isFailureMatchingTolerance($fName, $vh->expected_value, $vh->input_value)) {
+                                $cleanExp = preg_replace('/[^0-9.-]/', '', (string)$vh->expected_value);
+                                $cleanAct = preg_replace('/[^0-9.-]/', '', (string)$vh->input_value);
+                                $diff = null;
+                                if ($cleanExp !== '' && $cleanAct !== '' && is_numeric($cleanExp) && is_numeric($cleanAct)) {
+                                    $diff = (float)$cleanAct - (float)$cleanExp;
+                                }
+                                $itemFailures[] = [
+                                    'field_name' => $canonKey,
+                                    'expected_value' => $vh->expected_value,
+                                    'actual_value' => $vh->input_value,
+                                    'diff' => $diff,
+                                    'unit' => self::getFieldUnit($canonKey),
+                                    'checked_by' => $vh->user?->name ?: '-',
+                                    'checked_at' => $vh->created_at ? $vh->created_at->format('d/m/Y h:i A') : '-',
+                                    'remark' => $vh->remarks ?: '-',
+                                ];
+                            }
+                        }
+                    }
+                }
+
+                if (empty($itemFailures) && $pr->relationLoaded('failChecks')) {
+                    foreach ($pr->failChecks as $fc) {
+                        if (! empty($fc->field_name) && self::getCanonicalFieldInfo($fc->field_name)['key'] === $canonKey) {
+                            if ($this->isFailureMatchingTolerance($fc->field_name, $fc->expected_value, $fc->actual_value)) {
+                                $cleanExp = preg_replace('/[^0-9.-]/', '', (string)$fc->expected_value);
+                                $cleanAct = preg_replace('/[^0-9.-]/', '', (string)$fc->actual_value);
+                                $diff = null;
+                                if ($cleanExp !== '' && $cleanAct !== '' && is_numeric($cleanExp) && is_numeric($cleanAct)) {
+                                    $diff = (float)$cleanAct - (float)$cleanExp;
+                                }
+                                $itemFailures[] = [
+                                    'field_name' => $canonKey,
+                                    'expected_value' => $fc->expected_value,
+                                    'actual_value' => $fc->actual_value,
+                                    'diff' => $diff,
+                                    'unit' => self::getFieldUnit($canonKey),
+                                    'checked_by' => $fc->whoChecked?->name ?: ($fc->user?->name ?: '-'),
+                                    'checked_at' => $fc->created_at ? $fc->created_at->format('d/m/Y h:i A') : '-',
+                                    'remark' => $fc->remark ?: '-',
+                                ];
+                            }
+                        }
+                    }
+                }
+
+                $viewUrl = null;
+                try {
+                    $viewUrl = route('filament.repurchase.resources.purchase-decisions.view', ['record' => $decision->id]);
+                } catch (\Exception $e) {}
+
+                $prUrl = null;
+                try {
+                    $prUrl = route('filament.repurchase.resources.purchase-requests.edit', ['record' => $pr->id]);
+                } catch (\Exception $e) {}
+
+                $table2Data[$canonKey]['branches'][$branchName]['records'][] = [
+                    'repurchase_id' => $repurchaseId,
+                    'purchase_number' => $pr->purchase_number ?: "PR-{$pr->id}",
+                    'customer_name' => $pr->customer_name ?: '-',
+                    'customer_phone' => $pr->customer_phone ?: '-',
+                    'customer_nrc' => $pr->customer_nrc ?: '-',
+                    'branch_name' => $branchName,
+                    'decision_id' => $decision->id,
+                    'decision_status' => $decision->status,
+                    'view_url' => $viewUrl,
+                    'pr_url' => $prUrl,
+                    'failures' => $itemFailures,
+                ];
             }
 
             // Table 3: Variance data collection (numeric fields only)
@@ -782,5 +875,56 @@ class DecisionReport extends Page
         }, $filename, [
             'Content-Type' => 'application/pdf',
         ]);
+    }
+
+    public function openDetailModal(string $fieldKey, string $branchName, string $varianceType = 'all'): void
+    {
+        $this->modalFieldKey = $fieldKey;
+        $this->modalFieldLabel = self::formatFieldLabel($fieldKey);
+        $this->modalBranchName = $branchName;
+        $this->modalVarianceType = $varianceType;
+
+        $reportData = $this->getReportData();
+        $records = [];
+
+        foreach ($reportData['table2'] as $group) {
+            if ($group['field_name'] === $fieldKey && isset($group['branches'][$branchName]['records'])) {
+                $records = $group['branches'][$branchName]['records'];
+                break;
+            }
+        }
+
+        if ($varianceType === 'over') {
+            $records = array_filter($records, function ($r) {
+                foreach ($r['failures'] as $f) {
+                    if ($f['diff'] !== null && $f['diff'] > 0) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        } elseif ($varianceType === 'short') {
+            $records = array_filter($records, function ($r) {
+                foreach ($r['failures'] as $f) {
+                    if ($f['diff'] !== null && $f['diff'] < 0) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        }
+
+        $this->modalRecords = array_values($records);
+        $this->isDetailModalOpen = true;
+    }
+
+    public function closeDetailModal(): void
+    {
+        $this->isDetailModalOpen = false;
+        $this->modalRecords = [];
+        $this->modalFieldKey = null;
+        $this->modalFieldLabel = null;
+        $this->modalBranchName = null;
+        $this->modalVarianceType = 'all';
     }
 }

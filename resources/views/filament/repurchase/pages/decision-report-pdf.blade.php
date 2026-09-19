@@ -208,9 +208,6 @@
 
     {{-- Document Header --}}
     <div class="doc-header">
-        <div class="doc-pretitle">
-            {{ $zg($companyTitle ?? 'MAHAR JEWELRY & GOLD REPURCHASE') }}
-        </div>
         <div class="doc-title">
             REPURCHASE PERFORMANCE ANALYSIS
         </div>
@@ -396,7 +393,7 @@
                 ၃။ {{ $zg('အလေးချိန်နှင့် ကိန်းဂဏန်း ကွာဟချက် အနှစ်ချုပ်') }} (Weight & Numeric Variance Analysis)
             </td>
             <td class="section-info">
-                {{ $zg('*Expected Value နှင့် Checked Value နှိုင်းယှဉ်ချက်') }}
+                {{ $zg('*Customer ပေးရွှေ နှင့် Checked Value နှိုင်းယှဉ်ချက်') }}
             </td>
         </tr>
     </table>
@@ -408,10 +405,10 @@
                     {{ $zg('စစ်ဆေးချက်') }}
                 </th>
                 <th style="width: 22%; text-align: right;">
-                    Expected {{ $zg('ထက် ပိုသော ပမာဏ') }} (+)
+                    {{ $zg('Customer ပေးရွှေထက် ပိုသော ပမာဏ') }} (+)
                 </th>
                 <th style="width: 22%; text-align: right;">
-                    Expected {{ $zg('ထက် လျော့သော ပမာဏ') }} (-)
+                    {{ $zg('Customer ပေးရွှေထက် လျော့သော ပမာဏ') }} (-)
                 </th>
                 <th style="width: 22%; text-align: right;">
                     {{ $zg('အသားတင် ကွာဟချက်') }} (Balance)

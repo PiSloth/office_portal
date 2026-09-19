@@ -514,6 +514,13 @@
             justify-content: space-between;
             gap: 8px;
             line-height: 1.8;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .branch-item.clickable:hover {
+            background-color: #eff6ff;
         }
 
         .branch-badge {
@@ -527,6 +534,153 @@
             color: #1f2937;
             border: 1px solid #d1d5db;
             line-height: 1.5;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .branch-item.clickable:hover .branch-badge {
+            background: #dbeafe;
+            color: #1e40af;
+            border-color: #93c5fd;
+        }
+
+        /* Modal Styles */
+        .report-modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(17, 24, 39, 0.65);
+            backdrop-filter: blur(3px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .report-modal-content {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            width: 100%;
+            max-width: 1100px;
+            max-height: 86vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+
+        .dark .report-modal-content {
+            background: #18181b;
+            border-color: #27272a;
+            color: #f4f4f5;
+        }
+
+        .report-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .dark .report-modal-header {
+            background: #27272a;
+            border-color: #3f3f46;
+        }
+
+        .report-modal-close-btn {
+            background: transparent;
+            border: none;
+            font-size: 26px;
+            font-weight: 700;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 0 8px;
+            border-radius: 6px;
+            line-height: 1;
+        }
+
+        .report-modal-close-btn:hover {
+            color: #111827;
+            background: #e5e7eb;
+        }
+
+        .report-modal-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .report-modal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .report-modal-table th {
+            background: #f3f4f6;
+            color: #374151;
+            font-weight: 700;
+            padding: 10px 12px;
+            border-bottom: 2px solid #e5e7eb;
+            text-align: left;
+        }
+
+        .dark .report-modal-table th {
+            background: #27272a;
+            color: #d1d5db;
+            border-color: #3f3f46;
+        }
+
+        .report-modal-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+
+        .dark .report-modal-table td {
+            border-color: #27272a;
+        }
+
+        .report-modal-table tr:hover td {
+            background-color: #f9fafb;
+        }
+
+        .dark .report-modal-table tr:hover td {
+            background-color: #27272a;
+        }
+
+        .report-modal-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-top: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .dark .report-modal-footer {
+            background: #27272a;
+            border-color: #3f3f46;
+        }
+
+        .report-modal-btn-secondary {
+            padding: 6px 16px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #374151;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .report-modal-btn-secondary:hover {
+            background: #f3f4f6;
         }
 
         /* Sign-off Section */
@@ -865,11 +1019,8 @@
             
             {{-- Document Header --}}
             <div class="doc-header">
-                <div class="doc-pretitle">
-                    {{ $reportData['companyTitle'] ?? 'MAHAR JEWELRY & GOLD REPURCHASE' }}
-                </div>
                 <h1 class="doc-title">
-                    Repurchse Performance Analysis
+                    Repurchase Performance Analysis
                 </h1>
                 <div class="doc-subtitle-badge mm-font">
                     The report at within {{ $startDateText }} and {{ $endDateText }}
@@ -1023,10 +1174,18 @@
                                             @endif
 
                                             <td>
-                                                <div class="branch-item">
-                                                    <span style="font-weight: 500; color: #374151;">{{ $branchName }}</span>
-                                                    <span class="branch-badge">
-                                                        {{ number_format($bData['distinct_repurchase_count']) }} ကြိမ်
+                                                <div 
+                                                    class="branch-item clickable" 
+                                                    style="cursor: pointer;"
+                                                    wire:click="openDetailModal('{{ $group['field_name'] }}', '{{ addslashes($branchName) }}', 'all')"
+                                                    title="နှိပ်၍ အသေးစိတ် Customer စာရင်း ကြည့်ရှုပါ"
+                                                >
+                                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                                        <span style="font-weight: 600; color: #1e40af; text-decoration: underline; text-underline-offset: 3px;">{{ $branchName }}</span>
+                                                        <span style="font-size: 11px; color: #6b7280; font-weight: normal;">(အသေးစိတ်ကြည့်ရန် နှိပ်ပါ)</span>
+                                                    </div>
+                                                    <span class="branch-badge" style="cursor: pointer;">
+                                                        {{ number_format($bData['distinct_repurchase_count']) }} ကြိမ် 🔍
                                                     </span>
                                                 </div>
                                             </td>
@@ -1073,7 +1232,7 @@
                     </div>
                 </div>
                 <div class="section-info mm-font" style="font-style: italic; margin-top: -6px; margin-bottom: 10px;">
-                    *Expected Value (ထည့်သွင်းတန်ဖိုး) နှင့် Checked Value (စစ်ဆေးချက်တန်ဖိုး) နှိုင်းယှဉ်ချက်
+                    *Customer ပေးရွှေ (ထည့်သွင်းတန်ဖိုး) နှင့် Checked Value (စစ်ဆေးချက်တန်ဖိုး) နှိုင်းယှဉ်ချက်
                 </div>
 
                 <div style="overflow-x: auto;">
@@ -1084,10 +1243,10 @@
                                     စစ်ဆေးချက်
                                 </th>
                                 <th class="text-right" style="width: 24%;">
-                                    Expected ထက် ပိုသော ပမာဏ (+)
+                                    Customer ပေးရွှေထက် ပိုသော ပမာဏ (+)
                                 </th>
                                 <th class="text-right" style="width: 24%;">
-                                    Expected ထက် လျော့သော ပမာဏ (-)
+                                    Customer ပေးရွှေထက် လျော့သော ပမာဏ (-)
                                 </th>
                                 <th class="text-right" style="width: 24%;">
                                     အသားတင် ကွာဟချက် (Balance)
@@ -1128,9 +1287,15 @@
                                             @if(!empty($overBranches))
                                                 <div style="margin-top: 6px; padding: 6px 8px; border-top: 1px dashed #d1fae5; font-size: 11px; text-align: left; background: #f0fdf4; border-radius: 4px;">
                                                     @foreach($overBranches as $bName => $bData)
-                                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px;">
-                                                            <span style="color: #374151; font-weight: 500;">{{ $bName }}:</span>
-                                                            <span style="color: #047857; font-weight: 700; white-space: nowrap;">+{{ $fmt($bData['over_amount']) }}</span>
+                                                        <div 
+                                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background-color 0.15s;"
+                                                            onmouseover="this.style.backgroundColor='#dcfce7'"
+                                                            onmouseout="this.style.backgroundColor='transparent'"
+                                                            wire:click="openDetailModal('{{ $row['field_name'] }}', '{{ addslashes($bName) }}', 'over')"
+                                                            title="နှိပ်၍ ပိုသော အသေးစိတ် စာရင်းကြည့်ပါ"
+                                                        >
+                                                            <span style="color: #1e40af; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;">{{ $bName }}:</span>
+                                                            <span style="color: #047857; font-weight: 700; white-space: nowrap;">+{{ $fmt($bData['over_amount']) }} 🔍</span>
                                                         </div>
                                                     @endforeach
                                                 </div>
@@ -1152,9 +1317,15 @@
                                             @if(!empty($shortBranches))
                                                 <div style="margin-top: 6px; padding: 6px 8px; border-top: 1px dashed #fef3c7; font-size: 11px; text-align: left; background: #fffbeb; border-radius: 4px;">
                                                     @foreach($shortBranches as $bName => $bData)
-                                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px;">
-                                                            <span style="color: #374151; font-weight: 500;">{{ $bName }}:</span>
-                                                            <span style="color: #b45309; font-weight: 700; white-space: nowrap;">-{{ $fmt($bData['short_amount']) }}</span>
+                                                        <div 
+                                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background-color 0.15s;"
+                                                            onmouseover="this.style.backgroundColor='#fef3c7'"
+                                                            onmouseout="this.style.backgroundColor='transparent'"
+                                                            wire:click="openDetailModal('{{ $row['field_name'] }}', '{{ addslashes($bName) }}', 'short')"
+                                                            title="နှိပ်၍ လျော့သော အသေးစိတ် စာရင်းကြည့်ပါ"
+                                                        >
+                                                            <span style="color: #1e40af; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;">{{ $bName }}:</span>
+                                                            <span style="color: #b45309; font-weight: 700; white-space: nowrap;">-{{ $fmt($bData['short_amount']) }} 🔍</span>
                                                         </div>
                                                     @endforeach
                                                 </div>
@@ -1185,10 +1356,16 @@
                                                 <div style="margin-top: 6px; padding: 6px 8px; border-top: 1px dashed #e5e7eb; font-size: 11px; text-align: left; background: #f9fafb; border-radius: 4px;">
                                                     @foreach($activeBranches as $bName => $bData)
                                                         @php $bBal = $bData['net_balance']; @endphp
-                                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px;">
-                                                            <span style="color: #374151; font-weight: 500;">{{ $bName }}:</span>
+                                                        <div 
+                                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background-color 0.15s;"
+                                                            onmouseover="this.style.backgroundColor='#f3f4f6'"
+                                                            onmouseout="this.style.backgroundColor='transparent'"
+                                                            wire:click="openDetailModal('{{ $row['field_name'] }}', '{{ addslashes($bName) }}', 'all')"
+                                                            title="နှိပ်၍ အသေးစိတ် စာရင်းကြည့်ပါ"
+                                                        >
+                                                            <span style="color: #1e40af; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;">{{ $bName }}:</span>
                                                             <span style="font-weight: 700; white-space: nowrap; color: {{ $bBal > 0 ? '#047857' : ($bBal < 0 ? '#b91c1c' : '#4b5563') }};">
-                                                                {{ $bBal > 0 ? '+' : ($bBal < 0 ? '-' : '') }}{{ $fmt(abs($bBal)) }}
+                                                                {{ $bBal > 0 ? '+' : ($bBal < 0 ? '-' : '') }}{{ $fmt(abs($bBal)) }} 🔍
                                                             </span>
                                                         </div>
                                                     @endforeach
@@ -1230,4 +1407,170 @@
 
         </div>
     </div>
+
+    {{-- Drill-down Detail Modal --}}
+    @if($isDetailModalOpen)
+        <div 
+            class="report-modal-backdrop"
+            wire:click.self="closeDetailModal"
+            x-data
+            x-on:keydown.escape.window="$wire.closeDetailModal()"
+        >
+            <div class="report-modal-content mm-font">
+                {{-- Modal Header --}}
+                <div class="report-modal-header">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #111827;">
+                                {{ $modalFieldLabel }}
+                            </h2>
+                            <span style="background: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">
+                                {{ $modalBranchName }}
+                            </span>
+                            <span style="background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">
+                                စုစုပေါင်း: {{ count($modalRecords) }} မှု
+                            </span>
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                            ရက်စွဲ: {{ $startDateText }} မှ {{ $endDateText }} ထိ
+                            @if($modalVarianceType === 'over')
+                                &bull; <strong style="color: #059669;">Customer ပေးရွှေထက် ပိုသော စာရင်းများ</strong>
+                            @elseif($modalVarianceType === 'short')
+                                &bull; <strong style="color: #d97706;">Customer ပေးရွှေထက် လျော့သော စာရင်းများ</strong>
+                            @endif
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        wire:click="closeDetailModal"
+                        class="report-modal-close-btn"
+                        title="ပိတ်မည်"
+                    >
+                        &times;
+                    </button>
+                </div>
+
+                {{-- Modal Body --}}
+                <div class="report-modal-body">
+                    @if(empty($modalRecords))
+                        <div style="padding: 40px 20px; text-align: center; color: #6b7280; font-style: italic;">
+                            ကိုက်ညီသော အချက်အလက် မှတ်တမ်း မရှိပါ။
+                        </div>
+                    @else
+                        <div style="overflow-x: auto;">
+                            <table class="report-modal-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 36px; text-align: center;">စဉ်</th>
+                                        <th>PR နံပါတ်</th>
+                                        <th>Customer အမည် / ဖုန်း</th>
+                                        <th>စစ်ဆေးသူ</th>
+                                        <th style="text-align: right;">Customer ပေးရွှေ</th>
+                                        <th style="text-align: right;">စစ်ဆေးချက်</th>
+                                        <th style="text-align: right;">ကွာဟချက်</th>
+                                        <th>စစ်ဆေးချိန်</th>
+                                        <th>အခြေအနေ</th>
+                                        <th style="text-align: center; width: 90px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($modalRecords as $idx => $record)
+                                        @php
+                                            $firstFail = $record['failures'][0] ?? null;
+                                            $unit = $firstFail['unit'] ?? '';
+                                            $unitStr = $unit ? ' ' . $unit : '';
+                                            $diff = $firstFail['diff'] ?? null;
+                                        @endphp
+                                        <tr>
+                                            <td style="text-align: center; color: #6b7280; font-size: 12px;">
+                                                {{ $idx + 1 }}
+                                            </td>
+                                            <td style="font-weight: 600; white-space: nowrap; color: #1e40af;">
+                                                {{ $record['purchase_number'] }}
+                                            </td>
+                                            <td>
+                                                <div style="font-weight: 600; color: #111827;">{{ $record['customer_name'] }}</div>
+                                                <div style="font-size: 11px; color: #6b7280;">{{ $record['customer_phone'] }}</div>
+                                            </td>
+                                            <td style="color: #374151; font-weight: 500;">
+                                                {{ $firstFail['checked_by'] ?? '-' }}
+                                            </td>
+                                            <td style="text-align: right; font-weight: 500;">
+                                                {{ $firstFail ? $firstFail['expected_value'] . $unitStr : '-' }}
+                                            </td>
+                                            <td style="text-align: right; font-weight: 500;">
+                                                {{ $firstFail ? $firstFail['actual_value'] . $unitStr : '-' }}
+                                            </td>
+                                            <td style="text-align: right; font-weight: 700;">
+                                                @if($diff !== null)
+                                                    @if($diff > 0)
+                                                        <span style="color: #059669;">+{{ rtrim(rtrim(number_format($diff, 4), '0'), '.') }}{{ $unitStr }}</span>
+                                                    @elseif($diff < 0)
+                                                        <span style="color: #dc2626;">-{{ rtrim(rtrim(number_format(abs($diff), 4), '0'), '.') }}{{ $unitStr }}</span>
+                                                    @else
+                                                        <span style="color: #6b7280;">0{{ $unitStr }}</span>
+                                                    @endif
+                                                @else
+                                                    <span style="color: #dc2626; font-size: 11px;">မကိုက်ညီပါ</span>
+                                                @endif
+                                            </td>
+                                            <td style="font-size: 11px; color: #6b7280; white-space: nowrap;">
+                                                {{ $firstFail['checked_at'] ?? '-' }}
+                                            </td>
+                                            <td>
+                                                @if($record['decision_status'] === 'open')
+                                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #fef3c7; color: #92400e;">Open</span>
+                                                @else
+                                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #d1fae5; color: #065f46;">Closed</span>
+                                                @endif
+                                            </td>
+                                            <td style="text-align: center; white-space: nowrap;">
+                                                @if(!empty($record['view_url']))
+                                                    <a 
+                                                        href="{{ $record['view_url'] }}" 
+                                                        target="_blank"
+                                                        style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none;"
+                                                        onmouseover="this.style.background='#dbeafe'"
+                                                        onmouseout="this.style.background='#eff6ff'"
+                                                        title="Decision စာမျက်နှာကို Window အသစ်ဖြင့် ဖွင့်မည်"
+                                                    >
+                                                        အသေးစိတ် ↗
+                                                    </a>
+                                                @elseif(!empty($record['pr_url']))
+                                                    <a 
+                                                        href="{{ $record['pr_url'] }}" 
+                                                        target="_blank"
+                                                        style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none;"
+                                                        title="PR စာမျက်နှာကို Window အသစ်ဖြင့် ဖွင့်မည်"
+                                                    >
+                                                        PR ကြည့်မည် ↗
+                                                    </a>
+                                                @else
+                                                    <span style="color: #9ca3af;">-</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Modal Footer --}}
+                <div class="report-modal-footer">
+                    <div style="font-size: 12px; color: #6b7280;">
+                        💡 <strong>အသေးစိတ် ↗</strong> ကိုနှိပ်ပါက Decision အတည်ပြုချက် စာမျက်နှာသို့ သီးခြား tab/window ဖြင့် သွားရောက် ကြည့်ရှုနိုင်ပါသည်။
+                    </div>
+                    <button 
+                        type="button" 
+                        wire:click="closeDetailModal"
+                        class="report-modal-btn-secondary"
+                    >
+                        ပိတ်မည် (Close)
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </x-filament-panels::page>
