@@ -198,7 +198,7 @@ class EditPurchaseRequest extends EditRecord
                             $steps[] = \Filament\Schemas\Components\Wizard\Step::make("step_{$item->id}_{$rule->id}")
                                 ->label("Item #" . ($itemIndex + 1) . ": " . ($rule->label ?? $rule->field_name))
                                 ->schema($stepSchema)
-                                ->afterValidation(function (\Filament\Schemas\Components\Utilities\Get $get) use ($item, $rule) {
+                                ->afterValidation(function (\Filament\Schemas\Components\Utilities\Get $get) use ($item, $rule, $record, $transition) {
                                     $validationManager = new \App\Modules\Core\Validation\Services\ValidationManager();
                                     $expectedValue = $validationManager->resolveExpectedValue($rule->expected_source ?: $rule->field_name, $item);
                                     $remarks = $get("remarks_{$item->id}_{$rule->id}");
