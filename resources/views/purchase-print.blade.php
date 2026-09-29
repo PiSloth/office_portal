@@ -408,21 +408,34 @@
                             $productName = $inputs['product_name'] ?? '-';
                             $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
                             $qty = $inputs['quantity'] ?? 1;
-                            $weightGram = ($inputs['goldWeightGram'] ?? '0') . ' g';
                             $k = $inputs['kyat'] ?? 0;
                             $p = $inputs['pae'] ?? 0;
                             $y = $inputs['yawe'] ?? 0;
                             $weightKpy = "{$k}ကျပ် {$p}ပဲ {$y}ရွေး";
                             $remark = $inputs['remark'] ?? '';
+
+                            $kyaukWeight = (float) ($inputs['kyaukWeight'] ?? 0);
+                            $goldWeightGram = (float) ($inputs['goldWeightGram'] ?? 0);
+                            if ($goldWeightGram == 0 && (!empty($inputs['kyat']) || !empty($inputs['pae']) || !empty($inputs['yawe']))) {
+                                $goldWeightGram = (($k * 1) + ($p / 16) + ($y / 128)) * 16.606;
+                            }
+
+                            if ($kyaukWeight > 0) {
+                                $kyaukWeightGram = ($kyaukWeight / 128) * 16.606;
+                                $netWeightGram = max(0, $goldWeightGram - $kyaukWeightGram);
+                                $weightDisplay = 'Net: ' . number_format($netWeightGram, 2) . ' g, ကျောက်: ' . number_format($kyaukWeightGram, 2) . ' g';
+                            } else {
+                                $weightDisplay = ($inputs['goldWeightGram'] ?? '0') . ' g';
+                            }
                         @endphp
                         <div class="checklist-item">
                             <div class="checkbox"></div>
                             <div class="checklist-details">
                                 <div class="checklist-name">
-                                    {{ $productName }} ({{ $weightGram }})
                                     <span style="float: right; font-weight: bold; border: 1px solid #9ca3af; padding: 0px 3px; border-radius: 2px;">
                                         {{ ($inputs['is_good'] ?? false) ? 'ရ' : 'မရ' }}
                                     </span>
+                                    {{ $productName }} ({{ $weightDisplay }})
                                 </div>
                                 <div class="checklist-sub">Qty: {{ $qty }} | {{ $goldGrade }}</div>
                                 <div class="checklist-sub">{{ $weightKpy }}</div>
