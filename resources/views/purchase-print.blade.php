@@ -324,17 +324,39 @@
                                 $inputs = $item->dynamic_fields_json ?? [];
                                 $productName = $inputs['product_name'] ?? '-';
                                 $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
-                                $weightGram = ($inputs['goldWeightGram'] ?? '0') . ' g';
-                                $k = $inputs['kyat'] ?? 0;
-                                $p = $inputs['pae'] ?? 0;
-                                $y = $inputs['yawe'] ?? 0;
-                                $weightKpy = "{$k}ကျပ် {$p}ပဲ {$y}ရွေး";
                                 $qty = $inputs['quantity'] ?? 1;
                                 $price = number_format($item->calculated_price) . ' MMK';
+
+                                $netCalc = \App\Modules\Core\Calculation\Strategies\JewelryCalculator::calculateNetWeight($inputs);
+
+                                if ($netCalc['has_kyauk']) {
+                                    $weightGram = $netCalc['net_gram'] . ' g';
+                                    $weightKpy = $netCalc['net_kpy'];
+                                } else {
+                                    $weightGram = ($inputs['goldWeightGram'] ?? '0') . ' g';
+                                    $k = $inputs['kyat'] ?? 0;
+                                    $p = $inputs['pae'] ?? 0;
+                                    $y = $inputs['yawe'] ?? 0;
+                                    $weightKpy = "{$k}ကျပ် {$p}ပဲ {$y}ရွေး";
+                                }
                             @endphp
                             <tr>
-                                <td><strong>{{ $productName }}</strong></td>
-                                <td>{{ $weightGram }}</td>
+                                <td>
+                                    <strong>{{ $productName }}</strong>
+                                    @if ($netCalc['has_kyauk'])
+                                        <div style="font-size: 7.5px; color: #4b5563;">
+                                            (Net: {{ $netCalc['net_gram'] }} g, ကျောက်: {{ $netCalc['kyauk_weight_gram'] }} g)
+                                        </div>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($netCalc['has_kyauk'])
+                                        <div>{{ $netCalc['net_gram'] }} g</div>
+                                        <div style="font-size: 7.5px; color: #6b7280;">(ကျောက်: {{ $netCalc['kyauk_weight_gram'] }} g)</div>
+                                    @else
+                                        {{ $weightGram }}
+                                    @endif
+                                </td>
                                 <td>{{ $weightKpy }}</td>
                                 <td>{{ $goldGrade }}</td>
                                 <td>{{ $qty }}</td>
@@ -408,24 +430,19 @@
                             $productName = $inputs['product_name'] ?? '-';
                             $goldGrade = ($inputs['goldList'] ?? '-') . ' ပဲ';
                             $qty = $inputs['quantity'] ?? 1;
-                            $k = $inputs['kyat'] ?? 0;
-                            $p = $inputs['pae'] ?? 0;
-                            $y = $inputs['yawe'] ?? 0;
-                            $weightKpy = "{$k}ကျပ် {$p}ပဲ {$y}ရွေး";
                             $remark = $inputs['remark'] ?? '';
 
-                            $kyaukWeight = (float) ($inputs['kyaukWeight'] ?? 0);
-                            $goldWeightGram = (float) ($inputs['goldWeightGram'] ?? 0);
-                            if ($goldWeightGram == 0 && (!empty($inputs['kyat']) || !empty($inputs['pae']) || !empty($inputs['yawe']))) {
-                                $goldWeightGram = (($k * 1) + ($p / 16) + ($y / 128)) * 16.606;
-                            }
+                            $netCalc = \App\Modules\Core\Calculation\Strategies\JewelryCalculator::calculateNetWeight($inputs);
 
-                            if ($kyaukWeight > 0) {
-                                $kyaukWeightGram = ($kyaukWeight / 128) * 16.606;
-                                $netWeightGram = max(0, $goldWeightGram - $kyaukWeightGram);
-                                $weightDisplay = 'Net: ' . number_format($netWeightGram, 2) . ' g, ကျောက်: ' . number_format($kyaukWeightGram, 2) . ' g';
+                            if ($netCalc['has_kyauk']) {
+                                $weightDisplay = 'Net: ' . $netCalc['net_gram'] . ' g, ကျောက်: ' . $netCalc['kyauk_weight_gram'] . ' g';
+                                $weightKpy = $netCalc['net_kpy'];
                             } else {
                                 $weightDisplay = ($inputs['goldWeightGram'] ?? '0') . ' g';
+                                $k = $inputs['kyat'] ?? 0;
+                                $p = $inputs['pae'] ?? 0;
+                                $y = $inputs['yawe'] ?? 0;
+                                $weightKpy = "{$k}ကျပ် {$p}ပဲ {$y}ရွေး";
                             }
                         @endphp
                         <div class="checklist-item">

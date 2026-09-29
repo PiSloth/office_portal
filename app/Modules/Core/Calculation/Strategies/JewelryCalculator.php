@@ -159,6 +159,65 @@ class JewelryCalculator implements CalculatorContract
     }
 
     /**
+     * Calculate net weight and KPY inspired by Step 1 of calculation modal.
+     *
+     * @param array $inputs
+     * @param array|null $parameters
+     * @return array
+     */
+    public static function calculateNetWeight(array $inputs, ?array $parameters = null): array
+    {
+        $gramPerKyat = (float) ($parameters['gram_per_kyat'] ?? 16.606);
+        if ($gramPerKyat <= 0) {
+            $gramPerKyat = 16.606;
+        }
+
+        $goldList = (string) ($inputs['goldList'] ?? '16');
+        $purchaseType = $inputs['purchase_type'] ?? 'gb_product';
+        $kyat = (float) ($inputs['kyat'] ?? 0);
+        $pae = (float) ($inputs['pae'] ?? 0);
+        $yawe = (float) ($inputs['yawe'] ?? 0);
+        $kyaukWeightYawe = (float) ($inputs['kyaukWeight'] ?? 0);
+        $goldWeightGram = (float) ($inputs['goldWeightGram'] ?? 0);
+
+        $kyaukWeightGram = ($kyaukWeightYawe / 128) * $gramPerKyat;
+
+        if ($goldList == '12' && $purchaseType === 'gb_product') {
+            $grossGram = $goldWeightGram > 0 ? $goldWeightGram : ((($kyat * 1) + ($pae / 16) + ($yawe / 128)) * $gramPerKyat);
+        } else {
+            if ($goldWeightGram > 0 && $kyat == 0 && $pae == 0 && $yawe == 0) {
+                $grossGram = $goldWeightGram;
+            } else {
+                $grossGram = (($kyat * 1) + ($pae / 16) + ($yawe / 128)) * $gramPerKyat;
+            }
+        }
+
+        $netGram = max(0, $grossGram - $kyaukWeightGram);
+        $totalWeightKyat = $netGram / $gramPerKyat;
+
+        $kKyat = floor($totalWeightKyat);
+        $remKyat = $totalWeightKyat - $kKyat;
+        $tPae = $remKyat * 16;
+        $kPae = floor($tPae);
+        $remPae = $tPae - $kPae;
+        $kYawe = round($remPae * 8, 2);
+        $netKpyString = "{$kKyat}ကျပ် {$kPae}ပဲ {$kYawe}ရွေး";
+
+        $grossKpyString = "{$kyat}ကျပ် {$pae}ပဲ {$yawe}ရွေး";
+
+        return [
+            'has_kyauk' => $kyaukWeightYawe > 0,
+            'gross_gram' => round($grossGram, 4),
+            'kyauk_weight_yawe' => $kyaukWeightYawe,
+            'kyauk_weight_gram' => round($kyaukWeightGram, 4),
+            'net_gram' => round($netGram, 4),
+            'total_weight_kyat' => round($totalWeightKyat, 6),
+            'net_kpy' => $netKpyString,
+            'gross_kpy' => $grossKpyString,
+        ];
+    }
+
+    /**
      * Generate step-by-step calculation breakdown data and HTML for verification.
      */
     public static function renderStepsHtml(array $inputs, array $parameters): string

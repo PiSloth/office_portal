@@ -48,12 +48,46 @@ class PurchasePrintViewTest extends TestCase
         $html = view('purchase-print', ['record' => $request])->render();
 
         $this->assertStringContainsString('Diamond Ring', $html);
-        // Kyauk: 4 / 128 * 16.606 = 0.52 g
-        // Net: 10 - 0.5189 = 9.48 g
-        $this->assertStringContainsString('Net: 9.48 g', $html);
-        $this->assertStringContainsString('ကျောက်: 0.52 g', $html);
+        $this->assertStringContainsString('Net: 9.4811 g', $html);
+        $this->assertStringContainsString('ကျောက်: 0.5189 g', $html);
 
         // Plain ring should show original weight
         $this->assertStringContainsString('Plain Ring (5.5 g)', $html);
+    }
+
+    public function test_purchase_print_view_net_weight_and_kpy_matching_calculation_step_modal()
+    {
+        $request = new PurchaseRequest();
+        $request->id = 2;
+        $request->purchase_number = 'PR-B5/260920044';
+        $request->customer_name = 'Customer';
+        $request->created_at = now();
+
+        $item = new PurchaseItem();
+        $item->id = 10;
+        $item->calculated_price = 653700;
+        $item->dynamic_fields_json = [
+            'product_name' => 'ပုံဆန်းကျောက်နားကပ်',
+            'goldList' => '14.2',
+            'purchase_type' => 'gb_product',
+            'kyat' => 0,
+            'pae' => 1,
+            'yawe' => 2.483,
+            'goldWeightGram' => 1.36,
+            'kyaukWeight' => 1.3,
+            'quantity' => 1,
+            'is_good' => false,
+            'remark' => 'ပုံဆန်းကျောက်နားကပ် 1pcs',
+        ];
+        $item->setRelation('validationHistories', collect([]));
+
+        $request->setRelation('items', collect([$item]));
+
+        $html = view('purchase-print', ['record' => $request])->render();
+
+        $this->assertStringContainsString('ပုံဆန်းကျောက်နားကပ်', $html);
+        $this->assertStringContainsString('Net: 1.1914 g', $html);
+        $this->assertStringContainsString('ကျောက်: 0.1687 g', $html);
+        $this->assertStringContainsString('0ကျပ် 1ပဲ 1.18ရွေး', $html);
     }
 }
