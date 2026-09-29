@@ -1511,7 +1511,12 @@ class PurchaseRequestResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('purchase_number')
                     ->label('Purchase No')
-                    ->searchable()
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->where('purchase_number', 'like', "%{$search}%")
+                                ->orWhere('id', 'like', "%{$search}%");
+                        });
+                    })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('branch.name')
                     ->searchable(),
@@ -1520,7 +1525,14 @@ class PurchaseRequestResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('customer_name')
-                    ->searchable(),
+                    ->label('Customer Name')
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->where('customer_name', 'like', "%{$search}%")
+                                ->orWhere('customer_phone', 'like', "%{$search}%")
+                                ->orWhere('customer_nrc', 'like', "%{$search}%");
+                        });
+                    }),
                 Tables\Columns\TextColumn::make('workflowState.name')
                     ->badge()
                     ->sortable(),
@@ -1543,6 +1555,53 @@ class PurchaseRequestResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\Filter::make('purchase_number')
+                    ->label('Purchase Number')
+                    ->form([
+                        Forms\Components\TextInput::make('purchase_number')
+                            ->label('Purchase Number')
+                            ->placeholder('e.g. PR-MAIN/260711001 or ID'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!empty($data['purchase_number'])) {
+                            $search = trim($data['purchase_number']);
+                            return $query->where(function ($sub) use ($search) {
+                                $sub->where('purchase_number', 'like', "%{$search}%")
+                                    ->orWhere('id', 'like', "%{$search}%");
+                            });
+                        }
+                        return $query;
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (!empty($data['purchase_number'])) {
+                            return 'Purchase No: ' . $data['purchase_number'];
+                        }
+                        return null;
+                    }),
+                Tables\Filters\Filter::make('customer')
+                    ->label('Customer Name')
+                    ->form([
+                        Forms\Components\TextInput::make('customer_search')
+                            ->label('Customer Name')
+                            ->placeholder('Name, Phone, or NRC'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!empty($data['customer_search'])) {
+                            $search = trim($data['customer_search']);
+                            return $query->where(function ($sub) use ($search) {
+                                $sub->where('customer_name', 'like', "%{$search}%")
+                                    ->orWhere('customer_phone', 'like', "%{$search}%")
+                                    ->orWhere('customer_nrc', 'like', "%{$search}%");
+                            });
+                        }
+                        return $query;
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (!empty($data['customer_search'])) {
+                            return 'Customer: ' . $data['customer_search'];
+                        }
+                        return null;
+                    }),
                 Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Branch')
                     ->options(\App\Models\Branch::pluck('name', 'id'))
@@ -1626,6 +1685,7 @@ class PurchaseRequestResource extends Resource
                         }
                     }),
                 Tables\Filters\Filter::make('created_at')
+                    ->label('Date Range')
                     ->form([
                         Forms\Components\DatePicker::make('created_from')
                             ->label('Start Date')
@@ -1644,9 +1704,22 @@ class PurchaseRequestResource extends Resource
                                 $data['created_until'],
                                 fn(Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
                             );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if (!empty($data['created_from'])) {
+                            $indicators['created_from'] = 'From: ' . \Carbon\Carbon::parse($data['created_from'])->toFormattedDateString();
+                        }
+                        if (!empty($data['created_until'])) {
+                            $indicators['created_until'] = 'Until: ' . \Carbon\Carbon::parse($data['created_until'])->toFormattedDateString();
+                        }
+                        return $indicators;
                     }),
                 Tables\Filters\TrashedFilter::make(),
             ])
+            ->filtersFormColumns(2)
+            ->searchPlaceholder('Search Purchase No, Customer, Branch...')
+            ->searchDebounce('500ms')
             ->actions([
                 \Filament\Actions\Action::make('view_history')
                     ->label('History')
