@@ -349,7 +349,18 @@ class RepurchaseCheckHistoryExportService
             if (method_exists($source, 'loadMissing')) {
                 $source->loadMissing($relations);
             }
-            return $source;
+
+            if ($startDate) {
+                $startBound = Carbon::parse($startDate)->startOfDay();
+                $source = $source->filter(fn ($pr) => $pr->created_at && Carbon::parse($pr->created_at)->gte($startBound));
+            }
+
+            if ($endDate) {
+                $endBound = Carbon::parse($endDate)->endOfDay();
+                $source = $source->filter(fn ($pr) => $pr->created_at && Carbon::parse($pr->created_at)->lte($endBound));
+            }
+
+            return $source->values();
         }
 
         $query = $source instanceof Builder
@@ -372,17 +383,11 @@ class RepurchaseCheckHistoryExportService
         }
 
         if ($startDate) {
-            $query->where(function ($q) use ($startDate) {
-                $q->whereDate('created_at', '>=', $startDate)
-                    ->orWhereHas('items.validationHistories', fn ($vq) => $vq->whereDate('created_at', '>=', $startDate));
-            });
+            $query->whereDate('created_at', '>=', $startDate);
         }
 
         if ($endDate) {
-            $query->where(function ($q) use ($endDate) {
-                $q->whereDate('created_at', '<=', $endDate)
-                    ->orWhereHas('items.validationHistories', fn ($vq) => $vq->whereDate('created_at', '<=', $endDate));
-            });
+            $query->whereDate('created_at', '<=', $endDate);
         }
 
         return $query->orderByDesc('id')->get();

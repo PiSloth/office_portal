@@ -280,5 +280,15 @@ class RepurchaseCheckHistoryExportServiceTest extends TestCase
         $this->assertSame('Inv Validate unagree', RepurchaseCheckHistoryExportService::resolveWhoUnagree('false', 'false', 'true'));
         $this->assertSame('-', RepurchaseCheckHistoryExportService::resolveWhoUnagree('true', 'true', 'true'));
         $this->assertSame('-', RepurchaseCheckHistoryExportService::resolveWhoUnagree('true', 'false', null));
+
+        // Date Filter assertions (PR created_at is 2026-10-01)
+        $matchingRows = $service->buildReportRows(collect([$pr]), '2026-10-01', '2026-10-05');
+        $this->assertCount(4, $matchingRows);
+
+        $excludedByStartRows = $service->buildReportRows(collect([$pr]), '2026-10-02', '2026-10-05');
+        $this->assertCount(0, $excludedByStartRows);
+
+        $excludedByEndRows = $service->buildReportRows(collect([$pr]), '2026-09-01', '2026-09-30');
+        $this->assertCount(0, $excludedByEndRows);
     }
 }
