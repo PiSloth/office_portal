@@ -923,6 +923,19 @@ class DecisionReport extends Page
         ]);
     }
 
+    public function exportCheckedHistoryExcel(): StreamedResponse
+    {
+        $service = new \App\Services\RepurchaseCheckHistoryExportService();
+
+        return $service->downloadExcel(
+            null,
+            $this->startDate,
+            $this->endDate,
+            $this->selectedState,
+            $this->toleranceField
+        );
+    }
+
     public function openDetailModal(string $fieldKey, string $branchName, string $varianceType = 'all'): void
     {
         $this->modalFieldKey = $fieldKey;

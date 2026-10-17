@@ -183,6 +183,7 @@ class EditPurchaseRequest extends EditRecord
                                             $record->items->pluck('id')->toArray()
                                         )
                                             ->where('validatable_type', \App\Modules\Purchase\Models\PurchaseItem::class)
+                                            ->when($record->workflow_state_id, fn ($q) => $q->where('workflow_state_id', $record->workflow_state_id))
                                             ->delete();
 
                                         \Filament\Notifications\Notification::make()

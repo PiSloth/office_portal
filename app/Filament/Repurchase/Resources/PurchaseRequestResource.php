@@ -1815,6 +1815,14 @@ class PurchaseRequestResource extends Resource
             ->defaultSort('id', 'desc')
             ->bulkActions([
                 \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\BulkAction::make('export_checked_history_excel')
+                        ->label('Export Checked History to Excel')
+                        ->icon('heroicon-o-clipboard-document-check')
+                        ->color('primary')
+                        ->action(function (\Illuminate\Support\Collection $records) {
+                            $service = new \App\Services\RepurchaseCheckHistoryExportService();
+                            return $service->downloadExcel($records);
+                        }),
                     \Filament\Actions\BulkAction::make('export_items_excel')
                         ->label('Export Selected Items to Excel')
                         ->icon('heroicon-o-document-arrow-down')

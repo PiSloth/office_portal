@@ -47,6 +47,36 @@ class ListPurchaseRequests extends ListRecords
                     
                     $this->js("window.open('" . route('purchase-requests.report.print') . '?' . $queryParams . "', '_blank')");
                 }),
+            Actions\Action::make('export_checked_history')
+                ->label('Export Checked History (Excel)')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('primary')
+                ->modalHeading('Export Field Checked History to Excel')
+                ->modalWidth('lg')
+                ->form([
+                    \Filament\Forms\Components\Select::make('branch_id')
+                        ->label('Branch Name')
+                        ->options(\App\Models\Branch::pluck('name', 'id'))
+                        ->placeholder('All Branches'),
+                    \Filament\Forms\Components\DatePicker::make('start_date')
+                        ->label('Start Date')
+                        ->default(now()->startOfMonth()),
+                    \Filament\Forms\Components\DatePicker::make('end_date')
+                        ->label('End Date')
+                        ->default(now()),
+                ])
+                ->action(function (array $data) {
+                    $query = \App\Modules\Purchase\Models\PurchaseRequest::query();
+                    if (! empty($data['branch_id'])) {
+                        $query->where('branch_id', $data['branch_id']);
+                    }
+                    $service = new \App\Services\RepurchaseCheckHistoryExportService();
+                    return $service->downloadExcel(
+                        $query,
+                        $data['start_date'] ?? null,
+                        $data['end_date'] ?? null
+                    );
+                }),
             Actions\CreateAction::make(),
         ];
     }
