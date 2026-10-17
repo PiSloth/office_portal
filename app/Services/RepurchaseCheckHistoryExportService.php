@@ -63,6 +63,7 @@ class RepurchaseCheckHistoryExportService
     {
         return [
             'Branch Name',
+            'Created At',
             'Customer Name',
             'Purchase Number',
             'Inventory Name',
@@ -72,7 +73,11 @@ class RepurchaseCheckHistoryExportService
             'Inv Validate',
             'Duration (Verify - Supervisor Check)',
             'Duration (Supervisor Check - Inv Validate)',
+            'Total Lead Day',
+            'Late Check',
+            'Pickup Remark',
             'QC Profit',
+            'Who Unagree',
             'Status',
         ];
     }
@@ -95,6 +100,7 @@ class RepurchaseCheckHistoryExportService
 
         foreach ($purchaseRequests as $pr) {
             $branchName = $pr->branch?->name ?: ($pr->branch?->code ?: 'N/A');
+            $createdAtDate = $pr->created_at ? Carbon::parse($pr->created_at)->format('Y-m-d') : '-';
             $customerName = $pr->customer_name ?: '-';
             $purchaseNumber = $pr->purchase_number ?: "PR-{$pr->id}";
 
@@ -182,35 +188,35 @@ class RepurchaseCheckHistoryExportService
                         $verifyDisplay = ($rawExpected !== null && $rawExpected !== '') ? (string) $rawExpected : '-';
                     }
 
-                    // 2. Resolve Input Value for "Supervisor Check" column
-                    $supDisplay = '-';
+                    // 2. Resolve Input Value for "Supervisor Check" column (show "Pending" if no value)
+                    $supDisplay = 'Pending';
                     $supBool = null;
                     if ($supHistory) {
                         if ($isBoolean) {
                             $supBool = self::resolveHistoryBooleanInput($supHistory, $verifyDisplay);
-                            $supDisplay = $supBool ?? '-';
+                            $supDisplay = $supBool ?? 'Pending';
                         } else {
                             $supDisplay = ($supHistory->input_value !== null && $supHistory->input_value !== '')
                                 ? (string) $supHistory->input_value
-                                : ($supHistory->status ?: '-');
+                                : 'Pending';
                         }
                     }
 
-                    // 3. Resolve Input Value for "Inv Validate" column
-                    $invDisplay = '-';
+                    // 3. Resolve Input Value for "Inv Validate" column (show "Pending" if no value)
+                    $invDisplay = 'Pending';
                     $invBool = null;
                     if ($invHistory) {
                         if ($isBoolean) {
                             $invBool = self::resolveHistoryBooleanInput($invHistory, $verifyDisplay);
-                            $invDisplay = $invBool ?? '-';
+                            $invDisplay = $invBool ?? 'Pending';
                         } else {
                             $invDisplay = ($invHistory->input_value !== null && $invHistory->input_value !== '')
                                 ? (string) $invHistory->input_value
-                                : ($invHistory->status ?: '-');
+                                : 'Pending';
                         }
                     }
 
-                    // 4. Calculate Durations in Days
+                    // 4. Calculate Durations in Days, Total Lead Day, Late Check & Pickup Remark
                     $verifyTimestamp = $verifyHistory?->created_at
                         ?? $pr->submitted_at
                         ?? $item->created_at
@@ -218,11 +224,29 @@ class RepurchaseCheckHistoryExportService
                     $supTimestamp = $supHistory?->created_at;
                     $invTimestamp = $invHistory?->created_at;
 
-                    $durationVerifyToSup = self::formatDurationDays($verifyTimestamp, $supTimestamp);
-                    $durationSupToInv = self::formatDurationDays($supTimestamp, $invTimestamp);
+                    $daysVerifyToSup = self::calculateDurationDaysInt($verifyTimestamp, $supTimestamp);
+                    $daysSupToInv = self::calculateDurationDaysInt($supTimestamp, $invTimestamp);
 
-                    // 5. Calculate QC Profit for Boolean fields (false -> true = good, true -> false = Loss)
+                    $durationVerifyToSup = self::formatDaysLabel($daysVerifyToSup);
+                    $durationSupToInv = self::formatDaysLabel($daysSupToInv);
+
+                    $totalLeadDaysInt = ($daysVerifyToSup !== null && $daysSupToInv !== null)
+                        ? ($daysVerifyToSup + $daysSupToInv)
+                        : null;
+                    $totalLeadDay = self::formatDaysLabel($totalLeadDaysInt);
+
+                    $lateCheck = '-';
+                    if ($daysVerifyToSup !== null) {
+                        $lateCheck = $daysVerifyToSup > 0 ? 'true' : 'false';
+                    }
+
+                    $pickupRemark = ($lateCheck === 'true' && $daysSupToInv === 0)
+                        ? 'Same day with pickup'
+                        : '-';
+
+                    // 5. Calculate QC Profit & Who Unagree for Boolean fields
                     $qcProfit = '-';
+                    $whoUnagree = '-';
                     if ($isBoolean) {
                         // Compare Expected (Verify) against the latest checked stage input (Inv Validate -> Supervisor Check -> Verify Input)
                         $verifyInputBool = $verifyHistory ? self::resolveHistoryBooleanInput($verifyHistory, $verifyDisplay) : null;
@@ -233,6 +257,8 @@ class RepurchaseCheckHistoryExportService
                         } elseif ($verifyDisplay === 'true' && $latestCheckedBool === 'false') {
                             $qcProfit = 'Loss';
                         }
+
+                        $whoUnagree = self::resolveWhoUnagree($verifyDisplay, $supBool, $invBool);
                     }
 
                     // 6. Resolve Pass/Fail Status (Final Column)
@@ -240,6 +266,7 @@ class RepurchaseCheckHistoryExportService
 
                     $rows[] = [
                         'branch_name' => $branchName,
+                        'created_at' => $createdAtDate,
                         'customer_name' => $customerName,
                         'purchase_number' => $purchaseNumber,
                         'inventory_name' => $inventoryName,
@@ -249,7 +276,11 @@ class RepurchaseCheckHistoryExportService
                         'inv_validate' => $invDisplay,
                         'duration_verify_to_supervisor' => $durationVerifyToSup,
                         'duration_supervisor_to_inv' => $durationSupToInv,
+                        'total_lead_day' => $totalLeadDay,
+                        'late_check' => $lateCheck,
+                        'pickup_remark' => $pickupRemark,
                         'qc_profit' => $qcProfit,
+                        'who_unagree' => $whoUnagree,
                         'status' => $status,
                     ];
                 }
@@ -257,6 +288,43 @@ class RepurchaseCheckHistoryExportService
         }
 
         return $rows;
+    }
+
+    /**
+     * Identify which of the 3 members (Cashier / Supervisor / Inv Validate) disagrees with the other 2
+     * on a boolean check field.
+     */
+    public static function resolveWhoUnagree(?string $verifyBool, ?string $supBool, ?string $invBool): string
+    {
+        if (
+            ! in_array($verifyBool, ['true', 'false'], true) ||
+            ! in_array($supBool, ['true', 'false'], true) ||
+            ! in_array($invBool, ['true', 'false'], true)
+        ) {
+            return '-';
+        }
+
+        // All 3 agree
+        if ($verifyBool === $supBool && $supBool === $invBool) {
+            return '-';
+        }
+
+        // Supervisor disagrees with Cashier (Verify) and Inv Validate (e.g. true, false, true OR false, true, false)
+        if ($verifyBool === $invBool && $supBool !== $verifyBool) {
+            return 'Supervisor unagree';
+        }
+
+        // Cashier (Verify) disagrees with Supervisor and Inv Validate (e.g. false, true, true OR true, false, false)
+        if ($supBool === $invBool && $verifyBool !== $supBool) {
+            return 'Cashier unagree';
+        }
+
+        // Inv Validate disagrees with Cashier (Verify) and Supervisor (e.g. true, true, false OR false, false, true)
+        if ($verifyBool === $supBool && $invBool !== $verifyBool) {
+            return 'Inv Validate unagree';
+        }
+
+        return '-';
     }
 
     /**
@@ -486,23 +554,42 @@ class RepurchaseCheckHistoryExportService
     }
 
     /**
-     * Format duration between two timestamps in days (e.g. "2 Days", "1 Day", "0 Day").
+     * Calculate duration between two timestamps in integer calendar days.
      */
-    public static function formatDurationDays($from, $to): string
+    public static function calculateDurationDaysInt($from, $to): ?int
     {
         if (! $from || ! $to) {
-            return '-';
+            return null;
         }
 
         try {
             $start = Carbon::parse($from)->startOfDay();
             $end = Carbon::parse($to)->startOfDay();
-            $days = (int) abs($end->diffInDays($start));
 
-            return $days . ' ' . ($days <= 1 ? 'Day' : 'Days');
+            return (int) abs($end->diffInDays($start));
         } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Format integer day count as label (e.g. "2 Days", "1 Day", "0 Day", or "-").
+     */
+    public static function formatDaysLabel(?int $days): string
+    {
+        if ($days === null) {
             return '-';
         }
+
+        return $days . ' ' . ($days <= 1 ? 'Day' : 'Days');
+    }
+
+    /**
+     * Format duration between two timestamps in days (e.g. "2 Days", "1 Day", "0 Day").
+     */
+    public static function formatDurationDays($from, $to): string
+    {
+        return self::formatDaysLabel(self::calculateDurationDaysInt($from, $to));
     }
 
     /**
