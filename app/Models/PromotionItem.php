@@ -37,7 +37,7 @@ class PromotionItem extends Model
     ];
 
     /**
-     * Scope query to search by barcode or lot/serial number.
+     * Scope query to search by barcode, lot/serial number, or voucher reference number.
      */
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
@@ -49,7 +49,10 @@ class PromotionItem extends Model
 
         return $query->where(function (Builder $q) use ($term) {
             $q->where('barcode', 'like', "%{$term}%")
-              ->orWhere('lot_serial_number', 'like', "%{$term}%");
+              ->orWhere('lot_serial_number', 'like', "%{$term}%")
+              ->orWhereHas('soldItem', function (Builder $sq) use ($term) {
+                  $sq->where('reference_number', 'like', "%{$term}%");
+              });
         });
     }
 

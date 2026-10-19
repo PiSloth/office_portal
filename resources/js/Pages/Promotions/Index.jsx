@@ -19,7 +19,10 @@ import {
     Sparkles,
     Trash2,
     Copy,
-    Tag
+    Tag,
+    Building2,
+    CheckSquare,
+    Square
 } from 'lucide-react';
 
 const ALL_COLUMNS = [
@@ -39,10 +42,21 @@ const ALL_COLUMNS = [
     { key: 'actions', label: 'Actions / လုပ်ဆောင်ချက်', defaultVisible: true },
 ];
 
-export default function Index({ items, filters, canImport, latestGoldPrice = 0, latestPriceHistoryId = null, latestPriceUpdatedAt = null, importErrors = [] }) {
+export default function Index({ 
+    items, 
+    branches = [], 
+    filters = {}, 
+    canImport, 
+    latestGoldPrice = 0, 
+    latestPriceHistoryId = null, 
+    latestPriceUpdatedAt = null, 
+    importErrors = [] 
+}) {
     const { flash, auth } = usePage().props;
     const currentUser = auth?.user;
     const [search, setSearch] = useState(filters.search || '');
+    const [selectedBranchId, setSelectedBranchId] = useState(filters.branch_id || '');
+    const [selectedSoldStatus, setSelectedSoldStatus] = useState(filters.sold_status || 'all');
     const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [uploadFile, setUploadFile] = useState(null);
@@ -188,20 +202,50 @@ export default function Index({ items, filters, canImport, latestGoldPrice = 0, 
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Apply filters helper
+    const applyFilters = (newParams) => {
+        const queryParams = {
+            search: search || undefined,
+            branch_id: selectedBranchId || undefined,
+            sold_status: selectedSoldStatus !== 'all' ? selectedSoldStatus : undefined,
+            ...newParams,
+        };
+
+        // Remove undefined / empty values
+        Object.keys(queryParams).forEach((k) => {
+            if (queryParams[k] === undefined || queryParams[k] === '' || queryParams[k] === 'all') {
+                delete queryParams[k];
+            }
+        });
+
+        router.get('/promotions', queryParams, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
     // Live debounced search
     useEffect(() => {
         const timer = setTimeout(() => {
             if (search !== (filters.search || '')) {
-                router.get(
-                    '/promotions',
-                    { search: search || undefined },
-                    { preserveState: true, replace: true }
-                );
+                applyFilters({ search: search || undefined });
             }
         }, 350);
 
         return () => clearTimeout(timer);
     }, [search]);
+
+    const handleBranchChange = (e) => {
+        const branchId = e.target.value;
+        setSelectedBranchId(branchId);
+        applyFilters({ branch_id: branchId || undefined });
+    };
+
+    const handleToggleSoldStatus = () => {
+        const nextStatus = selectedSoldStatus === 'sold' ? 'all' : 'sold';
+        setSelectedSoldStatus(nextStatus);
+        applyFilters({ sold_status: nextStatus !== 'all' ? nextStatus : undefined });
+    };
 
     const handleUploadSubmit = (e) => {
         e.preventDefault();
@@ -605,24 +649,25 @@ export default function Index({ items, filters, canImport, latestGoldPrice = 0, 
 
                 {/* Filter and Control Bar */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                    {/* Search Input for Barcode & Lot/Serial */}
+                    {/* Search Input for Barcode, Lot/Serial & Voucher */}
                     <div className="relative flex-1 max-w-md">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center">
                             <Search className="w-4 h-4 text-slate-400" />
                         </div>
                         <input
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search barcode or lot/serial number..."
+                            placeholder="Search barcode, lot/serial, or voucher number..."
                             className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-white border border-slate-300 text-sm text-slate-800 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition leading-normal"
                         />
                         {search && (
-                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center">
                                 <button
                                     type="button"
                                     onClick={() => setSearch('')}
-                                    className="text-slate-400 hover:text-slate-600 p-1"
+                                    className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition flex items-center justify-center"
+                                    title="Clear search"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -630,7 +675,48 @@ export default function Index({ items, filters, canImport, latestGoldPrice = 0, 
                         )}
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Branch Filter Select */}
+                        <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 flex items-center justify-center">
+                                <Building2 className="w-4 h-4 text-slate-400" />
+                            </div>
+                            <select
+                                value={selectedBranchId}
+                                onChange={handleBranchChange}
+                                className="pl-9 pr-8 py-2.5 rounded-xl bg-white border border-slate-300 text-sm font-medium text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition cursor-pointer leading-normal"
+                            >
+                                <option value="">All Branches (အားလုံး)</option>
+                                {branches.map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                        {b.name} {b.code ? `(${b.code})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Check button to see Sold Items */}
+                        <button
+                            type="button"
+                            onClick={handleToggleSoldStatus}
+                            title={selectedSoldStatus === 'sold' ? 'Click to show all items' : 'Click to see sold items only'}
+                            className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm ${
+                                selectedSoldStatus === 'sold'
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 ring-2 ring-amber-400/40'
+                                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900'
+                            }`}
+                        >
+                            {selectedSoldStatus === 'sold' ? (
+                                <CheckSquare className="w-4 h-4 text-amber-700" />
+                            ) : (
+                                <Square className="w-4 h-4 text-slate-400" />
+                            )}
+                            <span>Sold Items Only (ရောင်းပြီးစာရင်း)</span>
+                            {selectedSoldStatus === 'sold' && (
+                                <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse"></span>
+                            )}
+                        </button>
+
                         {/* Table Column Collapse / Toggle Dropdown */}
                         <div className="relative" ref={columnDropdownRef}>
                             <button

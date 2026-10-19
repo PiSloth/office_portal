@@ -16,11 +16,24 @@ class PromotionItemController extends Controller
     public function index(Request $request): Response
     {
         $search = $request->query('search');
+        $branchId = $request->query('branch_id');
+        $soldStatus = $request->query('sold_status'); // 'all', 'unsold', 'sold'
 
-        $items = PromotionItem::query()
+        $query = PromotionItem::query()
             ->with(['soldItem', 'branch'])
-            ->search($search)
-            ->latest('id')
+            ->search($search);
+
+        if ($branchId !== null && $branchId !== '') {
+            $query->where('branch_id', $branchId);
+        }
+
+        if ($soldStatus === 'sold') {
+            $query->whereHas('soldItem');
+        } elseif ($soldStatus === 'unsold') {
+            $query->whereDoesntHave('soldItem');
+        }
+
+        $items = $query->latest('id')
             ->paginate(10)
             ->withQueryString();
 
@@ -28,10 +41,15 @@ class PromotionItemController extends Controller
         $latestGoldPrice = $latestDailyPrice ? (float) $latestDailyPrice->gold_price : 0;
         $latestPriceUpdatedAt = $latestDailyPrice?->updated_at ?? $latestDailyPrice?->created_at;
 
+        $branches = \App\Models\Branch::orderBy('name')->get(['id', 'name', 'code']);
+
         return Inertia::render('Promotions/Index', [
             'items' => $items,
+            'branches' => $branches,
             'filters' => [
                 'search' => $search ?? '',
+                'branch_id' => $branchId ?? '',
+                'sold_status' => $soldStatus ?? 'all',
             ],
             'latestGoldPrice' => $latestGoldPrice,
             'latestPriceHistoryId' => $latestDailyPrice?->id,
