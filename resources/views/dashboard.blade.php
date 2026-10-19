@@ -42,6 +42,20 @@
                     <h3 class="mt-4 text-2xl font-semibold text-gray-900 dark:text-white">Import Setup Guide</h3>
                     <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">See the CSV template, required columns, and configuration checklist.</p>
                 </a>
+                <a href="{{ route('promotions.index') }}" class="rounded-3xl border border-purple-200 bg-purple-50 p-6 shadow-xl transition hover:-translate-y-1 dark:border-purple-900/40 dark:bg-purple-950/40 md:col-span-2 xl:col-span-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <div class="inline-flex items-center gap-2">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
+                            <p class="text-sm uppercase tracking-[0.35em] text-purple-700 dark:text-purple-300">New Feature</p>
+                        </div>
+                        <h3 class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">Promotion Items Showcase</h3>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Browse and search promotional items with collapsible columns, pagination, and Excel data import.</p>
+                    </div>
+                    <span class="inline-flex items-center gap-2 self-start sm:self-center px-4 py-2.5 rounded-xl bg-purple-600 text-white font-medium text-sm shadow hover:bg-purple-700 transition">
+                        View Promotions
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </span>
+                </a>
             </div>
 
             <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">

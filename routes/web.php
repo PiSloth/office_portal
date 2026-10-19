@@ -53,6 +53,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('supervisor', SupervisorDashboard::class)->name('supervisor.dashboard');
     Route::get('import-guide', fn () => view('import-guide'))->name('import.guide');
     Route::get('product-import-template', ProductImportTemplateController::class)->name('product-import.template');
+
+    // Promotion Items routes
+    Route::get('promotions', [\App\Http\Controllers\PromotionItemController::class, 'index'])->name('promotions.index');
+    Route::post('promotions/import', [\App\Http\Controllers\PromotionItemController::class, 'import'])->name('promotions.import');
+    Route::post('promotions/sold', [\App\Http\Controllers\PromotionItemController::class, 'storeSold'])->name('promotions.sold');
+    Route::get('promotions/voucher/{reference_number}', [\App\Http\Controllers\PromotionItemController::class, 'getVoucherItems'])->name('promotions.voucher.items');
+    Route::post('promotions/sold/cancel', [\App\Http\Controllers\PromotionItemController::class, 'cancelSold'])->name('promotions.sold.cancel');
+    Route::get('promotions/latest-price', [\App\Http\Controllers\PromotionItemController::class, 'getLatestPrice'])->name('promotions.latest.price');
     
     Route::get('purchase-requests/report/print', function (\Illuminate\Http\Request $request) {
         $branchId = $request->query('branch_id');
