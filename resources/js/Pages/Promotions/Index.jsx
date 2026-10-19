@@ -280,15 +280,22 @@ export default function Index({ items, filters, canImport, latestGoldPrice = 0, 
     };
 
     const calculatePromotionPrice = (additionWastage, laborFee, goldPrice = currentGoldPrice) => {
-        if (!additionWastage || !goldPrice) return 0;
         const wastage = parseFloat(additionWastage);
-        if (isNaN(wastage) || wastage <= 0) return 0;
-        let price = wastage * (goldPrice / 16.606);
-
         const labor = parseFloat(laborFee);
-        if (!isNaN(labor) && labor > 0) {
-            price += labor / 2;
+        let price = 0;
+
+        // If additional wastage is > 0, calculate from wastage and gold price only (do not add labor fee / 2)
+        if (!isNaN(wastage) && wastage > 0) {
+            if (goldPrice > 0) {
+                price = wastage * (goldPrice / 16.606);
+            }
+        } 
+        // If additional wastage is 0 (or empty/negative) and labor fee > 0, price is labor fee / 2
+        else if (!isNaN(labor) && labor > 0) {
+            price = labor / 2;
         }
+
+        if (price <= 0) return 0;
 
         // Round down to 2nd digit (nearest 10, e.g., 40052 -> 40050)
         return roundDownToTens(price);
