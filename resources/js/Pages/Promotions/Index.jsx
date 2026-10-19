@@ -22,7 +22,9 @@ import {
     Tag,
     Building2,
     CheckSquare,
-    Square
+    Square,
+    Receipt,
+    RotateCcw
 } from 'lucide-react';
 
 const ALL_COLUMNS = [
@@ -158,6 +160,14 @@ export default function Index({
     const [cancelError, setCancelError] = useState('');
     const [isLoadingVoucherItems, setIsLoadingVoucherItems] = useState(false);
     const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+    // VR Search Modal state
+    const [isVrSearchModalOpen, setIsVrSearchModalOpen] = useState(false);
+    const [vrSearchNumber, setVrSearchNumber] = useState('');
+    const [isSearchingVr, setIsSearchingVr] = useState(false);
+    const [vrSearchError, setVrSearchError] = useState('');
+    const [vrSearchResult, setVrSearchResult] = useState(null); // { reference_number: '', items: [] }
+    const [vrCopiedSuccess, setVrCopiedSuccess] = useState(false);
 
     useEffect(() => {
         try {
@@ -459,10 +469,8 @@ export default function Index({
         );
     };
 
-    // Open Cancel Sold Modal for an item
-    const handleOpenCancelModal = async (item) => {
-        if (!item.sold_item) return;
-        const refNumber = item.sold_item.reference_number;
+    const handleOpenCancelModalByVoucher = async (refNumber) => {
+        if (!refNumber) return;
         setCancelVoucherNumber(refNumber);
         setCancelReason('');
         setCancelError('');
@@ -482,6 +490,57 @@ export default function Index({
         } finally {
             setIsLoadingVoucherItems(false);
         }
+    };
+
+    // Open Cancel Sold Modal for an item
+    const handleOpenCancelModal = (item) => {
+        if (!item.sold_item) return;
+        handleOpenCancelModalByVoucher(item.sold_item.reference_number);
+    };
+
+    // VR Search Modal Handlers
+    const handleSearchVr = async (e) => {
+        if (e) e.preventDefault();
+        const query = vrSearchNumber.trim();
+        if (!query) {
+            setVrSearchError('Please enter an invoice or voucher number (ဘောက်ချာနံပါတ် ထည့်သွင်းပါ).');
+            return;
+        }
+
+        setIsSearchingVr(true);
+        setVrSearchError('');
+        setVrSearchResult(null);
+        setVrCopiedSuccess(false);
+
+        try {
+            const res = await fetch(`/promotions/voucher/${encodeURIComponent(query)}`);
+            if (!res.ok) throw new Error('Failed to fetch voucher items');
+            const data = await res.json();
+            setVrSearchResult(data);
+        } catch (err) {
+            console.error('Error fetching VR items:', err);
+            setVrSearchError('Failed to load items for this voucher number. Please try again.');
+        } finally {
+            setIsSearchingVr(false);
+        }
+    };
+
+    const handleCopyVrGrandTotal = async (amount) => {
+        if (amount === undefined || amount === null) return;
+        try {
+            await navigator.clipboard.writeText(amount.toString());
+            setVrCopiedSuccess(true);
+            setTimeout(() => setVrCopiedSuccess(false), 3000);
+        } catch (err) {
+            console.error('Clipboard copy failed:', err);
+        }
+    };
+
+    const handleTriggerCancelFromVr = () => {
+        if (!vrSearchResult || !vrSearchResult.reference_number) return;
+        const refNum = vrSearchResult.reference_number;
+        setIsVrSearchModalOpen(false);
+        handleOpenCancelModalByVoucher(refNum);
     };
 
     const toggleCancelItemSelection = (id) => {
@@ -583,6 +642,20 @@ export default function Index({
                                 </div>
                             );
                         })()}
+
+                        {/* VR Search Trigger Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsVrSearchModalOpen(true);
+                                setVrSearchError('');
+                            }}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-sm font-semibold shadow-sm transition"
+                            title="Search sold items and historical prices by voucher / invoice number"
+                        >
+                            <Receipt className="w-4 h-4 text-purple-600" />
+                            <span className="hidden sm:inline">VR Search</span>
+                        </button>
 
                         {/* Cart Trigger Button */}
                         <button
@@ -1319,6 +1392,272 @@ export default function Index({
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* VR Search Modal */}
+            {isVrSearchModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="w-full max-w-3xl rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl space-y-5 max-h-[90vh] flex flex-col">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <span className="p-2.5 rounded-xl bg-purple-100 text-purple-700 border border-purple-200">
+                                    <Receipt className="w-5 h-5" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-900">VR Lookup / ဘောက်ချာဖြင့် ရှာဖွေခြင်း</h2>
+                                    <p className="text-xs text-slate-500">
+                                        Look up sold promotion items and historical sale prices by invoice or voucher number.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsVrSearchModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 transition p-1"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Search Input Form */}
+                        <form onSubmit={handleSearchVr} className="shrink-0 flex items-center gap-2">
+                            <div className="relative flex-1">
+                                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center">
+                                    <Search className="w-4 h-4 text-slate-400" />
+                                </div>
+                                <input
+                                    type="text"
+                                    value={vrSearchNumber}
+                                    onChange={(e) => setVrSearchNumber(e.target.value)}
+                                    placeholder="Enter invoice / voucher number (e.g., V001)..."
+                                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-white border border-slate-300 text-sm text-slate-800 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition leading-normal font-mono"
+                                    autoFocus
+                                />
+                                {vrSearchNumber && (
+                                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => setVrSearchNumber('')}
+                                            className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isSearchingVr}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold shadow-md shadow-purple-600/20 transition shrink-0"
+                            >
+                                {isSearchingVr ? (
+                                    <>
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                        <span>Searching...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Search className="w-4 h-4" />
+                                        <span>Search / ရှာမည်</span>
+                                    </>
+                                )}
+                            </button>
+                        </form>
+
+                        {/* Error Notice */}
+                        {vrSearchError && (
+                            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 shrink-0">
+                                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                <span>{vrSearchError}</span>
+                            </div>
+                        )}
+
+                        {/* Modal Body / Results Area */}
+                        <div className="flex-1 overflow-y-auto space-y-4 min-h-[160px] pr-1">
+                            {!vrSearchResult && !isSearchingVr && !vrSearchError && (
+                                <div className="text-center py-12 text-slate-400 space-y-2">
+                                    <Receipt className="w-10 h-10 mx-auto text-slate-300 stroke-[1.5]" />
+                                    <p className="text-sm font-medium text-slate-500">
+                                        Enter a voucher or invoice number above to view sold items and amounts.
+                                    </p>
+                                    <p className="text-xs text-slate-400">
+                                        (အရောင်းဘောက်ချာနံပါတ်ရိုက်ထည့်ပြီး ရှာဖွေပါ)
+                                    </p>
+                                </div>
+                            )}
+
+                            {isSearchingVr && (
+                                <div className="text-center py-12 text-slate-400 space-y-3">
+                                    <RefreshCw className="w-8 h-8 mx-auto text-purple-600 animate-spin" />
+                                    <p className="text-sm font-medium text-slate-600">Searching voucher records...</p>
+                                </div>
+                            )}
+
+                            {vrSearchResult && vrSearchResult.items && vrSearchResult.items.length === 0 && (
+                                <div className="text-center py-12 bg-amber-50/50 rounded-2xl border border-amber-200 space-y-2">
+                                    <AlertCircle className="w-8 h-8 mx-auto text-amber-500" />
+                                    <p className="text-sm font-semibold text-amber-950">
+                                        No items found for voucher "{vrSearchResult.reference_number}"
+                                    </p>
+                                    <p className="text-xs text-amber-800">
+                                        ဤဘောက်ချာနံပါတ်ဖြင့် ရောင်းချထားသော ပရိုမိုးရှင်းပစ္စည်း ရှာမတွေ့ပါ။
+                                    </p>
+                                </div>
+                            )}
+
+                            {vrSearchResult && vrSearchResult.items && vrSearchResult.items.length > 0 && (() => {
+                                const vrGrandTotal = vrSearchResult.items.reduce(
+                                    (sum, item) => sum + (parseFloat(item.promotion_price) || 0),
+                                    0
+                                );
+                                const firstItem = vrSearchResult.items[0];
+                                const formattedSaleDate = formatRelativeDateTime(firstItem.created_at);
+
+                                return (
+                                    <div className="space-y-4">
+                                        {/* Summary Header Info Bar */}
+                                        <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                            <div className="flex items-center gap-3">
+                                                <div>
+                                                    <span className="text-slate-500 block text-[10px] uppercase font-semibold">Voucher / Invoice</span>
+                                                    <span className="font-mono font-bold text-purple-900 text-sm">
+                                                        {vrSearchResult.reference_number}
+                                                    </span>
+                                                </div>
+                                                {firstItem.user?.name && (
+                                                    <div className="border-l border-purple-200 pl-3">
+                                                        <span className="text-slate-500 block text-[10px] uppercase font-semibold">Sold By</span>
+                                                        <span className="font-medium text-slate-800">{firstItem.user.name}</span>
+                                                    </div>
+                                                )}
+                                                {firstItem.promotion_item?.branch?.name && (
+                                                    <div className="border-l border-purple-200 pl-3">
+                                                        <span className="text-slate-500 block text-[10px] uppercase font-semibold">Branch</span>
+                                                        <span className="font-medium text-slate-800">{firstItem.promotion_item.branch.name}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="text-right">
+                                                <span className="text-slate-500 block text-[10px] uppercase font-semibold">Sale Date & Time</span>
+                                                <span className="font-medium text-slate-700">{formattedSaleDate || '-'}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Items Table */}
+                                        <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                            <table className="w-full text-left text-xs text-slate-700">
+                                                <thead className="bg-slate-100 uppercase tracking-wider text-slate-600 border-b border-slate-200 font-semibold text-[11px]">
+                                                    <tr>
+                                                        <th className="px-3.5 py-2.5 text-center w-12">#</th>
+                                                        <th className="px-3.5 py-2.5">Barcode</th>
+                                                        <th className="px-3.5 py-2.5">Product</th>
+                                                        <th className="px-3.5 py-2.5">Lot / Serial</th>
+                                                        <th className="px-3.5 py-2.5 text-right">Gold Wt (g)</th>
+                                                        <th className="px-3.5 py-2.5 text-right">Sold Promo Price</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {vrSearchResult.items.map((sold, idx) => {
+                                                        const promo = sold.promotion_item || {};
+                                                        return (
+                                                            <tr key={sold.id} className={idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'}>
+                                                                <td className="px-3.5 py-2.5 text-center text-slate-400 font-mono">
+                                                                    {idx + 1}
+                                                                </td>
+                                                                <td className="px-3.5 py-2.5 font-mono text-purple-700 font-semibold">
+                                                                    {promo.barcode || '-'}
+                                                                </td>
+                                                                <td className="px-3.5 py-2.5 font-medium text-slate-900">
+                                                                    {promo.product || '-'}
+                                                                </td>
+                                                                <td className="px-3.5 py-2.5 font-mono text-slate-600">
+                                                                    {promo.lot_serial_number || '-'}
+                                                                </td>
+                                                                <td className="px-3.5 py-2.5 text-right font-mono text-slate-700">
+                                                                    {formatNumber(promo.gold_weight, 2)}
+                                                                </td>
+                                                                <td className="px-3.5 py-2.5 text-right font-mono font-bold text-amber-900">
+                                                                    {Math.round(sold.promotion_price).toLocaleString()} MMK
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Grand Total Bar with Copy Button */}
+                                        <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 flex items-center justify-between gap-4 shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <span className="p-2 rounded-xl bg-amber-200/70 text-amber-900">
+                                                    <Tag className="w-5 h-5" />
+                                                </span>
+                                                <div>
+                                                    <span className="text-xs uppercase tracking-wider font-semibold text-amber-900 block">
+                                                        Grand Total (စုစုပေါင်းကျသင့်ငွေ)
+                                                    </span>
+                                                    <div className="text-xl font-mono font-bold text-amber-950">
+                                                        {Math.round(vrGrandTotal).toLocaleString()} <span className="text-sm font-normal text-amber-800">MMK</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Copy Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCopyVrGrandTotal(Math.round(vrGrandTotal))}
+                                                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs transition shadow-sm ${
+                                                    vrCopiedSuccess
+                                                        ? 'bg-emerald-600 text-white shadow-emerald-600/20'
+                                                        : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300'
+                                                }`}
+                                            >
+                                                {vrCopiedSuccess ? (
+                                                    <>
+                                                        <Check className="w-4 h-4 text-white" />
+                                                        <span>Copied Total! (ကူးယူပြီး)</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="w-4 h-4 text-amber-700" />
+                                                        <span>Copy Total (ကူးမည်)</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 shrink-0">
+                            <div>
+                                {vrSearchResult && vrSearchResult.items && vrSearchResult.items.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleTriggerCancelFromVr}
+                                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-semibold shadow-sm transition"
+                                        title="Cancel / void sold items under this voucher"
+                                    >
+                                        <RotateCcw className="w-4 h-4 text-rose-600" />
+                                        <span>ဖျက်သိမ်းရန် (Cancel Voucher Sale)</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsVrSearchModalOpen(false)}
+                                className="px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+                            >
+                                Close (ပိတ်မည်)
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

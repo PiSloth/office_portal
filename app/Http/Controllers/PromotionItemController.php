@@ -137,7 +137,7 @@ class PromotionItemController extends Controller
      */
     public function getVoucherItems(string $referenceNumber)
     {
-        $soldItems = \App\Models\PromotionSoldItem::with('promotionItem')
+        $soldItems = \App\Models\PromotionSoldItem::with(['promotionItem.branch', 'user'])
             ->where('reference_number', $referenceNumber)
             ->get();
 
