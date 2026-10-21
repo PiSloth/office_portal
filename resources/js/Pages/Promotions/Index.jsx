@@ -36,9 +36,9 @@ const ALL_COLUMNS = [
     { key: 'weight', label: 'Weight (g)', defaultVisible: false },
     { key: 'gold_weight', label: 'Gold Weight (g)', defaultVisible: true },
     { key: 'dg_weight', label: 'D/G WT', defaultVisible: false },
-    { key: 'addition_wastage', label: 'Add Wastage', defaultVisible: true },
+    { key: 'addition_wastage', label: 'Add Wastage', defaultVisible: false },
     { key: 'labor_fee', label: 'Labour Fee', defaultVisible: true },
-    { key: 'total_wastage', label: 'Total Wastage', defaultVisible: false },
+    { key: 'total_wastage', label: 'Total Wastage', defaultVisible: true },
     { key: 'promotion_price', label: 'Promotion Price', defaultVisible: true },
     { key: 'internal_reference', label: 'Internal Ref', defaultVisible: false },
     { key: 'actions', label: 'Actions / လုပ်ဆောင်ချက်', defaultVisible: true },
@@ -333,18 +333,19 @@ export default function Index({
         return `${dateFormatted} at ${timeString}`;
     };
 
-    const calculatePromotionPrice = (additionWastage, laborFee, goldPrice = currentGoldPrice) => {
-        const wastage = parseFloat(additionWastage);
+    const calculatePromotionPrice = (totalWastage, laborFee, goldPrice = currentGoldPrice) => {
+        const rawTotalWastage = parseFloat(totalWastage);
+        const wastage = (!isNaN(rawTotalWastage) && rawTotalWastage > 0) ? (rawTotalWastage / 2) : 0;
         const labor = parseFloat(laborFee);
         let price = 0;
 
-        // If additional wastage is > 0, calculate from wastage and gold price only (do not add labor fee / 2)
-        if (!isNaN(wastage) && wastage > 0) {
+        // If (total_wastage / 2) is > 0, calculate from (total_wastage / 2) and gold price only (do not add labor fee / 2)
+        if (wastage > 0) {
             if (goldPrice > 0) {
                 price = wastage * (goldPrice / 16.606);
             }
         } 
-        // If additional wastage is 0 (or empty/negative) and labor fee > 0, price is labor fee / 2
+        // If total_wastage is 0 (or empty/negative) and labor fee > 0, price is labor fee / 2
         else if (!isNaN(labor) && labor > 0) {
             price = labor / 2;
         }
@@ -363,7 +364,7 @@ export default function Index({
         if (isInCart(item.id)) {
             setCartItems((prev) => prev.filter((i) => i.id !== item.id));
         } else {
-            const promoPrice = calculatePromotionPrice(item.addition_wastage, item.labor_fee);
+            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee);
             setCartItems((prev) => [
                 ...prev,
                 {
@@ -373,6 +374,7 @@ export default function Index({
                     lot_serial_number: item.lot_serial_number,
                     product_subgroup_name: item.product_subgroup_name,
                     addition_wastage: item.addition_wastage,
+                    total_wastage: item.total_wastage,
                     labor_fee: item.labor_fee,
                     promotion_price: promoPrice,
                 },
@@ -383,7 +385,7 @@ export default function Index({
     const handleDirectUse = (item) => {
         if (item.sold_item) return;
         if (!isInCart(item.id)) {
-            const promoPrice = calculatePromotionPrice(item.addition_wastage, item.labor_fee);
+            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee);
             setCartItems((prev) => [
                 ...prev,
                 {
@@ -393,6 +395,7 @@ export default function Index({
                     lot_serial_number: item.lot_serial_number,
                     product_subgroup_name: item.product_subgroup_name,
                     addition_wastage: item.addition_wastage,
+                    total_wastage: item.total_wastage,
                     labor_fee: item.labor_fee,
                     promotion_price: promoPrice,
                 },
@@ -407,9 +410,11 @@ export default function Index({
 
     // Calculate cart items dynamically based on currentGoldPrice
     const dynamicCartItems = cartItems.map((cItem) => {
-        const livePrice = (cItem.addition_wastage !== undefined && cItem.addition_wastage !== null)
-            ? calculatePromotionPrice(cItem.addition_wastage, cItem.labor_fee)
-            : (parseFloat(cItem.promotion_price) || 0);
+        const livePrice = (cItem.total_wastage !== undefined && cItem.total_wastage !== null)
+            ? calculatePromotionPrice(cItem.total_wastage, cItem.labor_fee)
+            : ((cItem.addition_wastage !== undefined && cItem.addition_wastage !== null)
+                ? calculatePromotionPrice(cItem.addition_wastage, cItem.labor_fee)
+                : (parseFloat(cItem.promotion_price) || 0));
 
         return {
             ...cItem,
@@ -874,8 +879,12 @@ export default function Index({
                                     </tr>
                                 ) : (
                                     items.data.map((item, index) => {
-                                        const calculatedPrice = calculatePromotionPrice(item.addition_wastage, item.labor_fee);
                                         const isSold = !!item.sold_item;
+                                        const soldPrice = isSold && item.sold_item?.promotion_price !== undefined && item.sold_item?.promotion_price !== null
+                                            ? parseFloat(item.sold_item.promotion_price)
+                                            : null;
+                                        const calculatedPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee);
+                                        const displayPrice = isSold && soldPrice !== null ? soldPrice : calculatedPrice;
                                         const inCart = isInCart(item.id);
 
                                         // Table striped background (even: white, odd: slate-50/70)
@@ -984,13 +993,15 @@ export default function Index({
                                             {/* 11. Promotion Price */}
                                             {visibleColumns.promotion_price && (
                                                 <td className="px-5 py-3.5 text-right font-mono font-semibold">
-                                                    {calculatedPrice > 0 ? (
+                                                    {displayPrice > 0 ? (
                                                         <span className={`inline-block px-2.5 py-1 rounded-lg ${
                                                             isSold 
-                                                                ? 'bg-slate-200 text-slate-500' 
+                                                                ? 'bg-slate-200 text-slate-700 border border-slate-300' 
                                                                 : 'bg-amber-100/80 border border-amber-300 text-amber-900'
-                                                        }`}>
-                                                            {Math.round(calculatedPrice).toLocaleString()}
+                                                        }`}
+                                                        title={isSold && item.sold_item ? `Fixed Sold Price (ရောင်းဈေး): ${Math.round(displayPrice).toLocaleString()} MMK (Voucher: ${item.sold_item.reference_number || '-'})` : undefined}
+                                                        >
+                                                            {Math.round(displayPrice).toLocaleString()}
                                                         </span>
                                                     ) : (
                                                         <span className="text-slate-400">-</span>
