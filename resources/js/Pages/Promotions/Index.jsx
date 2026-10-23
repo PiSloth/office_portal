@@ -333,21 +333,40 @@ export default function Index({
         return `${dateFormatted} at ${timeString}`;
     };
 
-    const calculatePromotionPrice = (totalWastage, laborFee, goldPrice = currentGoldPrice) => {
-        const rawTotalWastage = parseFloat(totalWastage);
-        const wastage = (!isNaN(rawTotalWastage) && rawTotalWastage > 0) ? (rawTotalWastage / 2) : 0;
-        const labor = parseFloat(laborFee);
-        let price = 0;
+    const calculatePromotionPrice = (totalWastageOrItem, laborFee, additionWastage = 0, goldPrice = currentGoldPrice) => {
+        let totalWastage = totalWastageOrItem;
+        let labor = laborFee;
+        let addWastage = additionWastage;
+        let currentGold = goldPrice;
 
-        // If (total_wastage / 2) is > 0, calculate from (total_wastage / 2) and gold price only (do not add labor fee / 2)
-        if (wastage > 0) {
-            if (goldPrice > 0) {
-                price = wastage * (goldPrice / 16.606);
-            }
-        } 
-        // If total_wastage is 0 (or empty/negative) and labor fee > 0, price is labor fee / 2
-        else if (!isNaN(labor) && labor > 0) {
-            price = labor / 2;
+        if (typeof totalWastageOrItem === 'object' && totalWastageOrItem !== null) {
+            totalWastage = totalWastageOrItem.total_wastage;
+            labor = totalWastageOrItem.labor_fee;
+            addWastage = totalWastageOrItem.addition_wastage;
+            currentGold = typeof laborFee === 'number' ? laborFee : currentGoldPrice;
+        }
+
+        const rawTotalWastage = parseFloat(totalWastage);
+        const rawAdditionWastage = parseFloat(addWastage);
+        const parsedLabor = parseFloat(labor);
+
+        let wastage = 0;
+        if (!isNaN(rawTotalWastage) && rawTotalWastage > 0) {
+            wastage = rawTotalWastage / 2;
+        } else if (!isNaN(rawAdditionWastage) && rawAdditionWastage > 0) {
+            wastage = rawAdditionWastage;
+        }
+
+        let price = 0;
+        if (wastage > 0 && currentGold > 0) {
+            price = wastage * (currentGold / 16.606);
+        }
+
+        // If additional wastage > 0, don't plus the labour fee/2 to promotion price.
+        // Otherwise (additional wastage <= 0 or not provided), add labor fee / 2 if present.
+        const hasAdditionWastage = !isNaN(rawAdditionWastage) && rawAdditionWastage > 0;
+        if (!hasAdditionWastage && !isNaN(parsedLabor) && parsedLabor > 0) {
+            price += parsedLabor / 2;
         }
 
         if (price <= 0) return 0;
@@ -364,7 +383,7 @@ export default function Index({
         if (isInCart(item.id)) {
             setCartItems((prev) => prev.filter((i) => i.id !== item.id));
         } else {
-            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee);
+            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee, item.addition_wastage);
             setCartItems((prev) => [
                 ...prev,
                 {
@@ -385,7 +404,7 @@ export default function Index({
     const handleDirectUse = (item) => {
         if (item.sold_item) return;
         if (!isInCart(item.id)) {
-            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee);
+            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee, item.addition_wastage);
             setCartItems((prev) => [
                 ...prev,
                 {
@@ -410,10 +429,10 @@ export default function Index({
 
     // Calculate cart items dynamically based on currentGoldPrice
     const dynamicCartItems = cartItems.map((cItem) => {
-        const livePrice = (cItem.total_wastage !== undefined && cItem.total_wastage !== null)
-            ? calculatePromotionPrice(cItem.total_wastage, cItem.labor_fee)
-            : ((cItem.addition_wastage !== undefined && cItem.addition_wastage !== null)
-                ? calculatePromotionPrice(cItem.addition_wastage, cItem.labor_fee)
+        const livePrice = (cItem.total_wastage !== undefined && cItem.total_wastage !== null && cItem.total_wastage !== '')
+            ? calculatePromotionPrice(cItem.total_wastage, cItem.labor_fee, cItem.addition_wastage)
+            : ((cItem.addition_wastage !== undefined && cItem.addition_wastage !== null && cItem.addition_wastage !== '')
+                ? calculatePromotionPrice(cItem.addition_wastage, cItem.labor_fee, cItem.addition_wastage)
                 : (parseFloat(cItem.promotion_price) || 0));
 
         return {
@@ -883,7 +902,7 @@ export default function Index({
                                         const soldPrice = isSold && item.sold_item?.promotion_price !== undefined && item.sold_item?.promotion_price !== null
                                             ? parseFloat(item.sold_item.promotion_price)
                                             : null;
-                                        const calculatedPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee);
+                                        const calculatedPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee, item.addition_wastage);
                                         const displayPrice = isSold && soldPrice !== null ? soldPrice : calculatedPrice;
                                         const inCart = isInCart(item.id);
 

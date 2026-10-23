@@ -88,10 +88,11 @@
 ### ၄.၂ အချိန်နှင့်တပြေးညီ ဈေးနှုန်းတွက်ချက်မှု (Real-Time Price Engine)
 စနစ်သည် အောက်ပါ စည်းမျဉ်းများအတိုင်း တိကျစွာ တွက်ချက်ပေးပါသည်:
 1. **အပိုအလျော့တွက် (Addition Wastage) > 0 ဖြစ်ပါက**:
-   $$\text{Promotion Price} = \text{Addition Wastage} \times \left(\frac{\text{Daily Gold Price}}{16.606}\right)$$
-   *(သတိပြုရန် - အပိုအလျော့တွက် ရှိနေပါက လက်ခ (Labor Fee) ကို ထည့်မပေါင်းပါ)*
-2. **အပိုအလျော့တွက် = 0 ဖြစ်ပြီး လက်ခ (Labor Fee) > 0 ဖြစ်ပါက**:
-   $$\text{Promotion Price} = \frac{\text{Labor Fee}}{2}$$
+   $$\text{Promotion Price} = \left(\frac{\text{Total Wastage}}{2}\right) \times \left(\frac{\text{Daily Gold Price}}{16.606}\right)$$
+   *(သတိပြုရန် - အပိုအလျော့တွက် > 0 ဖြစ်နေပါက လက်ခ/၂ (Labor Fee / 2) ကို ထည့်မပေါင်းပါ)*
+2. **အပိုအလျော့တွက် <= 0 (သို့မဟုတ် မရှိ) ဖြစ်ပါက**:
+   $$\text{Promotion Price} = \left(\frac{\text{Total Wastage}}{2}\right) \times \left(\frac{\text{Daily Gold Price}}{16.606}\right) + \frac{\text{Labor Fee}}{2}$$
+   *(စုစုပေါင်း အလျော့တွက် မရှိပါက လက်ခ/၂ သာ ကျသင့်မည်ဖြစ်သည်)*
 3. **ကျသင့်ငွေဝိုင်းဖြတ်ခြင်း**:
    - တွက်ချက်ရရှိသော ကျသင့်ငွေအားလုံးကို **ဆယ်ဂဏန်းအောက်သို့ အလိုအလျောက် ဝိုင်းဖြတ်ပေးပါသည်** (ဥပမာ - `40,058` ကျပ် $\rightarrow$ `40,050` ကျပ်)။
 
