@@ -46,9 +46,9 @@ class ProductCategoryMultiplierResource extends Resource
                             ->required()
                             ->numeric()
                             ->default(1.0)
-                            ->step(0.0001)
+                            ->step('any')
                             ->minValue(0)
-                            ->helperText('Used in formula: (total wastage / 2) * ((gold price * multiplier) / 16.606)'),
+                            ->helperText('Supports up to 16 decimal places. Used in formula: (total wastage / 2) * ((gold price * multiplier) / 16.606)'),
                         Forms\Components\Textarea::make('description')
                             ->label('Description / Notes')
                             ->maxLength(500)
@@ -71,7 +71,7 @@ class ProductCategoryMultiplierResource extends Resource
                 Tables\Columns\TextColumn::make('multiplier')
                     ->label('Multiplier')
                     ->sortable()
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 4)),
+                    ->formatStateUsing(fn ($state) => rtrim(rtrim((string)$state, '0'), '.')),
                 Tables\Columns\TextColumn::make('promotion_items_count')
                     ->label('Assigned Items')
                     ->counts('promotionItems')

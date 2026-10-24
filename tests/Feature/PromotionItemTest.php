@@ -365,4 +365,24 @@ class PromotionItemTest extends TestCase
             @unlink($tempPath);
         }
     }
+
+    public function test_multiplier_supports_16_decimal_places(): void
+    {
+        $user = User::factory()->create();
+
+        // 16 decimal places: e.g. 16/17 = 0.9411764705882353
+        $sixteenDecimalMultiplier = '0.9411764705882353';
+
+        $response = $this->actingAs($user)->post('/promotions/categories', [
+            'name' => '15 Pe_' . uniqid(),
+            'multiplier' => $sixteenDecimalMultiplier,
+            'description' => '16 decimal place test',
+        ]);
+
+        $response->assertRedirect();
+
+        $category = ProductCategoryMultiplier::where('multiplier', $sixteenDecimalMultiplier)->first();
+        $this->assertNotNull($category);
+        $this->assertEquals($sixteenDecimalMultiplier, $category->multiplier);
+    }
 }

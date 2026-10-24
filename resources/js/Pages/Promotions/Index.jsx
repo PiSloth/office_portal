@@ -297,7 +297,7 @@ export default function Index({
         setEditingCategory(cat);
         setCategoryForm({
             name: cat.name,
-            multiplier: String(parseFloat(cat.multiplier)),
+            multiplier: String(cat.multiplier ?? ''),
             description: cat.description || '',
         });
         setCategoryFormErrors({});
@@ -963,7 +963,7 @@ export default function Index({
                                 <option value="">All Categories (အမျိုးအစား အားလုံး)</option>
                                 {productCategories.map((c) => (
                                     <option key={c.id} value={c.id}>
-                                        {c.name} (x{parseFloat(c.multiplier).toFixed(4)})
+                                        {c.name} (x{parseFloat(c.multiplier).toString()})
                                     </option>
                                 ))}
                             </select>
@@ -1141,7 +1141,7 @@ export default function Index({
                                                                 }`}
                                                                 title={`Multiplier: ${item.product_category.multiplier}`}
                                                             >
-                                                                x{parseFloat(item.product_category.multiplier).toFixed(4)}
+                                                                x{parseFloat(item.product_category.multiplier).toString()}
                                                             </span>
                                                         </div>
                                                     ) : (
@@ -1721,10 +1721,10 @@ export default function Index({
                                             </label>
                                             <input
                                                 type="number"
-                                                step="0.0001"
+                                                step="any"
                                                 min="0"
                                                 required
-                                                placeholder="e.g. 1.0 or 0.999"
+                                                placeholder="e.g. 1.0 or 0.9411764705882353"
                                                 value={categoryForm.multiplier}
                                                 onChange={(e) => setCategoryForm({ ...categoryForm, multiplier: e.target.value })}
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white font-mono"
@@ -1799,7 +1799,7 @@ export default function Index({
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-mono font-bold text-purple-700">
-                                                            x{parseFloat(cat.multiplier).toFixed(4)}
+                                                            x{parseFloat(cat.multiplier).toString()}
                                                         </td>
                                                         <td className="px-4 py-3 text-center font-mono">
                                                             <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">

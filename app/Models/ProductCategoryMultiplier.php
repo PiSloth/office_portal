@@ -19,7 +19,7 @@ class ProductCategoryMultiplier extends Model
     ];
 
     protected $casts = [
-        'multiplier' => 'decimal:6',
+        'multiplier' => 'decimal:16',
     ];
 
     public function promotionItems(): HasMany
