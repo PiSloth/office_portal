@@ -24,13 +24,18 @@ import {
     CheckSquare,
     Square,
     Receipt,
-    RotateCcw
+    RotateCcw,
+    Sliders,
+    Plus,
+    Edit3,
+    FileEdit
 } from 'lucide-react';
 
 const ALL_COLUMNS = [
     { key: 'lot_serial_number', label: 'Lot/Serial', defaultVisible: true },
     { key: 'barcode', label: 'Barcode', defaultVisible: true },
     { key: 'product', label: 'Product', defaultVisible: true },
+    { key: 'product_category', label: 'Product Category', defaultVisible: true },
     { key: 'branch_name', label: 'Branch Name', defaultVisible: true },
     { key: 'product_subgroup_name', label: 'Subgroup', defaultVisible: false },
     { key: 'weight', label: 'Weight (g)', defaultVisible: false },
@@ -47,6 +52,7 @@ const ALL_COLUMNS = [
 export default function Index({ 
     items, 
     branches = [], 
+    productCategories = [],
     filters = {}, 
     canImport, 
     latestGoldPrice = 0, 
@@ -58,15 +64,30 @@ export default function Index({
     const currentUser = auth?.user;
     const [search, setSearch] = useState(filters.search || '');
     const [selectedBranchId, setSelectedBranchId] = useState(filters.branch_id || '');
+    const [selectedCategoryId, setSelectedCategoryId] = useState(filters.product_category_id || '');
     const [selectedSoldStatus, setSelectedSoldStatus] = useState(filters.sold_status || 'all');
     const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [uploadFile, setUploadFile] = useState(null);
+    const [updateExistingItems, setUpdateExistingItems] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState('');
     const [currentImportErrors, setCurrentImportErrors] = useState(importErrors || []);
     const [isImportErrorsModalOpen, setIsImportErrorsModalOpen] = useState(importErrors && importErrors.length > 0);
     const columnDropdownRef = useRef(null);
+
+    // Product Category Multiplier CRUD state
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    const [editingCategory, setEditingCategory] = useState(null);
+    const [categoryForm, setCategoryForm] = useState({ name: '', multiplier: '1.0', description: '' });
+    const [categoryFormErrors, setCategoryFormErrors] = useState({});
+    const [isSavingCategory, setIsSavingCategory] = useState(false);
+
+    // Update Product Categories with Excel state
+    const [isUpdateCategoryModalOpen, setIsUpdateCategoryModalOpen] = useState(false);
+    const [categoryUpdateFile, setCategoryUpdateFile] = useState(null);
+    const [isUpdatingCategories, setIsUpdatingCategories] = useState(false);
+    const [categoryUpdateError, setCategoryUpdateError] = useState('');
 
     // Live real-time gold price state
     const [currentGoldPrice, setCurrentGoldPrice] = useState(latestGoldPrice || 0);
@@ -217,6 +238,7 @@ export default function Index({
         const queryParams = {
             search: search || undefined,
             branch_id: selectedBranchId || undefined,
+            product_category_id: selectedCategoryId || undefined,
             sold_status: selectedSoldStatus !== 'all' ? selectedSoldStatus : undefined,
             ...newParams,
         };
@@ -251,10 +273,105 @@ export default function Index({
         applyFilters({ branch_id: branchId || undefined });
     };
 
+    const handleCategoryChange = (e) => {
+        const catId = e.target.value;
+        setSelectedCategoryId(catId);
+        applyFilters({ product_category_id: catId || undefined });
+    };
+
     const handleToggleSoldStatus = () => {
         const nextStatus = selectedSoldStatus === 'sold' ? 'all' : 'sold';
         setSelectedSoldStatus(nextStatus);
         applyFilters({ sold_status: nextStatus !== 'all' ? nextStatus : undefined });
+    };
+
+    // Product Category Multiplier CRUD actions
+    const handleOpenCreateCategory = () => {
+        setEditingCategory(null);
+        setCategoryForm({ name: '', multiplier: '1.0', description: '' });
+        setCategoryFormErrors({});
+        setIsCategoryModalOpen(true);
+    };
+
+    const handleOpenEditCategory = (cat) => {
+        setEditingCategory(cat);
+        setCategoryForm({
+            name: cat.name,
+            multiplier: String(parseFloat(cat.multiplier)),
+            description: cat.description || '',
+        });
+        setCategoryFormErrors({});
+        setIsCategoryModalOpen(true);
+    };
+
+    const handleSaveCategory = (e) => {
+        e.preventDefault();
+        setIsSavingCategory(true);
+        setCategoryFormErrors({});
+
+        if (editingCategory) {
+            router.put(`/promotions/categories/${editingCategory.id}`, categoryForm, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsSavingCategory(false);
+                    setEditingCategory(null);
+                    setCategoryForm({ name: '', multiplier: '1.0', description: '' });
+                },
+                onError: (err) => {
+                    setIsSavingCategory(false);
+                    setCategoryFormErrors(err);
+                },
+            });
+        } else {
+            router.post('/promotions/categories', categoryForm, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsSavingCategory(false);
+                    setCategoryForm({ name: '', multiplier: '1.0', description: '' });
+                },
+                onError: (err) => {
+                    setIsSavingCategory(false);
+                    setCategoryFormErrors(err);
+                },
+            });
+        }
+    };
+
+    const handleDeleteCategory = (cat) => {
+        if (!confirm(`Are you sure you want to delete category "${cat.name}"? If promotion items reference this category, they will revert to default multiplier (1.0).`)) {
+            return;
+        }
+
+        router.delete(`/promotions/categories/${cat.id}`, {
+            preserveScroll: true,
+        });
+    };
+
+    // Update categories via Excel handler
+    const handleUpdateCategoriesSubmit = (e) => {
+        e.preventDefault();
+        if (!categoryUpdateFile) {
+            setCategoryUpdateError('Please select a .xlsx or .csv file to upload.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', categoryUpdateFile);
+
+        setIsUpdatingCategories(true);
+        setCategoryUpdateError('');
+
+        router.post('/promotions/update-categories-excel', formData, {
+            onSuccess: () => {
+                setIsUpdatingCategories(false);
+                setIsUpdateCategoryModalOpen(false);
+                setCategoryUpdateFile(null);
+            },
+            onError: (err) => {
+                setIsUpdatingCategories(false);
+                setCategoryUpdateError(err.file || err.message || 'Failed to update categories from file.');
+            },
+        });
     };
 
     const handleUploadSubmit = (e) => {
@@ -269,6 +386,7 @@ export default function Index({
 
         const formData = new FormData();
         formData.append('file', uploadFile);
+        formData.append('update_existing', updateExistingItems ? '1' : '0');
 
         router.post('/promotions/import', formData, {
             onSuccess: () => {
@@ -333,22 +451,29 @@ export default function Index({
         return `${dateFormatted} at ${timeString}`;
     };
 
-    const calculatePromotionPrice = (totalWastageOrItem, laborFee, additionWastage = 0, goldPrice = currentGoldPrice) => {
+    const calculatePromotionPrice = (totalWastageOrItem, laborFee, additionWastage = 0, goldPrice = currentGoldPrice, categoryMultiplier = 1) => {
         let totalWastage = totalWastageOrItem;
         let labor = laborFee;
         let addWastage = additionWastage;
         let currentGold = goldPrice;
+        let multiplier = categoryMultiplier;
 
         if (typeof totalWastageOrItem === 'object' && totalWastageOrItem !== null) {
             totalWastage = totalWastageOrItem.total_wastage;
             labor = totalWastageOrItem.labor_fee;
             addWastage = totalWastageOrItem.addition_wastage;
             currentGold = typeof laborFee === 'number' ? laborFee : currentGoldPrice;
+            multiplier = totalWastageOrItem.product_category?.multiplier 
+                ?? totalWastageOrItem.productCategory?.multiplier 
+                ?? totalWastageOrItem.category_multiplier 
+                ?? 1;
         }
 
         const rawTotalWastage = parseFloat(totalWastage);
         const rawAdditionWastage = parseFloat(addWastage);
         const parsedLabor = parseFloat(labor);
+        const parsedMultiplier = parseFloat(multiplier);
+        const validMultiplier = (!isNaN(parsedMultiplier) && parsedMultiplier > 0) ? parsedMultiplier : 1;
 
         let wastage = 0;
         if (!isNaN(rawTotalWastage) && rawTotalWastage > 0) {
@@ -358,8 +483,9 @@ export default function Index({
         }
 
         let price = 0;
+        // Formula: (total wastage / 2) * ((gold price * multiplier) / 16.606)
         if (wastage > 0 && currentGold > 0) {
-            price = wastage * (currentGold / 16.606);
+            price = wastage * ((currentGold * validMultiplier) / 16.606);
         }
 
         // If additional wastage > 0, don't plus the labour fee/2 to promotion price.
@@ -383,7 +509,7 @@ export default function Index({
         if (isInCart(item.id)) {
             setCartItems((prev) => prev.filter((i) => i.id !== item.id));
         } else {
-            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee, item.addition_wastage);
+            const promoPrice = calculatePromotionPrice(item);
             setCartItems((prev) => [
                 ...prev,
                 {
@@ -395,6 +521,8 @@ export default function Index({
                     addition_wastage: item.addition_wastage,
                     total_wastage: item.total_wastage,
                     labor_fee: item.labor_fee,
+                    category_multiplier: item.product_category?.multiplier ?? 1,
+                    product_category_name: item.product_category?.name ?? '',
                     promotion_price: promoPrice,
                 },
             ]);
@@ -404,7 +532,7 @@ export default function Index({
     const handleDirectUse = (item) => {
         if (item.sold_item) return;
         if (!isInCart(item.id)) {
-            const promoPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee, item.addition_wastage);
+            const promoPrice = calculatePromotionPrice(item);
             setCartItems((prev) => [
                 ...prev,
                 {
@@ -416,6 +544,8 @@ export default function Index({
                     addition_wastage: item.addition_wastage,
                     total_wastage: item.total_wastage,
                     labor_fee: item.labor_fee,
+                    category_multiplier: item.product_category?.multiplier ?? 1,
+                    product_category_name: item.product_category?.name ?? '',
                     promotion_price: promoPrice,
                 },
             ]);
@@ -427,12 +557,12 @@ export default function Index({
         setCartItems((prev) => prev.filter((i) => i.id !== id));
     };
 
-    // Calculate cart items dynamically based on currentGoldPrice
+    // Calculate cart items dynamically based on currentGoldPrice & multiplier
     const dynamicCartItems = cartItems.map((cItem) => {
         const livePrice = (cItem.total_wastage !== undefined && cItem.total_wastage !== null && cItem.total_wastage !== '')
-            ? calculatePromotionPrice(cItem.total_wastage, cItem.labor_fee, cItem.addition_wastage)
+            ? calculatePromotionPrice(cItem.total_wastage, cItem.labor_fee, cItem.addition_wastage, currentGoldPrice, cItem.category_multiplier ?? 1)
             : ((cItem.addition_wastage !== undefined && cItem.addition_wastage !== null && cItem.addition_wastage !== '')
-                ? calculatePromotionPrice(cItem.addition_wastage, cItem.labor_fee, cItem.addition_wastage)
+                ? calculatePromotionPrice(cItem.addition_wastage, cItem.labor_fee, cItem.addition_wastage, currentGoldPrice, cItem.category_multiplier ?? 1)
                 : (parseFloat(cItem.promotion_price) || 0));
 
         return {
@@ -681,6 +811,20 @@ export default function Index({
                             <span className="hidden sm:inline">VR Search</span>
                         </button>
 
+                        {/* Category Multipliers CRUD Trigger Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setCategoryFormErrors({});
+                                setIsCategoryModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-sm font-semibold shadow-sm transition"
+                            title="Manage Product Category Multipliers"
+                        >
+                            <Sliders className="w-4 h-4 text-purple-600" />
+                            <span className="hidden md:inline">Multipliers</span>
+                        </button>
+
                         {/* Cart Trigger Button */}
                         <button
                             type="button"
@@ -697,17 +841,31 @@ export default function Index({
                         </button>
 
                         {canImport && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setUploadError('');
-                                    setIsUploadModalOpen(true);
-                                }}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold shadow-md shadow-purple-600/20 transition"
-                            >
-                                <Upload className="w-4 h-4" />
-                                <span>Import Excel</span>
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCategoryUpdateError('');
+                                        setIsUpdateCategoryModalOpen(true);
+                                    }}
+                                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 hover:text-purple-900 text-sm font-semibold shadow-sm transition"
+                                    title="Batch update product categories with Excel"
+                                >
+                                    <FileEdit className="w-4 h-4" />
+                                    <span className="hidden lg:inline">Update Categories</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setUploadError('');
+                                        setIsUploadModalOpen(true);
+                                    }}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold shadow-md shadow-purple-600/20 transition"
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    <span>Import Excel</span>
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -787,6 +945,25 @@ export default function Index({
                                 {branches.map((b) => (
                                     <option key={b.id} value={b.id}>
                                         {b.name} {b.code ? `(${b.code})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Product Category Filter Select */}
+                        <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 flex items-center justify-center">
+                                <Tag className="w-4 h-4 text-slate-400" />
+                            </div>
+                            <select
+                                value={selectedCategoryId}
+                                onChange={handleCategoryChange}
+                                className="pl-9 pr-8 py-2.5 rounded-xl bg-white border border-slate-300 text-sm font-medium text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition cursor-pointer leading-normal"
+                            >
+                                <option value="">All Categories (အမျိုးအစား အားလုံး)</option>
+                                {productCategories.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name} (x{parseFloat(c.multiplier).toFixed(4)})
                                     </option>
                                 ))}
                             </select>
@@ -872,6 +1049,7 @@ export default function Index({
                                     {visibleColumns.lot_serial_number && <th className="px-5 py-4">Lot/Serial</th>}
                                     {visibleColumns.barcode && <th className="px-5 py-4">Barcode</th>}
                                     {visibleColumns.product && <th className="px-5 py-4">Product</th>}
+                                    {visibleColumns.product_category && <th className="px-5 py-4">Category</th>}
                                     {visibleColumns.branch_name && <th className="px-5 py-4">Branch</th>}
                                     {visibleColumns.product_subgroup_name && <th className="px-5 py-4">Subgroup</th>}
                                     {visibleColumns.weight && <th className="px-5 py-4 text-right">Weight (g)</th>}
@@ -888,7 +1066,7 @@ export default function Index({
                             <tbody className="divide-y divide-slate-100">
                                 {items.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={14} className="px-5 py-16 text-center text-slate-400">
+                                        <td colSpan={15} className="px-5 py-16 text-center text-slate-400">
                                             <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 text-slate-300 stroke-[1.5]" />
                                             <p className="text-base font-medium text-slate-600">No promotion items found</p>
                                             <p className="text-xs text-slate-400 mt-1">
@@ -902,7 +1080,7 @@ export default function Index({
                                         const soldPrice = isSold && item.sold_item?.promotion_price !== undefined && item.sold_item?.promotion_price !== null
                                             ? parseFloat(item.sold_item.promotion_price)
                                             : null;
-                                        const calculatedPrice = calculatePromotionPrice(item.total_wastage, item.labor_fee, item.addition_wastage);
+                                        const calculatedPrice = calculatePromotionPrice(item);
                                         const displayPrice = isSold && soldPrice !== null ? soldPrice : calculatedPrice;
                                         const inCart = isInCart(item.id);
 
@@ -944,6 +1122,31 @@ export default function Index({
                                             {visibleColumns.product && (
                                                 <td className={`px-5 py-3.5 font-medium ${isSold ? 'text-slate-400' : 'text-slate-900'}`}>
                                                     {item.product || '-'}
+                                                </td>
+                                            )}
+
+                                            {/* Product Category & Multiplier */}
+                                            {visibleColumns.product_category && (
+                                                <td className="px-5 py-3.5">
+                                                    {item.product_category ? (
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className={`text-xs font-semibold ${isSold ? 'text-slate-500' : 'text-slate-900'}`}>
+                                                                {item.product_category.name}
+                                                            </span>
+                                                            <span
+                                                                className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-mono font-medium ${
+                                                                    isSold
+                                                                        ? 'bg-slate-200 text-slate-500 border border-slate-300'
+                                                                        : 'bg-purple-100 text-purple-800 border border-purple-200'
+                                                                }`}
+                                                                title={`Multiplier: ${item.product_category.multiplier}`}
+                                                            >
+                                                                x{parseFloat(item.product_category.multiplier).toFixed(4)}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-xs italic">Default (x1.0)</span>
+                                                    )}
                                                 </td>
                                             )}
 
@@ -1324,7 +1527,334 @@ export default function Index({
                 </div>
             )}
 
-            {/* Excel Upload Modal */}
+            {/* Update Categories via Excel Modal */}
+            {isUpdateCategoryModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-3">
+                                <span className="p-2 rounded-xl bg-purple-100 text-purple-700 border border-purple-200">
+                                    <FileEdit className="w-5 h-5" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-900">Update Product Categories via Excel</h2>
+                                    <p className="text-xs text-slate-500">Upload Excel (.xlsx) or CSV to set categories on existing items</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!isUpdatingCategories) setIsUpdateCategoryModalOpen(false);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 transition p-1"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {categoryUpdateError && (
+                            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                <span>{categoryUpdateError}</span>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleUpdateCategoriesSubmit} className="space-y-5">
+                            <div className="border-2 border-dashed border-slate-300 hover:border-purple-500 rounded-2xl p-6 text-center transition cursor-pointer bg-slate-50 relative">
+                                <input
+                                    type="file"
+                                    accept=".xlsx,.csv"
+                                    disabled={isUpdatingCategories}
+                                    onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            setCategoryUpdateFile(e.target.files[0]);
+                                            setCategoryUpdateError('');
+                                        }
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <FileSpreadsheet className="w-12 h-12 mx-auto text-purple-600 mb-2 stroke-[1.5]" />
+                                {categoryUpdateFile ? (
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">{categoryUpdateFile.name}</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            {(categoryUpdateFile.size / 1024).toFixed(1)} KB
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-700">Click to browse or drag & drop</p>
+                                        <p className="text-xs text-slate-500 mt-1">Supports Excel (.xlsx) and CSV files</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="rounded-xl bg-purple-50/70 border border-purple-200 p-3.5 text-xs text-purple-950 space-y-1.5">
+                                <p className="font-semibold text-purple-900 flex items-center gap-1.5">
+                                    <Sparkles className="w-4 h-4 text-purple-700" />
+                                    <span>How Category Update Works:</span>
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 text-slate-700">
+                                    <li>Required Columns: <strong>Barcode</strong> (or <strong>Lot/Serial Number</strong>) and <strong>Product Category</strong>.</li>
+                                    <li><strong className="text-rose-600">Strict Rule:</strong> If any row is missing the Product Category value, the import is rejected.</li>
+                                    <li><strong>Auto-Creation:</strong> If the Category name doesn't exist in the multiplier table, it will be automatically created with default multiplier (1.0).</li>
+                                    <li>Matches existing promotion items and updates their category & price calculation.</li>
+                                </ul>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    disabled={isUpdatingCategories}
+                                    onClick={() => setIsUpdateCategoryModalOpen(false)}
+                                    className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isUpdatingCategories || !categoryUpdateFile}
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold shadow-md shadow-purple-600/20 transition"
+                                >
+                                    {isUpdatingCategories ? (
+                                        <>
+                                            <RefreshCw className="w-4 h-4 animate-spin" />
+                                            <span>Updating...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload className="w-4 h-4" />
+                                            <span>Start Category Update</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Product Category Multipliers CRUD Modal */}
+            {isCategoryModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="w-full max-w-3xl rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl space-y-6 max-h-[90vh] flex flex-col">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <span className="p-2.5 rounded-xl bg-purple-100 text-purple-700 border border-purple-200">
+                                    <Sliders className="w-5 h-5" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-900">Product Category Multipliers</h2>
+                                    <p className="text-xs text-slate-500">
+                                        Configure gold price multiplier per product category (Formula: (total wastage / 2) * ((gold price * multiplier) / 16.606))
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsCategoryModalOpen(false);
+                                    setEditingCategory(null);
+                                    setCategoryFormErrors({});
+                                }}
+                                className="text-slate-400 hover:text-slate-600 transition p-1"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content: Form + Table */}
+                        <div className="overflow-y-auto space-y-6 flex-1 pr-1">
+                            {/* Create / Edit Form Card */}
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                        {editingCategory ? (
+                                            <>
+                                                <Edit3 className="w-4 h-4 text-purple-600" />
+                                                <span>Edit Category: {editingCategory.name}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Plus className="w-4 h-4 text-purple-600" />
+                                                <span>Add New Product Category Multiplier</span>
+                                            </>
+                                        )}
+                                    </h3>
+                                    {editingCategory && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setEditingCategory(null);
+                                                setCategoryForm({ name: '', multiplier: '1.0', description: '' });
+                                                setCategoryFormErrors({});
+                                            }}
+                                            className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                                        >
+                                            Cancel editing (Add new instead)
+                                        </button>
+                                    )}
+                                </div>
+
+                                <form onSubmit={handleSaveCategory} className="space-y-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                Category Name <span className="text-rose-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="e.g. 999, 18K, Gold Ring"
+                                                value={categoryForm.name}
+                                                onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                                                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                                            />
+                                            {categoryFormErrors.name && (
+                                                <p className="text-rose-600 text-xs mt-1">{categoryFormErrors.name}</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                Multiplier <span className="text-rose-500">*</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.0001"
+                                                min="0"
+                                                required
+                                                placeholder="e.g. 1.0 or 0.999"
+                                                value={categoryForm.multiplier}
+                                                onChange={(e) => setCategoryForm({ ...categoryForm, multiplier: e.target.value })}
+                                                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white font-mono"
+                                            />
+                                            {categoryFormErrors.multiplier && (
+                                                <p className="text-rose-600 text-xs mt-1">{categoryFormErrors.multiplier}</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                Description / Note (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. 999 pure gold"
+                                                value={categoryForm.description}
+                                                onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                                                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-end gap-2 pt-1">
+                                        <button
+                                            type="submit"
+                                            disabled={isSavingCategory}
+                                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                                        >
+                                            {isSavingCategory ? (
+                                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <Check className="w-3.5 h-3.5" />
+                                            )}
+                                            <span>{editingCategory ? 'Update Category' : 'Create Category'}</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            {/* Categories Table */}
+                            <div className="space-y-2">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    Existing Categories ({productCategories.length})
+                                </h3>
+                                <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+                                    <table className="w-full text-left text-xs text-slate-700">
+                                        <thead className="bg-slate-100 text-slate-600 uppercase tracking-wider font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3">Category Name</th>
+                                                <th className="px-4 py-3 text-right">Multiplier</th>
+                                                <th className="px-4 py-3 text-center">Assigned Items</th>
+                                                <th className="px-4 py-3">Formula Preview</th>
+                                                <th className="px-4 py-3 text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {productCategories.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                                                        No product categories created yet. Add one above or import via Excel.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                productCategories.map((cat) => (
+                                                    <tr key={cat.id} className="hover:bg-purple-50/40">
+                                                        <td className="px-4 py-3 font-semibold text-slate-900">
+                                                            {cat.name}
+                                                            {cat.description && (
+                                                                <span className="block text-[11px] font-normal text-slate-400">
+                                                                    {cat.description}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono font-bold text-purple-700">
+                                                            x{parseFloat(cat.multiplier).toFixed(4)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center font-mono">
+                                                            <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
+                                                                {cat.promotion_items_count || 0}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
+                                                            (wastage/2) * ((gold * {parseFloat(cat.multiplier)}) / 16.606)
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleOpenEditCategory(cat)}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-purple-700 hover:bg-purple-50 transition"
+                                                                    title="Edit Category"
+                                                                >
+                                                                    <Edit3 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteCategory(cat)}
+                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                                                                    title="Delete Category"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end pt-3 border-t border-slate-100 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsCategoryModalOpen(false);
+                                    setEditingCategory(null);
+                                    setCategoryFormErrors({});
+                                }}
+                                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {isUploadModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="w-full max-w-lg rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl space-y-6">
@@ -1390,9 +1920,26 @@ export default function Index({
                                 <p className="font-semibold text-slate-800">Automatic Handling:</p>
                                 <ul className="list-disc list-inside space-y-0.5 text-slate-600">
                                     <li>Grouping banner rows (e.g. <code>B1/Promotion (3)</code>) are automatically ignored.</li>
-                                    <li>Data columns: Barcode, Product, Branch, Weight, Wastage, Labor Fee, Lot/Serial Number.</li>
+                                    <li>Data columns: Barcode, Product, Branch, Product Category, Weight, Wastage, Labor Fee, Lot/Serial Number.</li>
+                                    <li><strong className="text-purple-900">Product Category:</strong> Required. Rows missing category will reject the import. New categories are auto-registered in the multiplier table.</li>
                                 </ul>
                             </div>
+
+                            {/* Option to Update Existing Items */}
+                            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-purple-50/70 border border-purple-200 cursor-pointer hover:bg-purple-50 transition select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={updateExistingItems}
+                                    onChange={(e) => setUpdateExistingItems(e.target.checked)}
+                                    className="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                                />
+                                <div className="text-xs">
+                                    <span className="font-semibold text-purple-950">Update existing promotion items (ရှိပြီးသားပစ္စည်းများကို အချက်အလက် update လုပ်မည်)</span>
+                                    <p className="text-slate-600 mt-0.5">
+                                        If checked, items matching existing Barcode or Lot/Serial will be updated with new Excel data instead of causing duplicate errors.
+                                    </p>
+                                </div>
+                            </label>
 
                             <div className="flex items-center justify-end gap-3 pt-2">
                                 <button

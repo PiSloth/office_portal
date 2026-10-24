@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ProductCategoryMultiplier;
 use App\Models\PromotionItem;
+use App\Services\PromotionItemCategoryUpdateService;
 use App\Services\PromotionItemImportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,14 +19,19 @@ class PromotionItemController extends Controller
     {
         $search = $request->query('search');
         $branchId = $request->query('branch_id');
+        $productCategoryId = $request->query('product_category_id');
         $soldStatus = $request->query('sold_status'); // 'all', 'unsold', 'sold'
 
         $query = PromotionItem::query()
-            ->with(['soldItem', 'branch'])
+            ->with(['soldItem', 'branch', 'productCategory'])
             ->search($search);
 
         if ($branchId !== null && $branchId !== '') {
             $query->where('branch_id', $branchId);
+        }
+
+        if ($productCategoryId !== null && $productCategoryId !== '') {
+            $query->where('product_category_id', $productCategoryId);
         }
 
         if ($soldStatus === 'sold') {
@@ -42,13 +49,16 @@ class PromotionItemController extends Controller
         $latestPriceUpdatedAt = $latestDailyPrice?->updated_at ?? $latestDailyPrice?->created_at;
 
         $branches = \App\Models\Branch::orderBy('name')->get(['id', 'name', 'code']);
+        $productCategories = ProductCategoryMultiplier::withCount('promotionItems')->orderBy('name')->get();
 
         return Inertia::render('Promotions/Index', [
             'items' => $items,
             'branches' => $branches,
+            'productCategories' => $productCategories,
             'filters' => [
                 'search' => $search ?? '',
                 'branch_id' => $branchId ?? '',
+                'product_category_id' => $productCategoryId ?? '',
                 'sold_status' => $soldStatus ?? 'all',
             ],
             'latestGoldPrice' => $latestGoldPrice,
@@ -71,6 +81,49 @@ class PromotionItemController extends Controller
 
         $request->validate([
             'file' => ['required', 'file', 'max:20480'], // max 20MB
+            'update_existing' => ['nullable'],
+        ]);
+
+        $file = $request->file('file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (!in_array($ext, ['xlsx', 'csv', 'txt'])) {
+            return back()->with('error', 'Only .xlsx or .csv files are supported.');
+        }
+
+        $updateExisting = $request->boolean('update_existing', true);
+
+        try {
+            $result = $importService->import($file, $updateExisting);
+
+            $msg = "Import completed successfully: {$result['imported']} new items imported";
+            if ($result['updated'] > 0) {
+                $msg .= ", {$result['updated']} existing items updated";
+            }
+            $msg .= ". ({$result['skipped']} group/summary rows ignored).";
+
+            return back()->with('success', $msg);
+        } catch (\App\Exceptions\PromotionImportValidationException $e) {
+            return back()->with([
+                'error' => "Import stopped: Found {$e->getMessage()}",
+                'importErrors' => $e->getErrors(),
+            ]);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Import failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update promotion items' product_category_id using uploaded Excel or CSV.
+     */
+    public function updateCategoriesExcel(Request $request, PromotionItemCategoryUpdateService $updateService)
+    {
+        // Permission check
+        if (!($request->user()?->can('promotion.import') || $request->user()?->hasRole('Super Admin'))) {
+            abort(403, 'Unauthorized to update promotion item categories.');
+        }
+
+        $request->validate([
+            'file' => ['required', 'file', 'max:20480'], // max 20MB
         ]);
 
         $file = $request->file('file');
@@ -80,19 +133,21 @@ class PromotionItemController extends Controller
         }
 
         try {
-            $result = $importService->import($file);
+            $result = $updateService->updateFromExcel($file);
 
-            return back()->with(
-                'success',
-                "Successfully imported {$result['imported']} items. ({$result['skipped']} group/summary rows ignored)."
-            );
+            $msg = "Successfully updated {$result['updated']} items.";
+            if ($result['created_categories'] > 0) {
+                $msg .= " ({$result['created_categories']} new product categories created in table).";
+            }
+
+            return back()->with('success', $msg);
         } catch (\App\Exceptions\PromotionImportValidationException $e) {
             return back()->with([
-                'error' => "Import stopped: Found {$e->getMessage()}",
+                'error' => "Category update stopped: Found {$e->getMessage()}",
                 'importErrors' => $e->getErrors(),
             ]);
         } catch (\Throwable $e) {
-            return back()->with('error', 'Import failed: ' . $e->getMessage());
+            return back()->with('error', 'Category update failed: ' . $e->getMessage());
         }
     }
 

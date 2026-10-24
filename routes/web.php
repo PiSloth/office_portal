@@ -57,10 +57,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Promotion Items routes
     Route::get('promotions', [\App\Http\Controllers\PromotionItemController::class, 'index'])->name('promotions.index');
     Route::post('promotions/import', [\App\Http\Controllers\PromotionItemController::class, 'import'])->name('promotions.import');
+    Route::post('promotions/update-categories-excel', [\App\Http\Controllers\PromotionItemController::class, 'updateCategoriesExcel'])->name('promotions.update.categories.excel');
     Route::post('promotions/sold', [\App\Http\Controllers\PromotionItemController::class, 'storeSold'])->name('promotions.sold');
     Route::get('promotions/voucher/{reference_number}', [\App\Http\Controllers\PromotionItemController::class, 'getVoucherItems'])->name('promotions.voucher.items');
     Route::post('promotions/sold/cancel', [\App\Http\Controllers\PromotionItemController::class, 'cancelSold'])->name('promotions.sold.cancel');
     Route::get('promotions/latest-price', [\App\Http\Controllers\PromotionItemController::class, 'getLatestPrice'])->name('promotions.latest.price');
+
+    // Product Category Multipliers CRUD
+    Route::get('promotions/categories', [\App\Http\Controllers\ProductCategoryMultiplierController::class, 'index'])->name('promotions.categories.index');
+    Route::post('promotions/categories', [\App\Http\Controllers\ProductCategoryMultiplierController::class, 'store'])->name('promotions.categories.store');
+    Route::put('promotions/categories/{categoryMultiplier}', [\App\Http\Controllers\ProductCategoryMultiplierController::class, 'update'])->name('promotions.categories.update');
+    Route::delete('promotions/categories/{categoryMultiplier}', [\App\Http\Controllers\ProductCategoryMultiplierController::class, 'destroy'])->name('promotions.categories.destroy');
     
     Route::get('purchase-requests/report/print', function (\Illuminate\Http\Request $request) {
         $branchId = $request->query('branch_id');

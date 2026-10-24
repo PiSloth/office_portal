@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Branch;
+use App\Models\ProductCategoryMultiplier;
 use App\Models\PromotionItem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -15,10 +16,11 @@ class PromotionItemImportService
      * Import promotion items from an uploaded file (xlsx, xls, csv).
      *
      * @param UploadedFile $file
-     * @return array{total_read: int, imported: int, skipped: int}
+     * @param bool $updateExisting If true, existing items by barcode/lot are updated instead of rejected.
+     * @return array{total_read: int, imported: int, updated: int, skipped: int}
      * @throws \Exception
      */
-    public function import(UploadedFile $file): array
+    public function import(UploadedFile $file, bool $updateExisting = true): array
     {
         $extension = strtolower($file->getClientOriginalExtension());
         $filePath = $file->getRealPath();
@@ -46,15 +48,22 @@ class PromotionItemImportService
             }
         }
 
-        // Preload existing barcodes and lot numbers to check uniqueness against database
+        // Preload product category multipliers for lookup
+        $categories = ProductCategoryMultiplier::all();
+        $categoryLookup = [];
+        foreach ($categories as $cat) {
+            $categoryLookup[strtolower(trim($cat->name))] = $cat->id;
+        }
+
+        // Preload existing barcodes and lot numbers to check uniqueness or update in database
         $existingBarcodes = PromotionItem::whereNotNull('barcode')
-            ->pluck('barcode')
-            ->mapWithKeys(fn ($b) => [trim($b) => true])
+            ->pluck('id', 'barcode')
+            ->mapWithKeys(fn ($id, $b) => [trim($b) => $id])
             ->toArray();
 
         $existingLotNumbers = PromotionItem::whereNotNull('lot_serial_number')
-            ->pluck('lot_serial_number')
-            ->mapWithKeys(fn ($l) => [trim($l) => true])
+            ->pluck('id', 'lot_serial_number')
+            ->mapWithKeys(fn ($id, $l) => [trim($l) => $id])
             ->toArray();
 
         // Track items encountered within the current file being imported
@@ -63,6 +72,7 @@ class PromotionItemImportService
 
         $rowErrors = [];
         $validItems = [];
+        $itemsToUpdate = [];
 
         foreach ($reader->getSheetIterator() as $sheet) {
             $rowNumber = 0;
@@ -102,17 +112,9 @@ class PromotionItemImportService
                 $lotSerialNumber = trim($rowData['lot_serial_number'] ?? '');
                 $hasRowError = false;
 
-                // Validate barcode uniqueness (must not be empty, must be unique in DB and within file)
+                // Validate barcode uniqueness within file
                 if ($barcode !== '') {
-                    if (isset($existingBarcodes[$barcode])) {
-                        $rowErrors[] = [
-                            'row' => $rowNumber,
-                            'barcode' => $barcode,
-                            'product' => $rowData['product'],
-                            'error' => "Duplicate barcode '{$barcode}' already exists in database (Barcode စနစ်ထဲတွင် ရှိပြီးသားဖြစ်နေပါသည်).",
-                        ];
-                        $hasRowError = true;
-                    } elseif (isset($fileBarcodes[$barcode])) {
+                    if (isset($fileBarcodes[$barcode])) {
                         $prevRow = $fileBarcodes[$barcode];
                         $rowErrors[] = [
                             'row' => $rowNumber,
@@ -126,17 +128,9 @@ class PromotionItemImportService
                     }
                 }
 
-                // Validate lot/serial number uniqueness (must not be empty, must be unique in DB and within file)
+                // Validate lot/serial number uniqueness within file
                 if ($lotSerialNumber !== '') {
-                    if (isset($existingLotNumbers[$lotSerialNumber])) {
-                        $rowErrors[] = [
-                            'row' => $rowNumber,
-                            'barcode' => $barcode,
-                            'product' => $rowData['product'],
-                            'error' => "Duplicate Lot/Serial '{$lotSerialNumber}' already exists in database (Lot/Serial နံပါတ် စနစ်ထဲတွင် ရှိပြီးသားဖြစ်နေပါသည်).",
-                        ];
-                        $hasRowError = true;
-                    } elseif (isset($fileLotNumbers[$lotSerialNumber])) {
+                    if (isset($fileLotNumbers[$lotSerialNumber])) {
                         $prevRow = $fileLotNumbers[$lotSerialNumber];
                         $rowErrors[] = [
                             'row' => $rowNumber,
@@ -147,6 +141,46 @@ class PromotionItemImportService
                         $hasRowError = true;
                     } else {
                         $fileLotNumbers[$lotSerialNumber] = $rowNumber;
+                    }
+                }
+
+                // Check against existing database records
+                $existingId = null;
+                if ($barcode !== '' && isset($existingBarcodes[$barcode])) {
+                    $existingId = $existingBarcodes[$barcode];
+                    if (!$updateExisting) {
+                        $rowErrors[] = [
+                            'row' => $rowNumber,
+                            'barcode' => $barcode,
+                            'product' => $rowData['product'],
+                            'error' => "Duplicate barcode '{$barcode}' already exists in database (Barcode စနစ်ထဲတွင် ရှိပြီးသားဖြစ်နေပါသည်).",
+                        ];
+                        $hasRowError = true;
+                    }
+                }
+
+                if ($lotSerialNumber !== '' && isset($existingLotNumbers[$lotSerialNumber])) {
+                    $lotExistingId = $existingLotNumbers[$lotSerialNumber];
+                    if ($existingId !== null && $existingId !== $lotExistingId) {
+                        $rowErrors[] = [
+                            'row' => $rowNumber,
+                            'barcode' => $barcode,
+                            'product' => $rowData['product'],
+                            'error' => "Barcode '{$barcode}' and Lot/Serial '{$lotSerialNumber}' belong to two different existing records in database.",
+                        ];
+                        $hasRowError = true;
+                    } else {
+                        $existingId = $lotExistingId;
+                    }
+
+                    if (!$updateExisting) {
+                        $rowErrors[] = [
+                            'row' => $rowNumber,
+                            'barcode' => $barcode,
+                            'product' => $rowData['product'],
+                            'error' => "Duplicate Lot/Serial '{$lotSerialNumber}' already exists in database (Lot/Serial နံပါတ် စနစ်ထဲတွင် ရှိပြီးသားဖြစ်နေပါသည်).",
+                        ];
+                        $hasRowError = true;
                     }
                 }
 
@@ -177,8 +211,34 @@ class PromotionItemImportService
                     }
                 }
 
+                // Validate product category (required)
+                $categoryName = trim($rowData['product_category'] ?? '');
+                $productCategoryId = null;
+
+                if ($categoryName === '') {
+                    $rowErrors[] = [
+                        'row' => $rowNumber,
+                        'barcode' => $rowData['barcode'],
+                        'product' => $rowData['product'],
+                        'error' => "Product category is missing (Product Category မပါရှိပါ).",
+                    ];
+                    $hasRowError = true;
+                } else {
+                    $lowerCategory = strtolower($categoryName);
+                    if (isset($categoryLookup[$lowerCategory])) {
+                        $productCategoryId = $categoryLookup[$lowerCategory];
+                    } else {
+                        $newCategory = ProductCategoryMultiplier::create([
+                            'name' => $categoryName,
+                            'multiplier' => 1.0,
+                        ]);
+                        $categoryLookup[$lowerCategory] = $newCategory->id;
+                        $productCategoryId = $newCategory->id;
+                    }
+                }
+
                 if (!$hasRowError) {
-                    $validItems[] = [
+                    $itemData = [
                         'barcode' => $barcode ?: null,
                         'product' => $rowData['product'] ?: null,
                         'weight' => $this->parseDecimal($rowData['weight']),
@@ -191,9 +251,19 @@ class PromotionItemImportService
                         'lot_serial_number' => $lotSerialNumber ?: null,
                         'product_subgroup_name' => $rowData['product_subgroup_name'] ?: null,
                         'branch_id' => $branchId,
+                        'product_category_id' => $productCategoryId,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
+
+                    if ($existingId !== null) {
+                        $itemsToUpdate[] = [
+                            'id' => $existingId,
+                            'data' => $itemData,
+                        ];
+                    } else {
+                        $validItems[] = $itemData;
+                    }
                 }
             }
 
@@ -203,24 +273,33 @@ class PromotionItemImportService
 
         $reader->close();
 
-        // If there are validation errors (duplicate barcode/lot or branch mismatch), abort the import and return error details
+        // If there are validation errors, abort the import and return error details
         if (!empty($rowErrors)) {
             $errorCount = count($rowErrors);
             throw new \App\Exceptions\PromotionImportValidationException($rowErrors);
         }
 
-        // Insert all valid items in chunks
+        // Insert new items and update existing items in a transaction
         $imported = 0;
-        DB::transaction(function () use ($validItems, &$imported) {
+        $updated = 0;
+        DB::transaction(function () use ($validItems, $itemsToUpdate, &$imported, &$updated) {
             foreach (array_chunk($validItems, 500) as $chunk) {
                 PromotionItem::insert($chunk);
                 $imported += count($chunk);
+            }
+
+            foreach ($itemsToUpdate as $itemUpdate) {
+                $data = $itemUpdate['data'];
+                unset($data['created_at']);
+                PromotionItem::where('id', $itemUpdate['id'])->update($data);
+                $updated++;
             }
         });
 
         return [
             'total_read' => $totalRead,
             'imported' => $imported,
+            'updated' => $updated,
             'skipped' => $skipped,
         ];
     }
@@ -258,6 +337,8 @@ class PromotionItemImportService
                 $map['internal_reference'] = $index;
             } elseif (str_contains($normalized, 'lotserial') || str_contains($normalized, 'lot') || str_contains($normalized, 'serial')) {
                 $map['lot_serial_number'] = $index;
+            } elseif (str_contains($normalized, 'category')) {
+                $map['product_category'] = $index;
             }
         }
 
@@ -282,6 +363,7 @@ class PromotionItemImportService
             'lot_serial_number' => '',
             'product_subgroup_name' => '',
             'branch_name' => '',
+            'product_category' => '',
         ];
 
         foreach ($headerMap as $key => $index) {

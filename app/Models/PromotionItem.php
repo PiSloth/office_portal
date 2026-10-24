@@ -20,11 +20,17 @@ class PromotionItem extends Model
         'lot_serial_number',
         'product_subgroup_name',
         'branch_id',
+        'product_category_id',
     ];
 
     public function branch(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function productCategory(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ProductCategoryMultiplier::class, 'product_category_id');
     }
 
     protected $casts = [
@@ -52,6 +58,9 @@ class PromotionItem extends Model
               ->orWhere('lot_serial_number', 'like', "%{$term}%")
               ->orWhereHas('soldItem', function (Builder $sq) use ($term) {
                   $sq->where('reference_number', 'like', "%{$term}%");
+              })
+              ->orWhereHas('productCategory', function (Builder $cq) use ($term) {
+                  $cq->where('name', 'like', "%{$term}%");
               });
         });
     }
